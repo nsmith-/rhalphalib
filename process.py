@@ -9,7 +9,7 @@ def normalize_histogram(hinput):
     elif isinstance(hinput, hist.Hist):
         binning = hinput.axes()[0].edges()
         sumw, sumw2 = hinput.values(sumw2=True, overflow='all')[()]
-        h = ROOT.TH1D("temp", "", binning.size - 1, binning)
+        h = ROOT.TH1D("template", "template;%s;Counts" % hinput.axes()[0].name, binning.size - 1, binning)
         h.SetDirectory(0)
         for i, (w, w2) in enumerate(zip(sumw, sumw2)):
             h.SetBinContent(i, w)
@@ -17,6 +17,14 @@ def normalize_histogram(hinput):
         return h
     else:
         raise ValueError
+
+
+def rooObservableFromAxis(name, haxis):
+    return ROOT.RooRealVar(name,
+                           haxis.GetTitle(),
+                           haxis.GetBinLowEdge(1),
+                           haxis.GetBinUpEdge(haxis.GetNbins())
+                           )
 
 
 class Process(object):
@@ -49,14 +57,14 @@ class Process(object):
         '''
         Set of nuisance parameters that influence this process
         '''
-        return set()
+        raise NotImplementedError
 
     @property
     def parameters(self):
         '''
         Set of parameters other than nuisance params that affect this process
         '''
-        return set()
+        raise NotImplementedError
 
     def normalization(self, systematicName=''):
         '''
@@ -64,19 +72,19 @@ class Process(object):
         when a systematic shift is applied (include 'Up' or 'Down' as appropriate)
         systematicName: string
         '''
-        return 0.
+        raise NotImplementedError
 
-    def renderRoofitModel(self, workspace, processName):
+    def renderRoofitModel(self, workspace, channelName):
         '''
         Import the necessary Roofit objects into the workspace for this process
         '''
-        pass
+        raise NotImplementedError
 
     def nuisanceParamString(self, param):
         '''
         A formatted string for placement into the combine datacard
         '''
-        raise KeyError(param)
+        raise NotImplementedError
 
 
 class SingleBinProcess(Process):
@@ -85,16 +93,25 @@ class SingleBinProcess(Process):
         self._norm = normalization
         self._nuisanceShifts = {}
         self._nuisanceParams = set()
+        self._parameters = set()
 
     @property
     def nuisanceParameters(self):
         return self._nuisanceParams
+
+    @property
+    def parameters(self):
+        return self._parameters
 
     def normalization(self, systematicName=''):
         if systematicName == '':
             return self._norm
         else:
             return self._nuisanceShifts[systematicName]
+
+    def renderRoofitModel(self, workspace, channelName):
+        # Nothing needed in combine workspace for single bin process
+        pass
 
     def nuisanceParamString(self, param):
         if param not in self.nuisanceParameters:
@@ -106,42 +123,105 @@ class SingleBinProcess(Process):
                 return '%.3f/%.3f' % (up, down)
             return '%.3f' % up
 
-    def addSystematic(self, syst, value):
-        self._nuisanceShifts[syst] = value
+    def addSystematic(self, syst, value, relative=False):
+        '''
+        syst: name including direction of shift ('Up' or 'Down')
+            if symmetric shift, only add the 'Up' version
+        value: scalar
+        relative: True if delta relative to the nominal
+        '''
+        # locate existing
         if syst[-2:] == 'Up':
             self._nuisanceParams.add(syst[:-2])
         elif syst[-4:] == 'Down':
             self._nuisanceParams.add(syst[:-4])
+        if relative:
+            value = value * self.normalization
+        self._nuisanceShifts[syst] = value
 
 
 class TemplateProcess(Process):
-    def __init__(self, processtype, template):
+    def __init__(self, processtype, template, observable="x"):
+        '''
+        processtype: Process.SIGNAL or BACKGROUND or DATA
+        template: a histogram (either ROOT TH1 or fnal Hist object)
+        observable: the name for the variable on x axis, really doesn't matter but RooFit wants it
+        '''
         super(TemplateProcess, self).__init__(processtype)
         self._nominal = normalize_histogram(template)
+        self._observable = observable
+        self._nuisanceShifts = {}
         self._nuisanceTemplates = {}
         self._nuisanceParams = set()
+        self._parameters = set()
 
     @property
     def nuisanceParameters(self):
         return self._nuisanceParams
+
+    @property
+    def parameters(self):
+        return self._parameters
 
     def normalization(self, systematicName=''):
         if systematicName == '':
             return self._nominal.Integral()
         return self._nuisanceTemplates[systematicName].Integral()
 
+    def renderRoofitModel(self, workspace, channelName):
+        processName = channelName + '_' + self.name
+        observable = workspace.var(self._observable)
+        if not observable:
+            observable = rooObservableFromAxis(self._observable, self._nominal.GetXaxis())
+        rootemplate = ROOT.RooDataHist(processName, processName, ROOT.RooArgList(observable), self._nominal)
+        getattr(workspace, 'import')(rootemplate)
+        for syst, template in self._nuisanceTemplates.items():
+            name = processName + '_' + syst
+            rootemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(observable), template)
+            getattr(workspace, 'import')(rootemplate)
+
     def nuisanceParamString(self, param):
         if param not in self.nuisanceParameters:
             return '-'
         if param+'Up' in self._nuisanceTemplates:
             return '1'
+        elif param + 'Up' in self._nuisanceShifts:
+            up = self._nuisanceShifts[param + 'Up']
+            if param + 'Down' in self._nuisanceShifts:
+                down = self._nuisanceShifts[param + 'Down']
+                return '%.3f/%.3f' % (up, down)
+            return '%.3f' % up
 
-    def addshape(self, syst, template):
-        self._nuisanceTemplates[syst] = normalize_histogram(template)
+    def addSystematic(self, syst, value, relative=False):
+        '''
+        Add a normalization systematic
+        syst: name including direction of shift ('Up' or 'Down')
+            if symmetric shift, only add the 'Up' version
+        value: scalar
+        relative: True if delta relative to the nominal
+        '''
+        # locate existing
         if syst[-2:] == 'Up':
             self._nuisanceParams.add(syst[:-2])
         elif syst[-4:] == 'Down':
             self._nuisanceParams.add(syst[:-4])
+        if relative:
+            value = value * self.normalization
+        self._nuisanceShifts[syst] = value
+
+    def addTemplateSystematic(self, syst, template):
+        '''
+        Add a template systematic
+        syst: name including direction of shift ('Up' or 'Down')
+            if symmetric shift, only add the 'Up' version
+        template: a histogram
+        '''
+        # locate existing
+        if syst[-2:] == 'Up':
+            self._nuisanceParams.add(syst[:-2])
+        elif syst[-4:] == 'Down':
+            self._nuisanceParams.add(syst[:-4])
+        self._nuisanceTemplates[syst] = normalize_histogram(template)
 
 
 class PerBinParameterProcess(Process):
@@ -168,7 +248,7 @@ class PerBinParameterProcess(Process):
         self._initialize()
         return 0.
 
-    def renderRoofitModel(self, workspace, processName):
+    def renderRoofitModel(self, workspace, channelName):
         pass
 
 

@@ -33,6 +33,8 @@ class Model(collections.abc.MutableMapping):
         return len(self._channel)
 
     def __setitem__(self, key, value):
+        if key in self:
+            del self[key]
         if isinstance(value, Channel):
             self._channel[key] = value
             value.link(self, key)
@@ -48,8 +50,8 @@ class Model(collections.abc.MutableMapping):
         if not os.path.exists(outputPath):
             os.makedirs(outputPath)
         workspace = ROOT.RooWorkspace(workspaceName)
-        for name, channel in self.items():
-            channel.renderRoofitModel(workspace, name)
+        for channel in self.values():
+            channel.renderRoofitModel(workspace, workspaceName)
         workspace.writeToFile(os.path.join(outputPath, "%s.root" % workspaceName))
         if combined:
             self.renderCombinedCard(os.path.join(outputPath, "combinedCard.txt"))
@@ -87,6 +89,8 @@ class Channel(collections.abc.MutableMapping):
         return len(self._process)
 
     def __setitem__(self, key, value):
+        if key in self:
+            del self[key]
         if isinstance(value, Process):
             self._process[key] = value
             value.link(self, key)
@@ -115,9 +119,9 @@ class Channel(collections.abc.MutableMapping):
     def parameters(self):
         return reduce(set.union, (p.parameters for p in self.values()), set())
 
-    def renderRoofitModel(self, workspace, channelName):
-        for name, process in self.items():
-            process.renderRoofitModel(workspace, channelName + '_' + name)
+    def renderRoofitModel(self, workspace, workspaceName):
+        for process in self.values():
+            process.renderRoofitModel(workspace, workspaceName + '_' + self.name)
 
     def renderCard(self, outputFilename, workspaceName):
         if 'data_obs' not in self:
@@ -134,7 +138,7 @@ class Channel(collections.abc.MutableMapping):
             fout.write("imax %d # number of categories ('bins' but here we are using shape templates)\n" % 1)
             fout.write("jmax %d # number of processes minus 1\n" % (nSig + nBkg - 1))
             fout.write("kmax %d # number of nuisance parameters\n" % len(self.nuisanceParameters))
-            fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
+            fout.write("shapes * {1} {0}.root {0}:{0}_{1}_$PROCESS {0}_{1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
             fout.write("bin %s\n" % self.name)
             fout.write("observation %.3f\n" % self['data_obs'].normalization())
             table = []
