@@ -200,7 +200,7 @@ class TemplateSample(Sample):
             # effect_up = ... / self._nominal
         elif not isinstance(effect_up, (np.ndarray, numbers.Number)):
             raise ValueError("effect_up is not a valid type")
-        elif isinstance(effect_up, numbers.Number) and 'shape' in param.combinePrior():
+        elif isinstance(effect_up, numbers.Number) and 'shape' in param.combinePrior:
             effect_up = np.full(self.observable.nbins(), effect_up)
         self._paramEffectsUp[param] = effect_up
         if effect_down is not None:
@@ -209,7 +209,7 @@ class TemplateSample(Sample):
                 # effect_down = ... / self._nominal
             elif not isinstance(effect_down, (np.ndarray, numbers.Number)):
                 raise ValueError("effect_down is not a valid type")
-            elif isinstance(effect_down, numbers.Number) and 'shape' in param.combinePrior():
+            elif isinstance(effect_down, numbers.Number) and 'shape' in param.combinePrior:
                 effect_down = np.full(self.observable.nbins(), effect_down)
             self._paramEffectsDown[param] = effect_down
         else:
@@ -232,7 +232,7 @@ class TemplateSample(Sample):
         '''
         if param not in self._paramEffectsUp:
             return '-'
-        elif 'shape' in param.combinePrior():
+        elif 'shape' in param.combinePrior:
             return '1'
         else:
             up = self._paramEffectsUp[param]
@@ -310,7 +310,7 @@ class ParametericSample(Sample):
         '''
         if param not in self._paramEffectsUp:
             return '-'
-        elif 'shape' in param.combinePrior():
+        elif 'shape' in param.combinePrior:
             return '1'
         else:
             up = self._paramEffectsUp[param]
@@ -386,7 +386,7 @@ class TransferFactorSample(Sample):
         '''
         if param not in self._paramEffectsUp:
             return '-'
-        elif 'shape' in param.combinePrior():
+        elif 'shape' in param.combinePrior:
             return '1'
         else:
             up = self._paramEffectsUp[param]

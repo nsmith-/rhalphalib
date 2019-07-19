@@ -10,6 +10,7 @@ from .sample import (
     TransferFactorSample,
 )
 from .parameter import (
+    NuisanceParameter,
     IndependentParameter,
     DependentParameter,
 )
@@ -18,10 +19,10 @@ __all__ = [
     'Model',
     'Channel',
     'Observable',
-    'Sample',
     'TemplateSample',
     'ParametericSample',
     'TransferFactorSample',
+    'NuisanceParameter',
     'IndependentParameter',
     'DependentParameter',
 ]

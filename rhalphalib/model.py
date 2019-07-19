@@ -100,9 +100,10 @@ class Channel():
         if sample.name in self._samples:
             raise ValueError("Channel %r already has a sample named %s" % (self, sample.name))
         if len(self._samples) > 0:
-            if sample.observable != self._samples[0].observable:
+            first = next(iter(self._samples.values()))
+            if sample.observable != first.observable:
                 raise ValueError("Sample %r has an incompatible observable with other smaples in channel %r" % (sample, self))
-            sample.observable = self._samples[0].observable
+            sample.observable = first.observable
         else:
             sample.observable._attached = True  # FIXME setter in observable?
         self._samples[sample.name] = sample
@@ -158,7 +159,7 @@ class Channel():
             fout.write("# Datacard for %r generated on %s\n" % (self, str(datetime.datetime.now())))
             fout.write("imax %d # number of categories ('bins' but here we are using shape templates)\n" % 1)
             fout.write("jmax %d # number of samples minus 1\n" % (nSig + nBkg - 1))
-            fout.write("kmax %d # number of nuisance parameters\n" % len(self.nuisanceParameters))
+            fout.write("kmax %d # number of nuisance parameters\n" % len(nuisanceParams))
             fout.write("shapes * {1} {0}.root {0}:{0}_{1}_$PROCESS {0}_{1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
             fout.write("bin %s\n" % self.name)
             fout.write("observation %.3f\n" % observation.normalization())
@@ -168,12 +169,12 @@ class Channel():
             table.append(['sample'] + [str(i) for i in range(1 - nSig, nBkg + 1)])
             table.append(['rate'] + ["%.3f" % s.normalization() for s in signalSamples + bkgSamples])
             for param in nuisanceParams:
-                table.append([param.name, param.combineType()] + [s.combineParamEffect(param) for s in signalSamples + bkgSamples])
+                table.append([param.name + ' ' + param.combinePrior] + [s.combineParamEffect(param) for s in signalSamples + bkgSamples])
 
-            colWidths = [max(len(table[row][col]) for row in range(len(table))) for col in range(nSig + nBkg + 1)]
+            colWidths = [max(len(table[row][col]) + 1 for row in range(len(table))) for col in range(nSig + nBkg + 1)]
             rowfmt = ("{:<%d}" % colWidths[0]) + " ".join("{:>%d}" % w for w in colWidths[1:]) + "\n"
             for row in table:
                 fout.write(rowfmt.format(*row))
             for param in otherParams:
-                table.append([param.name, param.combineType()])
-                fout.write(param.name + " " + param.combineType() + "\n")
+                table.append([param.name, param.combinePrior])
+                fout.write(param.name + ' ' + param.combinePrior + "\n")

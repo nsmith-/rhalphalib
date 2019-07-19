@@ -16,6 +16,12 @@ class Parameter(object):
         '''
         return self._hasPrior
 
+    @property
+    def combinePrior(self):
+        '''
+        By default assume param has no prior and we are just informing combine about it
+        '''
+        return 'param'
 
 class NuisanceParameter(Parameter):
     def __init__(self, name, combinePrior):
