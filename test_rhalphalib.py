@@ -32,7 +32,21 @@ def test_simple():
         templ = (np.random.poisson(5, size=5), bins, 'x')
         ch.addSample(rl.TemplateSample(ch.name + '_' + 'data_obs', rl.Sample.OBSERVATION, templ))
 
-    model.renderWorkspace("simplemodel")
+    # steal observable definition from previous template
+    obs = model['channel0']['channel0_wqq'].observable
+
+    params = [rl.IndependentParameter('qcd_ch0_bin%d' % i, 10) for i in range(5)]
+    fail_sample = rl.ParametericSample('channel0_qcd', rl.Sample.BACKGROUND, obs, params)
+    model['channel0'].addSample(fail_sample)
+
+    # tf = rl.RhalphabetPoly(nrho=2, npt=1)
+    # ptval = 10.
+    # rhovals = [1., 2., 3., 4., 5.]
+    # tf_params = [tf('qcd_ch1_bin%d' % i, ptval, rhovals[i]) for i in range(5)]
+    # pass_sample = rl.TransferFactorSample('channel1_qcd', rl.Sample.BACKGROUND, obs, tf_params, fail_sample)
+    # model['channel1'].addSample(pass_sample)
+
+    model.renderCombine("simplemodel")
 
 if __name__ == '__main__':
     test_simple()

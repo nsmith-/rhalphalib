@@ -45,6 +45,13 @@ class Observable(object):
         self._binning = np.array(binning)
         self._attached = False
 
+    def __repr__(self):
+        return "<%s (%s) instance at 0x%x>" % (
+            self.__class__.__name__,
+            self._name,
+            id(self),
+        )
+
     def __len__(self):
         return len(self._binning) - 1
 
@@ -65,15 +72,20 @@ class Observable(object):
     def nbins(self):
         return len(self)
 
-    def renderRooObservable(self):
+    def binningTArrayD(self):
+        return ROOT.TArrayD(len(self._binning), self._binning)
+
+    def renderRoofit(self, workspace):
         '''
         Return a RooObservable following the definition
         '''
+        if workspace.var(self._name) != None:
+            return workspace.var(self._name)
         var = ROOT.RooRealVar(self.name, self.name,
                               self.binning[0],
                               self.binning[-1]
                               )
-        # TODO: set binning?
+        var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
         return var
 
 
@@ -89,8 +101,9 @@ class Sample(object):
         self._observable = None
 
     def __repr__(self):
-        return "<%s instance at 0x%x>" % (
+        return "<%s (%s) instance at 0x%x>" % (
             self.__class__.__name__,
+            self._name,
             id(self),
         )
 
@@ -126,7 +139,10 @@ class Sample(object):
     def getParamEffect(self, param, up=True):
         raise NotImplementedError
 
-    def renderRoofitModel(self, workspace):
+    def getExpectation(self):
+        raise NotImplementedError
+
+    def renderRoofit(self, workspace):
         raise NotImplementedError
 
     def combineParamEffect(self, param):
@@ -158,15 +174,60 @@ class TemplateSample(Sample):
     def normalization(self):
         return self._nominal.sum()
 
-    def renderRoofitModel(self, workspace):
+    def setParamEffect(self, param, effect_up, effect_down=None):
+        '''
+        Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
+        param: a Parameter object
+        effect_up: a numpy array representing the multiplicative effect of the parameter on the yield, or a single number
+            TODO: or pass TH1 with yield and nominal is found automatically
+        effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
+
+        N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
+        '''
+        if isinstance(effect_up, ROOT.TH1):
+            raise NotImplementedError("Convert TH1 yield to effect numpy array")
+            # effect_up = ... / self._nominal
+        elif not isinstance(effect_up, (np.ndarray, numbers.Number)):
+            raise ValueError("effect_up is not a valid type")
+        elif isinstance(effect_up, numbers.Number) and 'shape' in param.combinePrior:
+            effect_up = np.full(self.observable.nbins, effect_up)
+        self._paramEffectsUp[param] = effect_up
+        if effect_down is not None:
+            if isinstance(effect_down, ROOT.TH1):
+                raise NotImplementedError("Convert TH1 yield to effect numpy array")
+                # effect_down = ... / self._nominal
+            elif not isinstance(effect_down, (np.ndarray, numbers.Number)):
+                raise ValueError("effect_down is not a valid type")
+            elif isinstance(effect_down, numbers.Number) and 'shape' in param.combinePrior:
+                effect_down = np.full(self.observable.nbins, effect_down)
+            self._paramEffectsDown[param] = effect_down
+        else:
+            # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+            self._paramEffectsDown[param] = 1. / effect_up
+
+    def getParamEffect(self, param, up=True):
+        '''
+        Get the parameter effect
+        '''
+        if up:
+            return self._paramEffectsUp[param]
+        else:
+            return self._paramEffectsDown[param]
+
+    def getExpectation(self):
+        '''
+        Create an array of per-bin expectations, accounting for all nuisance parameter effects
+        '''
+        # TODO: construct a DependentParameter per bin, as a function of the nuisance params
+        raise NotImplementedError
+
+    def renderRoofit(self, workspace):
         '''
         Import the necessary Roofit objects into the workspace for this sample
         and return an extended pdf representing this sample's prediciton for
         pdf and norm.  If the sample is an observation, return just a RooDataHist
         '''
-        rooObservable = workspace.var(self.observable.name)
-        if not rooObservable:
-            rooObservable = self.observable.renderRooObservable()
+        rooObservable = self.observable.renderRoofit(workspace)
         rooTemplate = ROOT.RooDataHist(self.name, self.name, ROOT.RooArgList(rooObservable), _to_TH1(self._nominal, self.observable.binning, self.observable.name))
         workspace.add(rooTemplate)
         for param in self._paramEffectsUp:
@@ -185,46 +246,6 @@ class TemplateSample(Sample):
         # TODO build the pdf from the data hist, maybe or maybe not with systematics
         return None
 
-    def setParamEffect(self, param, effect_up, effect_down=None):
-        '''
-        Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
-        param: a Parameter object
-        effect_up: a numpy array representing the multiplicative effect of the parameter on the yield, or a single number
-            TODO: or pass TH1 with yield and nominal is found automatically
-        effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
-
-        N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
-        '''
-        if isinstance(effect_up, ROOT.TH1):
-            raise NotImplementedError("Convert TH1 yield to effect numpy array")
-            # effect_up = ... / self._nominal
-        elif not isinstance(effect_up, (np.ndarray, numbers.Number)):
-            raise ValueError("effect_up is not a valid type")
-        elif isinstance(effect_up, numbers.Number) and 'shape' in param.combinePrior:
-            effect_up = np.full(self.observable.nbins(), effect_up)
-        self._paramEffectsUp[param] = effect_up
-        if effect_down is not None:
-            if isinstance(effect_down, ROOT.TH1):
-                raise NotImplementedError("Convert TH1 yield to effect numpy array")
-                # effect_down = ... / self._nominal
-            elif not isinstance(effect_down, (np.ndarray, numbers.Number)):
-                raise ValueError("effect_down is not a valid type")
-            elif isinstance(effect_down, numbers.Number) and 'shape' in param.combinePrior:
-                effect_down = np.full(self.observable.nbins(), effect_down)
-            self._paramEffectsDown[param] = effect_down
-        else:
-            # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
-            self._paramEffectsDown[param] = 1. / effect_up
-
-    def getParamEffect(self, param, up=True):
-        '''
-        Get the parameter effect
-        '''
-        if up:
-            return self._paramEffectsUp[param]
-        else:
-            return self._paramEffectsDown[param]
-
     def combineParamEffect(self, param):
         '''
         A formatted string for placement into the combine datacard that represents
@@ -241,6 +262,8 @@ class TemplateSample(Sample):
 
 
 class ParametericSample(Sample):
+    UseRooParametricHist = False
+
     def __init__(self, name, sampletype, observable, params):
         '''
         Create a sample that is a binned function, where each bin yield
@@ -250,7 +273,7 @@ class ParametericSample(Sample):
         super(ParametericSample, self).__init__(name, sampletype)
         if not isinstance(observable, Observable):
             raise ValueError
-        if len(params) != observable.nbins():
+        if len(params) != observable.nbins:
             raise ValueError
         self._observable = observable
         self._nominal = params
@@ -262,7 +285,9 @@ class ParametericSample(Sample):
         '''
         Set of parameters that affect this sample
         '''
-        return set(self._nominal)
+        pset = set(self._nominal)
+        pset.update(self._paramEffectsUp.keys())
+        return pset
 
     def normalization(self):
         '''
@@ -288,18 +313,30 @@ class ParametericSample(Sample):
         '''
         raise NotImplementedError
 
-    def renderRoofitModel(self, workspace):
+    def renderRoofit(self, workspace):
         '''
         Produce a RooParametricHist and add to workspace
         '''
-        rooParams = [p.renderRoofit() for p in self._nominal]
         # TODO RooFormulaVar of these params with any additional effects _paramEffectsUp/Down
-        rooObservable = workspace.var(self.observable.name)
-        if not rooObservable:
-            rooObservable = self.observable.renderRooObservable()
-        # need a dummy hist to generate proper binning
-        dummyHist = _to_TH1(np.zeros(len(self._nominal), self.observable.binning, self.observable.name))
-        rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList(*rooParams), dummyHist)
+        rooObservable = self.observable.renderRoofit(workspace)
+        if self.UseRooParametricHist:
+            rooParams = [p.renderRoofit(workspace) for p in self._nominal]
+            # need a dummy hist to generate proper binning
+            dummyHist = _to_TH1(np.zeros(len(self._nominal)), self.observable.binning, self.observable.name)
+            rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
+        else:
+            # RooParametricStepFunction expects bin-width-normalized parameters, so correct here
+            binw = np.diff(self.observable.binning)
+            params = np.array(self._nominal) / binw
+            for p,oldp in zip(params, self._nominal):
+                p.name = oldp.name + "_binwNorm"
+            rooParams = [p.renderRoofit(workspace) for p in params]
+            rooTemplate = ROOT.RooParametricStepFunction(self.name, self.name,
+                                                         rooObservable,
+                                                         ROOT.RooArgList.fromiter(rooParams),
+                                                         self.observable.binningTArrayD(),
+                                                         self.observable.nbins
+                                                         )
         workspace.add(rooTemplate)
         return rooTemplate
 
@@ -347,7 +384,9 @@ class TransferFactorSample(Sample):
         '''
         Set of parameters that affect this sample
         '''
-        return set(self._transferfactor)
+        pset = set(self._transferfactor)
+        pset.update(self._dependentsample.parameters)
+        return pset
 
     def normalization(self):
         '''
@@ -374,7 +413,7 @@ class TransferFactorSample(Sample):
         '''
         raise NotImplementedError
 
-    def renderRoofitModel(self, workspace):
+    def renderRoofit(self, workspace):
         '''
         '''
         raise NotImplementedError

@@ -27,7 +27,9 @@ class Model(object):
         return len(self._channels)
 
     def __repr__(self):
-        return "<Model instance at 0x%x>" % (
+        return "<%s (%s) instance at 0x%x>" % (
+            self.__class__.__name__,
+            self._name,
             id(self),
         )
 
@@ -51,7 +53,7 @@ class Model(object):
         self._channels[channel.name] = channel
         return self
 
-    def renderWorkspace(self, outputPath, combined=False):
+    def renderCombine(self, outputPath):
         if not os.path.exists(outputPath):
             os.makedirs(outputPath)
         workspace = ROOT.RooWorkspace(self.name)
@@ -59,21 +61,15 @@ class Model(object):
         # TODO: build RooSimultaneus from channels here
         pdfs = []
         for channel in self:
-            channelpdf = channel.renderRoofitModel(workspace)
+            channelpdf = channel.renderRoofit(workspace)
             pdfs.append(channelpdf)
 
         # simul = ROOSimultaneuous(...)
         # workspace.add(simul)
 
         workspace.writeToFile(os.path.join(outputPath, "%s.root" % self.name))
-        if combined:
-            self.renderCombinedCard(os.path.join(outputPath, "combinedCard.txt"))
-        else:
-            for channel in self:
-                channel.renderCard(os.path.join(outputPath, "%s.txt" % channel.name), self.name)
-
-    def renderCombinedCard(self, outputFilename):
-        raise NotImplementedError("For now, use combineCards.py")
+        for channel in self:
+            channel.renderCard(os.path.join(outputPath, "%s.txt" % channel.name), self.name)
 
 
 class Channel():
@@ -109,7 +105,9 @@ class Channel():
         self._samples[sample.name] = sample
 
     def __repr__(self):
-        return "<Channel instance at 0x%x>" % (
+        return "<%s (%s) instance at 0x%x>" % (
+            self.__class__.__name__,
+            self._name,
             id(self),
         )
 
@@ -125,14 +123,14 @@ class Channel():
     def parameters(self):
         return reduce(set.union, (s.parameters for s in self), set())
 
-    def renderRoofitModel(self, workspace):
+    def renderRoofit(self, workspace):
         '''
         Render each sample in the channel and add them into an extended RooAddPdf
         '''
         # TODO: build RooAddPdf from sample pdfs (and norms)
         pdfs = []
         for sample in self:
-            pdf = sample.renderRoofitModel(workspace)  # pdf, norm (or can pdf be already extended) ?
+            pdf = sample.renderRoofit(workspace)  # pdf, norm (or can pdf be already extended) ?
             pdfs.append(pdf)
 
         # addpdf = ROOT.RooAddPdf(self.name, self.name, ROOT.RooArgList(pdfs)...)
