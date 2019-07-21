@@ -2,6 +2,7 @@ import ROOT
 from coffea import hist
 import numpy as np
 import numbers
+from .parameter import DependentParameter
 
 
 def _to_numpy(hinput):
@@ -79,7 +80,7 @@ class Observable(object):
         '''
         Return a RooObservable following the definition
         '''
-        if workspace.var(self._name) != None:
+        if workspace.var(self._name) != None:  # noqa: E711
             return workspace.var(self._name)
         var = ROOT.RooRealVar(self.name, self.name,
                               self.binning[0],
@@ -276,7 +277,7 @@ class ParametericSample(Sample):
         if len(params) != observable.nbins:
             raise ValueError
         self._observable = observable
-        self._nominal = np.array(params)
+        self._params = np.array(params)
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
 
@@ -285,7 +286,7 @@ class ParametericSample(Sample):
         '''
         Set of parameters that affect this sample
         '''
-        pset = set(self._nominal)
+        pset = set(self._params)
         pset.update(self._paramEffectsUp.keys())
         return pset
 
@@ -318,8 +319,15 @@ class ParametericSample(Sample):
         '''
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
         '''
-        # TODO: create morph/modifier of self._nominal with any additional effects in _paramEffectsUp/Down
-        return np.array(self._nominal)
+        params = self._params
+        # TODO: create morph/modifier of self._params with any additional effects in _paramEffectsUp/Down
+
+        for i, p in enumerate(params):
+            p.name = self.name + '_bin%d' % i
+            if isinstance(p, DependentParameter):
+                # Let's make sure to render these
+                p.intermediate = False
+        return params
 
     def renderRoofit(self, workspace):
         '''
@@ -331,7 +339,7 @@ class ParametericSample(Sample):
         if self.UseRooParametricHist:
             rooParams = [p.renderRoofit(workspace) for p in params]
             # need a dummy hist to generate proper binning
-            dummyHist = _to_TH1(np.zeros(len(self._nominal)), self.observable.binning, self.observable.name)
+            dummyHist = _to_TH1(np.zeros(len(self._params)), self.observable.binning, self.observable.name)
             rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
             rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
         else:
@@ -380,18 +388,19 @@ class TransferFactorSample(ParametericSample):
         In all cases, please use numpy object arrays of Parameter types.
         '''
         if not isinstance(transferfactor, np.ndarray):
-            raise ValueError
+            raise ValueError("Transfer factor is not a numpy array")
         if not isinstance(dependentsample, Sample):
-            raise ValueError
+            raise ValueError("Dependent sample does not inherit from Sample")
         if len(transferfactor.shape) == 2:
             if observable is None:
                 raise ValueError("Transfer factor is 2D array, please provide an observable")
-            self._observable = observable
+            params = np.dot(transferfactor, dependentsample.getExpectation())
         elif len(transferfactor.shape) <= 1:
-            self._observable = dependentsample.observable
+            observable = dependentsample.observable
+            params = transferfactor * dependentsample.getExpectation()
         else:
             raise ValueError("Transfer factor has invalid dimension")
-        super(TransferFactorSample, self).__init__(name, sampletype, dependentsample.observable, params)
+        super(TransferFactorSample, self).__init__(name, sampletype, observable, params)
         self._transferfactor = transferfactor
         self._dependentsample = dependentsample
 
@@ -403,14 +412,3 @@ class TransferFactorSample(ParametericSample):
         pset = set(self._transferfactor)
         pset.update(self._dependentsample.parameters)
         return pset
-
-    def getExpectation(self):
-        '''
-        Create an array of per-bin expectations, accounting for all nuisance parameter effects
-        '''
-        # TODO: create morph/modifier of self._nominal with any additional effects in _paramEffectsUp/Down
-        if len(self._transferfactor.shape) == 2:
-            params = np.dot(self._transferfactor, self._dependentsample.getExpectation())
-        else:
-            params = self._transferfactor * self._dependentsample.getExpectation()
-        return params

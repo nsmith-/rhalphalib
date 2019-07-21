@@ -36,6 +36,7 @@ __all__ = [
 import ROOT as _ROOT
 import numbers as _numbers
 
+
 def _embed_ref(obj, dependents):
     # python reference counting gc will drop rvalue dependents
     # and we don't want to hand ownership to ROOT/RooFit because it's gc is garbage
@@ -46,6 +47,7 @@ def _embed_ref(obj, dependents):
         obj._rhalphalib_embed_ref.extend(dependents)
     else:
         obj._rhalphalib_embed_ref.append(dependents)
+
 
 def _RooWorkspace_add(self, obj, recycle=False):
     '''
@@ -61,7 +63,9 @@ def _RooWorkspace_add(self, obj, recycle=False):
     else:
         return wsimport(obj)
 
+
 _ROOT.RooWorkspace.add = _RooWorkspace_add
+
 
 def _RooAbsCollection__iter__(self):
     it = self.iterator()
@@ -70,7 +74,9 @@ def _RooAbsCollection__iter__(self):
         yield obj
         obj = it.Next()
 
+
 _ROOT.RooAbsCollection.__iter__ = _RooAbsCollection__iter__
+
 
 # This is mainly for collections of parameters
 def _RooAbsCollection_assign(self, other):
@@ -87,7 +93,9 @@ def _RooAbsCollection_assign(self, other):
         el.setAsymError(theirs.getErrorLo(), theirs.getErrorHi())
         el.setAttribute("Constant", theirs.isConstant())
 
+
 _ROOT.RooAbsCollection.assign = _RooAbsCollection_assign
+
 
 def _RooArgList_fromiter(iterable, silent=False):
     items = _ROOT.RooArgList()
@@ -95,7 +103,9 @@ def _RooArgList_fromiter(iterable, silent=False):
         items.add(item, silent)
     return items
 
+
 _ROOT.RooArgList.fromiter = _RooArgList_fromiter
+
 
 def _RooAbsReal__add__(self, other):
     '''
@@ -113,7 +123,9 @@ def _RooAbsReal__add__(self, other):
         return out
     raise TypeError("unsupported operand type(s) for +: '%s' and '%s'" % (str(type(self)), str(type(other))))
 
+
 _ROOT.RooAbsReal.__add__ = _RooAbsReal__add__
+
 
 def _RooAbsReal__mul__(self, other):
     '''
@@ -130,5 +142,6 @@ def _RooAbsReal__mul__(self, other):
         _embed_ref(out, [self])
         return out
     raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (str(type(self)), str(type(other))))
+
 
 _ROOT.RooAbsReal.__mul__ = _RooAbsReal__mul__
