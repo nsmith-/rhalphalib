@@ -46,6 +46,8 @@ def test_simple():
     # pass_sample = rl.TransferFactorSample('channel1_qcd', rl.Sample.BACKGROUND, obs, tf_params, fail_sample)
     # model['channel1'].addSample(pass_sample)
 
+    import ROOT
+    # ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.WARNING)
     model.renderCombine("simplemodel")
 
 if __name__ == '__main__':

@@ -129,9 +129,11 @@ class Channel():
         '''
         # TODO: build RooAddPdf from sample pdfs (and norms)
         pdfs = []
+        norms = []
         for sample in self:
-            pdf = sample.renderRoofit(workspace)  # pdf, norm (or can pdf be already extended) ?
+            pdf, norm = sample.renderRoofit(workspace)
             pdfs.append(pdf)
+            norms.append(norm)
 
         # addpdf = ROOT.RooAddPdf(self.name, self.name, ROOT.RooArgList(pdfs)...)
         # return addpdf
@@ -149,6 +151,8 @@ class Channel():
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
         nBkg = len(bkgSamples)
 
+        # TODO: check if we need to declare to combine *all* parameters used or only the free parameters
+        # Can check with isinstance(p, IndependentParameter)
         params = self.parameters
         nuisanceParams = [p for p in params if p.hasPrior()]
         otherParams = [p for p in params if p not in nuisanceParams]

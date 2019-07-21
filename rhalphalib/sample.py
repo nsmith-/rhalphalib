@@ -1,5 +1,5 @@
 import ROOT
-from fnal_column_analysis_tools import hist
+from coffea import hist
 import numpy as np
 import numbers
 
@@ -243,8 +243,8 @@ class TemplateSample(Sample):
             rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
             workspace.add(rooTemplate)
 
-        # TODO build the pdf from the data hist, maybe or maybe not with systematics
-        return None
+        # TODO build the pdf from the data hist, maybe or maybe not with systematics, return pdf and normalization
+        return None, None
 
     def combineParamEffect(self, param):
         '''
@@ -276,7 +276,7 @@ class ParametericSample(Sample):
         if len(params) != observable.nbins:
             raise ValueError
         self._observable = observable
-        self._nominal = params
+        self._nominal = np.array(params)
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
 
@@ -293,6 +293,7 @@ class ParametericSample(Sample):
         '''
         For combine, no normalization is needed in card for parameteric process.
         In some cases it might be useful to know, but would require formula evaluation.
+        TODO: this is only used for making combine cards, useful? Rename?
         '''
         return -1
 
@@ -313,37 +314,50 @@ class ParametericSample(Sample):
         '''
         raise NotImplementedError
 
+    def getExpectation(self):
+        '''
+        Create an array of per-bin expectations, accounting for all nuisance parameter effects
+        '''
+        # TODO: create morph/modifier of self._nominal with any additional effects in _paramEffectsUp/Down
+        return np.array(self._nominal)
+
     def renderRoofit(self, workspace):
         '''
         Produce a RooParametricHist and add to workspace
         '''
-        # TODO RooFormulaVar of these params with any additional effects _paramEffectsUp/Down
         rooObservable = self.observable.renderRoofit(workspace)
+        params = self.getExpectation()
+
         if self.UseRooParametricHist:
-            rooParams = [p.renderRoofit(workspace) for p in self._nominal]
+            rooParams = [p.renderRoofit(workspace) for p in params]
             # need a dummy hist to generate proper binning
             dummyHist = _to_TH1(np.zeros(len(self._nominal)), self.observable.binning, self.observable.name)
             rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
+            rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
         else:
             # RooParametricStepFunction expects bin-width-normalized parameters, so correct here
             binw = np.diff(self.observable.binning)
-            params = np.array(self._nominal) / binw
-            for p,oldp in zip(params, self._nominal):
+            binwparams = np.array(params) / binw
+            for p, oldp in zip(binwparams, params):
                 p.name = oldp.name + "_binwNorm"
-            rooParams = [p.renderRoofit(workspace) for p in params]
+                p.intermediate = False
+            rooParams = [p.renderRoofit(workspace) for p in binwparams]
             rooTemplate = ROOT.RooParametricStepFunction(self.name, self.name,
                                                          rooObservable,
                                                          ROOT.RooArgList.fromiter(rooParams),
                                                          self.observable.binningTArrayD(),
                                                          self.observable.nbins
                                                          )
+            rooParams = [p.renderRoofit(workspace) for p in params]
+            rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
         workspace.add(rooTemplate)
-        return rooTemplate
+        workspace.add(rooNorm)
+        return rooTemplate, rooNorm
 
     def combineParamEffect(self, param):
         '''
         Combine cannot build param effects on parameterized templates
-        So we have to do it in the model.
+        So we have to do it in the model, I think...
         '''
         if param not in self._paramEffectsUp:
             return '-'
@@ -355,27 +369,29 @@ class ParametericSample(Sample):
             return '%.3f/%.3f' % (up, down)
 
 
-class TransferFactorSample(Sample):
+class TransferFactorSample(ParametericSample):
     def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None):
         '''
         Create a sample that depends on another Sample by some transfer factor.
         The transfor factor can be a constant, an array of parameters of same length
-        as the dependent sample binning, or a matrix of parameters where the first
-        dimension matches  the sample binning.  The latter requires an additional
-        observable argument to specify the definition of the second dimension.
+        as the dependent sample binning, or a matrix of parameters where the second
+        dimension matches the sample binning, i.e. expectation = tf @ dependent_expectation.
+        The latter requires an additional observable argument to specify the definition of the first dimension.
         In all cases, please use numpy object arrays of Parameter types.
         '''
-        super(ParametericSample, self).__init__(name, sampletype)
         if not isinstance(transferfactor, np.ndarray):
             raise ValueError
         if not isinstance(dependentsample, Sample):
             raise ValueError
         if len(transferfactor.shape) == 2:
+            if observable is None:
+                raise ValueError("Transfer factor is 2D array, please provide an observable")
             self._observable = observable
         elif len(transferfactor.shape) <= 1:
             self._observable = dependentsample.observable
         else:
-            raise ValueError
+            raise ValueError("Transfer factor has invalid dimension")
+        super(TransferFactorSample, self).__init__(name, sampletype, dependentsample.observable, params)
         self._transferfactor = transferfactor
         self._dependentsample = dependentsample
 
@@ -388,46 +404,13 @@ class TransferFactorSample(Sample):
         pset.update(self._dependentsample.parameters)
         return pset
 
-    def normalization(self):
+    def getExpectation(self):
         '''
-        Sample yield (or integral for shape), either the nominal value or
-        when a systematic shift is applied (include 'Up' or 'Down' as appropriate)
-        systematicName: string
+        Create an array of per-bin expectations, accounting for all nuisance parameter effects
         '''
-        return self._nominal.sum()
-
-    def setParamEffect(self, param, effect_up, effect_down=None):
-        '''
-        Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
-        param: a Parameter object
-        effect_up: a numpy array representing the multiplicative effect of the parameter on the yield, or a single number
-        effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
-
-        For ParametericSample, only relative effects are supported.
-        '''
-        raise NotImplementedError
-
-    def getParamEffect(self, param, up=True):
-        '''
-        Get the parameter effect
-        '''
-        raise NotImplementedError
-
-    def renderRoofit(self, workspace):
-        '''
-        '''
-        raise NotImplementedError
-
-    def combineParamEffect(self, param):
-        '''
-        Combine cannot build param effects on parameterized templates
-        So we have to do it in the model.
-        '''
-        if param not in self._paramEffectsUp:
-            return '-'
-        elif 'shape' in param.combinePrior:
-            return '1'
+        # TODO: create morph/modifier of self._nominal with any additional effects in _paramEffectsUp/Down
+        if len(self._transferfactor.shape) == 2:
+            params = np.dot(self._transferfactor, self._dependentsample.getExpectation())
         else:
-            up = self._paramEffectsUp[param]
-            down = self._paramEffectsDown[param]
-            return '%.3f/%.3f' % (up, down)
+            params = self._transferfactor * self._dependentsample.getExpectation()
+        return params
