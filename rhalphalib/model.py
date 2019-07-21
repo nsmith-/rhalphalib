@@ -78,6 +78,8 @@ class Channel():
     """
     def __init__(self, name):
         self._name = name
+        if '_' in self._name:
+            raise ValueError("Naming convention restricts '_' characters in channel %r" % self)
         self._samples = OrderedDict()
 
     def __getitem__(self, key):
@@ -95,6 +97,8 @@ class Channel():
             raise ValueError("Only Sample types can be attached to Channel. Got: %r" % sample)
         if sample.name in self._samples:
             raise ValueError("Channel %r already has a sample named %s" % (self, sample.name))
+        if sample.name[:sample.name.find('_')] != self.name:
+            raise ValueError("Naming convention requires begining of sample %r name to be %s" % (sample, self.name))
         if len(self._samples) > 0:
             first = next(iter(self._samples.values()))
             if sample.observable != first.observable:
@@ -162,7 +166,7 @@ class Channel():
             fout.write("imax %d # number of categories ('bins' but here we are using shape templates)\n" % 1)
             fout.write("jmax %d # number of samples minus 1\n" % (nSig + nBkg - 1))
             fout.write("kmax %d # number of nuisance parameters\n" % len(nuisanceParams))
-            fout.write("shapes * {1} {0}.root {0}:{0}_{1}_$PROCESS {0}_{1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
+            fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
             fout.write("bin %s\n" % self.name)
             fout.write("observation %.3f\n" % observation.normalization())
             table = []
