@@ -17,7 +17,10 @@ class Model(object):
         self._channels = OrderedDict()
 
     def __getitem__(self, key):
-        return self._channels[key]
+        if key in self._channels:
+            return self._channels[key]
+        channel = key[:key.find('_')]
+        return self[channel][key]
 
     def __iter__(self):
         for item in self._channels.values():

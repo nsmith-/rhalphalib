@@ -140,7 +140,7 @@ class Sample(object):
     def getParamEffect(self, param, up=True):
         raise NotImplementedError
 
-    def getExpectation(self):
+    def getExpectation(self, nominal=False):
         raise NotImplementedError
 
     def renderRoofit(self, workspace):
@@ -215,12 +215,16 @@ class TemplateSample(Sample):
         else:
             return self._paramEffectsDown[param]
 
-    def getExpectation(self):
+    def getExpectation(self, nominal=False):
         '''
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
+            nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
-        # TODO: construct a DependentParameter per bin, as a function of the nuisance params
-        raise NotImplementedError
+        if nominal:
+            return self._nominal
+        else:
+            # TODO: construct a DependentParameter per bin, as a function of the nuisance params
+            raise NotImplementedError
 
     def renderRoofit(self, workspace):
         '''
@@ -315,19 +319,22 @@ class ParametericSample(Sample):
         '''
         raise NotImplementedError
 
-    def getExpectation(self):
+    def getExpectation(self, nominal=False):
         '''
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
+            nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
         params = self._params
-        # TODO: create morph/modifier of self._params with any additional effects in _paramEffectsUp/Down
-
-        for i, p in enumerate(params):
-            p.name = self.name + '_bin%d' % i
-            if isinstance(p, DependentParameter):
-                # Let's make sure to render these
-                p.intermediate = False
-        return params
+        if nominal:
+            return np.array([p.value for p in params])
+        else:
+            # TODO: create morph/modifier of self._params with any additional effects in _paramEffectsUp/Down
+            for i, p in enumerate(params):
+                p.name = self.name + '_bin%d' % i
+                if isinstance(p, DependentParameter):
+                    # Let's make sure to render these
+                    p.intermediate = False
+            return params
 
     def renderRoofit(self, workspace):
         '''

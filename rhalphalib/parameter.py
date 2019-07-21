@@ -1,11 +1,13 @@
 import ROOT
 import numbers
 import warnings
+import numpy as np
 
 
 class Parameter(object):
-    def __init__(self, name):
+    def __init__(self, name, value):
         self._name = name
+        self._value = value
         self._hasPrior = False
         self._intermediate = False
 
@@ -23,6 +25,10 @@ class Parameter(object):
     @name.setter
     def name(self, name):
         self._name = name
+
+    @property
+    def value(self):
+        return self._value
 
     @property
     def intermediate(self):
@@ -105,21 +111,20 @@ class Parameter(object):
 class IndependentParameter(Parameter):
     DefaultRange = (-10, 10)
 
-    def __init__(self, name, val, lo=None, hi=None):
-        super(IndependentParameter, self).__init__(name)
-        self._val = val
+    def __init__(self, name, value, lo=None, hi=None):
+        super(IndependentParameter, self).__init__(name, value)
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
 
     def renderRoofit(self, workspace):
         if workspace.var(self._name) == None:  # noqa: E711
-            var = ROOT.RooRealVar(self._name, self._name, self._val, self._lo, self._hi)
+            var = ROOT.RooRealVar(self._name, self._name, self.value, self._lo, self._hi)
             workspace.add(var)
         return workspace.var(self._name)
 
 
 class NuisanceParameter(IndependentParameter):
-    def __init__(self, name, combinePrior, val=0, lo=None, hi=None):
+    def __init__(self, name, combinePrior, value=0, lo=None, hi=None):
         '''
         A nuisance parameter.
         name: name of parameter
@@ -129,7 +134,7 @@ class NuisanceParameter(IndependentParameter):
         to be added at the RooSimultaneus level (I think)
         Filtering the set of model parameters for these classes can collect needed priors.
         '''
-        super(NuisanceParameter, self).__init__(name, val, lo, hi)
+        super(NuisanceParameter, self).__init__(name, value, lo, hi)
         self._hasPrior = True
         self._prior = combinePrior
 
@@ -150,11 +155,16 @@ class DependentParameter(Parameter):
             formula: a python format-string using only indices, e.g.
                 '{0} + sin({1})*{2}'
         '''
-        super(DependentParameter, self).__init__(name)
+        super(DependentParameter, self).__init__(name, np.nan)
         if not all(isinstance(d, Parameter) for d in dependents):
             raise ValueError
         self._formula = formula
         self._dependents = dependents
+
+    @property
+    def value(self):
+        # TODO: value from rendering formula and eval() or numexpr or TFormula or ...
+        raise NotImplementedError
 
     @Parameter.intermediate.setter
     def intermediate(self, val):

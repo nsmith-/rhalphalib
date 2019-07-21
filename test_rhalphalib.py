@@ -14,8 +14,10 @@ def test_simple():
         model.addChannel(ch)
         bins = np.linspace(0, 100, 6)
 
+        bkgsum = np.zeros(5)
         for sName in ['zqq', 'wqq']:
             templ = (np.random.exponential(5, size=5), bins, 'x')
+            bkgsum += templ[0]
             sample = rl.TemplateSample(ch.name + '_' + sName, rl.Sample.BACKGROUND, templ)
 
             jecup_ratio = np.array([0.02, 0.05, 0.1, 0.11, 0.2])
@@ -30,14 +32,22 @@ def test_simple():
             ch.addSample(sample)
 
         # make up a data_obs
-        templ = (np.random.poisson(5, size=5), bins, 'x')
+        templ = (np.random.poisson(bkgsum + 50), bins, 'x')
         ch.addSample(rl.TemplateSample(ch.name + '_' + 'data_obs', rl.Sample.OBSERVATION, templ))
 
     # steal observable definition from previous template
-    obs = model['channel0']['channel0_wqq'].observable
+    obs = model['channel0_wqq'].observable
 
-    params = [rl.IndependentParameter('qcdparam', 10) for _ in range(5)]
-    fail_sample = rl.ParametericSample('channel0_qcd', rl.Sample.BACKGROUND, obs, params)
+    qcdparams = [rl.IndependentParameter('qcdparam_bin%d' % i, 0) for i in range(5)]
+    initial_qcd = model['channel0_data_obs'].getExpectation(nominal=True).astype(float)
+    for p in model['channel0']:
+        if p.sampletype != rl.Sample.OBSERVATION:
+            initial_qcd -= p.getExpectation(nominal=True)
+    if np.any(initial_qcd < 0.):
+        raise ValueError("uh-oh")
+    sigmascale = 10  # to scale the deviation from initial
+    scaledparams = initial_qcd + sigmascale*np.sqrt(initial_qcd)*qcdparams
+    fail_sample = rl.ParametericSample('channel0_qcd', rl.Sample.BACKGROUND, obs, scaledparams)
     model['channel0'].addSample(fail_sample)
 
     tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'])
