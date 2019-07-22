@@ -63,10 +63,8 @@ def dummy_rhalphabet():
         obs = failCh.observable
         qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(nmsd)])
         initial_qcd = failCh.getObservation().astype(float)  # was integer, and numpy complained about subtracting float from it
-        print(initial_qcd)
         for sample in failCh:
             initial_qcd -= sample.getExpectation(nominal=True)
-            print(sample, initial_qcd)
         if np.any(initial_qcd < 0.):
             raise ValueError("uh-oh")
         sigmascale = 10  # to scale the deviation from initial
@@ -76,6 +74,10 @@ def dummy_rhalphabet():
 
         pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_params[ptbin, :], fail_qcd)
         model['ptbin%dpass' % ptbin].addSample(pass_qcd)
+
+    import pickle
+    with open("model.pkl", "wb") as fout:
+        pickle.dump(model, fout)
 
     import sys
     print("ROOT used? ", 'ROOT' in sys.modules)

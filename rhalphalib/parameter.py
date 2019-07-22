@@ -51,7 +51,7 @@ class Parameter(object):
         '''
         return 'flatParam'
 
-    def getDependents(self):
+    def getDependents(self, rendering=False, deep=False):
         return {self}
 
     def formula(self):
@@ -196,7 +196,7 @@ class DependentParameter(Parameter):
         if deep:
             for p in self._dependents:
                 if isinstance(p, DependentParameter):
-                    dependents.update(p.getDependents())
+                    dependents.update(p.getDependents(deep=True))
                 else:
                     dependents.add(p)
             return dependents

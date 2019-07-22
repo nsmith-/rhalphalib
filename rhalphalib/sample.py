@@ -256,9 +256,8 @@ class ParametericSample(Sample):
         Set of independent parameters that affect this sample
         '''
         pset = set()
-        for p in self._params:
+        for p in self.getExpectation():
             pset.update(p.getDependents(deep=True))
-        pset.update(self._paramEffectsUp.keys())
         return pset
 
     def setParamEffect(self, param, effect_up, effect_down=None):
@@ -285,7 +284,7 @@ class ParametericSample(Sample):
         '''
         params = self._params.copy()  # this is a shallow copy
         if self.mask is not None:
-            params[~self.mask] = [ConstantParameter(params[i].name, 0) for i in np.flatnonzero(~self.mask)]
+            params[~self.mask] = [ConstantParameter("masked", 0) for _ in range((~self.mask).sum())]
         if nominal:
             return np.array([p.value for p in params])
         else:
@@ -390,12 +389,9 @@ class TransferFactorSample(ParametericSample):
         self._dependentsample = dependentsample
 
     @property
-    def parameters(self):
-        '''
-        Set of independent parameters that affect this sample
-        '''
-        pset = set()
-        for p in self._transferfactor:
-            pset.update(p.getDependents(deep=True))
-        pset.update(self._dependentsample.parameters)
-        return pset
+    def transferfactor(self):
+        return self._transferfactor
+
+    @property
+    def dependentsample(self):
+        return self._dependentsample
