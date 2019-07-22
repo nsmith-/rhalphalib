@@ -63,7 +63,7 @@ class BernsteinPoly(object):
         # evaluate Bernstein polynomial product tensor
         bpolyval = np.array(1)
         for x, n, B in zip(xvals, self._order, self._bmatrices):
-            xpow = np.power.outer(np.arange(n + 1), x)
+            xpow = np.power(x, np.arange(n + 1))
             Bx = np.dot(B, xpow)
             bpolyval = np.multiply.outer(bpolyval, Bx)
 
