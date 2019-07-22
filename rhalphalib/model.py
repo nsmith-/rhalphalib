@@ -2,7 +2,6 @@ from collections import OrderedDict
 import datetime
 from functools import reduce
 import os
-import warnings
 import ROOT
 from .sample import Sample
 from .parameter import Observable
@@ -125,7 +124,7 @@ class Channel():
         observable = Observable(obs_name, binning)
         if self._observable is not None:
             if observable != self._observable:
-                raise ValueError("Observation has an incompatible observable with channel %r" % (sample, self))
+                raise ValueError("Observation has an incompatible observable with channel %r" % self)
         else:
             self._observable = observable
         self._observation = sumw
