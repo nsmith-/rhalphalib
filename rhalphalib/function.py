@@ -42,7 +42,7 @@ class BernsteinPoly(object):
         # Construct parameter tensor
         self._params = np.full(self._shape, None)
         for ipar, initial in np.ndenumerate(self._init_params):
-            param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial)
+            param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=0.)
             self._params[ipar] = param
 
     @property

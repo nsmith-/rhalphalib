@@ -105,22 +105,32 @@ class TemplateSample(Sample):
         '''
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via independent parameters with priors (i.e. a NuisanceParameter)")
-        if isinstance(effect_up, ROOT.TH1):
+
+        if isinstance(effect_up, np.ndarray):
+            if len(effect_up) != self.observable.nbins:
+                raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
+        elif isinstance(effect_up, numbers.Number):
+            if 'shape' in param.combinePrior:
+                effect_up = np.full(self.observable.nbins, effect_up)
+        elif isinstance(effect_up, ROOT.TH1):
             raise NotImplementedError("Convert TH1 yield to effect numpy array")
             # effect_up = ... / self._nominal
-        elif not isinstance(effect_up, (np.ndarray, numbers.Number)):
+        else:
             raise ValueError("effect_up is not a valid type")
-        elif isinstance(effect_up, numbers.Number) and 'shape' in param.combinePrior:
-            effect_up = np.full(self.observable.nbins, effect_up)
         self._paramEffectsUp[param] = effect_up
+
         if effect_down is not None:
-            if isinstance(effect_down, ROOT.TH1):
+            if isinstance(effect_down, np.ndarray):
+                if len(effect_down) != self.observable.nbins:
+                    raise ValueError("effect_down has the wrong number of bins (%d, expected %d)" % (len(effect_down), self.observable.nbins))
+            elif isinstance(effect_down, numbers.Number):
+                if 'shape' in param.combinePrior:
+                    effect_down = np.full(self.observable.nbins, effect_down)
+            elif isinstance(effect_down, ROOT.TH1):
                 raise NotImplementedError("Convert TH1 yield to effect numpy array")
                 # effect_down = ... / self._nominal
-            elif not isinstance(effect_down, (np.ndarray, numbers.Number)):
+            else:
                 raise ValueError("effect_down is not a valid type")
-            elif isinstance(effect_down, numbers.Number) and 'shape' in param.combinePrior:
-                effect_down = np.full(self.observable.nbins, effect_down)
             self._paramEffectsDown[param] = effect_down
         else:
             # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
@@ -217,11 +227,10 @@ class ParametericSample(Sample):
 
     def normalization(self):
         '''
-        For combine, no normalization is needed in card for parameteric process.
-        In some cases it might be useful to know, but would require formula evaluation.
-        TODO: this is only used for making combine cards, useful? Rename?
+        For combine, the normalization in the card is used to scale the parameteric process PDF
+        Since we provide an explicit normalization function, this should always stay at 1.
         '''
-        return -1
+        return 1.
 
     def setParamEffect(self, param, effect_up, effect_down=None):
         '''
@@ -270,24 +279,30 @@ class ParametericSample(Sample):
             dummyHist = _to_TH1(np.zeros(len(self._params)), self.observable.binning, self.observable.name)
             rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
             rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
+            workspace.add(rooTemplate)
+            workspace.add(rooNorm)
         else:
-            # RooParametricStepFunction expects bin-width-normalized parameters, so correct here
+            # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)
+            norm = params.sum()
+            norm.name = self.name + '_norm'
+            norm.intermediate = False
+
             binw = np.diff(self.observable.binning)
-            binwparams = np.array(params) / binw
-            for p, oldp in zip(binwparams, params):
-                p.name = oldp.name + "_binwNorm"
+            dparams = params / binw / norm
+
+            for p, oldp in zip(dparams, params):
+                p.name = oldp.name + "_density"
                 p.intermediate = False
-            rooParams = [p.renderRoofit(workspace) for p in binwparams]
+
+            rooParams = [p.renderRoofit(workspace) for p in dparams]
             rooTemplate = ROOT.RooParametricStepFunction(self.name, self.name,
                                                          rooObservable,
                                                          ROOT.RooArgList.fromiter(rooParams),
                                                          self.observable.binningTArrayD(),
                                                          self.observable.nbins
                                                          )
-            rooParams = [p.renderRoofit(workspace) for p in params]
-            rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
-        workspace.add(rooTemplate)
-        workspace.add(rooNorm)
+            workspace.add(rooTemplate)
+            rooNorm = norm.renderRoofit(workspace)  # already rendered but we want to return it
         return rooTemplate, rooNorm
 
     def combineParamEffect(self, param):

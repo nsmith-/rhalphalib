@@ -19,6 +19,14 @@ def _to_numpy(hinput):
         name = hinput.axes()[0].name
         return (sumw, binning, name)
     elif isinstance(hinput, tuple) and len(hinput) == 3:
+        if not isinstance(hinput[0], np.ndarray):
+            raise ValueError("Expected numpy array for element 0 of tuple %r" % hinput)
+        if not isinstance(hinput[1], np.ndarray):
+            raise ValueError("Expected numpy array for element 1 of tuple %r" % hinput)
+        if not isinstance(hinput[2], str):
+            raise ValueError("Expected string for element 2 of tuple %r" % hinput)
+        if hinput[0].size != hinput[1].size - 1:
+            raise ValueError("Counts array and binning array are incompatible in tuple %r" % hinput)
         return hinput
     else:
         raise ValueError
