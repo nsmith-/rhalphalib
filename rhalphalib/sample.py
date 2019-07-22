@@ -1,7 +1,7 @@
 import ROOT
 import numpy as np
 import numbers
-from .parameter import DependentParameter, Observable
+from .parameter import NuisanceParameter, DependentParameter, Observable
 from .util import _to_numpy, _to_TH1
 
 
@@ -85,6 +85,9 @@ class TemplateSample(Sample):
 
     @property
     def parameters(self):
+        '''
+        Set of independent parameters that affect this sample
+        '''
         return set(self._paramEffectsUp.keys())
 
     def normalization(self):
@@ -100,6 +103,8 @@ class TemplateSample(Sample):
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         '''
+        if not isinstance(param, NuisanceParameter):
+            raise ValueError("Template morphing can only be done via independent parameters with priors (i.e. a NuisanceParameter)")
         if isinstance(effect_up, ROOT.TH1):
             raise NotImplementedError("Convert TH1 yield to effect numpy array")
             # effect_up = ... / self._nominal
@@ -202,9 +207,11 @@ class ParametericSample(Sample):
     @property
     def parameters(self):
         '''
-        Set of parameters that affect this sample
+        Set of independent parameters that affect this sample
         '''
-        pset = set(self._params)
+        pset = set()
+        for p in self._params:
+            pset.update(p.getDependents(deep=True))
         pset.update(self._paramEffectsUp.keys())
         return pset
 
@@ -285,8 +292,10 @@ class ParametericSample(Sample):
 
     def combineParamEffect(self, param):
         '''
-        Combine cannot build param effects on parameterized templates
-        So we have to do it in the model, I think...
+        Combine cannot build shape param effects for parameterized templates, so we have to do it in the model
+        For normalization effects, I am not sure what happens.. if combine adds the nuisance properly then we just
+        need the effect size line as below, and we correspondingly should ignore it when calculating effects ourselves.
+        This would be annoying though, because then getExpectation() needs to behave different between combine rendering and otherwise.
         '''
         if param not in self._paramEffectsUp:
             return '-'
@@ -328,8 +337,10 @@ class TransferFactorSample(ParametericSample):
     @property
     def parameters(self):
         '''
-        Set of parameters that affect this sample
+        Set of independent parameters that affect this sample
         '''
-        pset = set(self._transferfactor)
+        pset = set()
+        for p in self._transferfactor:
+            pset.update(p.getDependents(deep=True))
         pset.update(self._dependentsample.parameters)
         return pset

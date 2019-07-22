@@ -50,7 +50,7 @@ class Parameter(object):
         '''
         By default assume param has no prior and we are just informing combine about it
         '''
-        return 'param'
+        return 'flatParam'
 
     def getDependents(self):
         return {self}
@@ -170,10 +170,25 @@ class DependentParameter(Parameter):
     def intermediate(self, val):
         self._intermediate = val
 
-    def getDependents(self, rendering=False):
+    def getDependents(self, rendering=False, deep=False):
+        '''
+        Return a set of parameters that this parameter depends on, which will be rendered.
+        By default, this means all non-intermediate dependent parameters, recursively descending and stopping at
+        the first renderable parameter (i.e. either non-intermediate or an IndependentParameter)
+        If this parameter itself is renderable, we return a set of just this parameter.
+        If rendering=True, we pass through this parameter if it is renderable.
+        If deep=True, descend all the way to the IndependentParameters
+        '''
+        dependents = set()
+        if deep:
+            for p in self._dependents:
+                if isinstance(p, DependentParameter):
+                    dependents.update(p.getDependents())
+                else:
+                    dependents.add(p)
+            return dependents
         if not (self.intermediate or rendering):
             return {self}
-        dependents = set()
         for p in self._dependents:
             if p.intermediate:
                 dependents.update(p.getDependents())

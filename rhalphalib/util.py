@@ -28,5 +28,5 @@ def _to_TH1(sumw, binning, name):
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
     h.SetDirectory(0)
     for i, w in enumerate(sumw):
-        h.SetBinContent(i, w)
+        h.SetBinContent(i + 1, w)
     return h

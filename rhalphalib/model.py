@@ -192,24 +192,25 @@ class Channel():
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
         nBkg = len(bkgSamples)
 
-        # TODO: check if we need to declare to combine *all* parameters used or only the free parameters
-        # Can check with isinstance(p, IndependentParameter)
         params = self.parameters
         nuisanceParams = [p for p in params if p.hasPrior()]
+        nuisanceParams.sort(key=lambda p: p.name)
         otherParams = [p for p in params if p not in nuisanceParams]
+        otherParams.sort(key=lambda p: p.name)
 
         with open(outputFilename, "w") as fout:
             fout.write("# Datacard for %r generated on %s\n" % (self, str(datetime.datetime.now())))
             fout.write("imax %d # number of categories ('bins' but here we are using shape templates)\n" % 1)
             fout.write("jmax %d # number of samples minus 1\n" % (nSig + nBkg - 1))
             fout.write("kmax %d # number of nuisance parameters\n" % len(nuisanceParams))
-            fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
+            fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {0}:{1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
             fout.write("bin %s\n" % self.name)
             fout.write("observation %.3f\n" % observation.sum())
             table = []
             table.append(['bin'] + [self.name]*(nSig + nBkg))
-            table.append(['sample'] + [s.name for s in signalSamples + bkgSamples])
-            table.append(['sample'] + [str(i) for i in range(1 - nSig, nBkg + 1)])
+            # combine calls 'sample' a 'process', here also we remove channel prefix
+            table.append(['process'] + [s.name[s.name.find('_')+1:] for s in signalSamples + bkgSamples])
+            table.append(['process'] + [str(i) for i in range(1 - nSig, nBkg + 1)])
             table.append(['rate'] + ["%.3f" % s.normalization() for s in signalSamples + bkgSamples])
             for param in nuisanceParams:
                 table.append([param.name + ' ' + param.combinePrior] + [s.combineParamEffect(param) for s in signalSamples + bkgSamples])

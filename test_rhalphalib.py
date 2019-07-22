@@ -15,10 +15,11 @@ def test_simple():
         bins = np.linspace(0, 100, 6)
 
         bkgsum = np.zeros(5)
-        for sName in ['zqq', 'wqq']:
+        for sName in ['zqq', 'wqq', 'hqq']:
             templ = (np.random.exponential(5, size=5), bins, 'x')
             bkgsum += templ[0]
-            sample = rl.TemplateSample(ch.name + '_' + sName, rl.Sample.BACKGROUND, templ)
+            stype = rl.Sample.SIGNAL if sName == 'hqq' else rl.Sample.BACKGROUND
+            sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
             jecup_ratio = np.array([0.02, 0.05, 0.1, 0.11, 0.2])
             sample.setParamEffect(jec, jecup_ratio)
