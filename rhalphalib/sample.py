@@ -195,7 +195,7 @@ class TemplateSample(Sample):
         workspace.add(rooTemplate)
         for param in self.parameters:
             effect_up = self.getParamEffect(param, up=True)
-            if not isinstance(effect_up, np.ndarray):
+            if 'shape' not in param.combinePrior:
                 # Normalization systematics can just go into combine datacards
                 continue
             name = self.name + '_' + param.name + 'Up'
@@ -223,8 +223,20 @@ class TemplateSample(Sample):
         elif 'shape' in param.combinePrior:
             return '1'
         else:
-            up = self._paramEffectsUp[param]
-            down = self._paramEffectsDown[param]
+            up = self.getParamEffect(param, up=True)
+            down = self.getParamEffect(param, up=False)
+            if isinstance(up, np.ndarray):
+                # Convert shape to norm (note symmeterized effect on shape != symmeterized effect on norm)
+                nominal = self.getExpectation(nominal=True)
+                if nominal.sum() == 0:
+                    up = 1.
+                    down = None
+                else:
+                    up = (up * nominal).sum() / nominal.sum()
+                    down = (down * nominal).sum() / nominal.sum()
+            elif self._paramEffectsDown[param] is None:
+                # Here we can safely defer to combine to calculate symmeterized effect
+                down = None
             if down is None:
                 return '%.3f' % up
             else:

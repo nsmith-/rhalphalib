@@ -5,7 +5,7 @@ import numpy as np
 def dummy_rhalphabet():
     model = rl.Model("testModel")
 
-    jec = rl.NuisanceParameter('CMS_jec', 'shape')
+    jec = rl.NuisanceParameter('CMS_jec', 'lnN')
     massScale = rl.NuisanceParameter('CMS_msdScale', 'shape')
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
 
@@ -42,6 +42,7 @@ def dummy_rhalphabet():
                 msdUp = np.linspace(0.9, 1.1, nmsd)
                 msdDn = np.linspace(1.2, 0.8, nmsd)
 
+                # for jec we set lnN prior, shape will automatically be converted to norm systematic
                 sample.setParamEffect(jec, jecup_ratio)
                 sample.setParamEffect(massScale, msdUp, msdDn)
                 sample.setParamEffect(lumi, 1.027)
