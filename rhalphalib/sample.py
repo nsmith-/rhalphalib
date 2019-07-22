@@ -294,7 +294,8 @@ class ParametericSample(Sample):
                 p.name = oldp.name + "_density"
                 p.intermediate = False
 
-            rooParams = [p.renderRoofit(workspace) for p in dparams]
+            # The last bin value is defined by 1 - sum(others), so no need to render it
+            rooParams = [p.renderRoofit(workspace) for p in dparams[:-1]]
             rooTemplate = ROOT.RooParametricStepFunction(self.name, self.name,
                                                          rooObservable,
                                                          ROOT.RooArgList.fromiter(rooParams),
