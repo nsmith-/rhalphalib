@@ -32,17 +32,16 @@ def test_simple():
             ch.addSample(sample)
 
         # make up a data_obs
-        templ = (np.random.poisson(bkgsum + 50), bins, 'x')
-        ch.addSample(rl.TemplateSample(ch.name + '_' + 'data_obs', rl.Sample.OBSERVATION, templ))
+        data_obs = (np.random.poisson(bkgsum + 50), bins, 'x')
+        ch.setObservation(data_obs)
 
     # steal observable definition from previous template
     obs = model['channel0_wqq'].observable
 
     qcdparams = [rl.IndependentParameter('qcdparam_bin%d' % i, 0) for i in range(5)]
-    initial_qcd = model['channel0_data_obs'].getExpectation(nominal=True).astype(float)
+    initial_qcd = model['channel0'].getObservation().astype(float)  # was integer, and numpy complained about subtracting float from it
     for p in model['channel0']:
-        if p.sampletype != rl.Sample.OBSERVATION:
-            initial_qcd -= p.getExpectation(nominal=True)
+        initial_qcd -= p.getExpectation(nominal=True)
     if np.any(initial_qcd < 0.):
         raise ValueError("uh-oh")
     sigmascale = 10  # to scale the deviation from initial

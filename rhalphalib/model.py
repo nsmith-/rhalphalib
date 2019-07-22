@@ -2,10 +2,11 @@ from collections import OrderedDict
 import datetime
 from functools import reduce
 import os
-
+import warnings
 import ROOT
-
 from .sample import Sample
+from .parameter import Observable
+from .util import _to_numpy, _to_TH1
 
 
 class Model(object):
@@ -84,6 +85,8 @@ class Channel():
         if '_' in self._name:
             raise ValueError("Naming convention restricts '_' characters in channel %r" % self)
         self._samples = OrderedDict()
+        self._observable = None
+        self._observation = None
 
     def __getitem__(self, key):
         return self._samples[key]
@@ -102,14 +105,38 @@ class Channel():
             raise ValueError("Channel %r already has a sample named %s" % (self, sample.name))
         if sample.name[:sample.name.find('_')] != self.name:
             raise ValueError("Naming convention requires begining of sample %r name to be %s" % (sample, self.name))
-        if len(self._samples) > 0:
-            first = next(iter(self._samples.values()))
-            if sample.observable != first.observable:
-                raise ValueError("Sample %r has an incompatible observable with other smaples in channel %r" % (sample, self))
-            sample.observable = first.observable
+        if self._observable is not None:
+            if sample.observable != self._observable:
+                raise ValueError("Sample %r has an incompatible observable with channel %r" % (sample, self))
+            sample.observable = self._observable
         else:
-            sample.observable._attached = True  # FIXME setter in observable?
+            self._observable = sample.observable
         self._samples[sample.name] = sample
+
+    def setObservation(self, obs):
+        '''
+        Set the observation of the channel.
+        obs: Either a ROOT TH1, a 1D Coffea Hist object, or a numpy histogram
+            in the latter case, please extend the numpy histogram tuple to define an observable name
+            i.e. (sumw, binning, name)
+            (for the others, the observable name is taken from the x axis name)
+        '''
+        sumw, binning, obs_name = _to_numpy(obs)
+        observable = Observable(obs_name, binning)
+        if self._observable is not None:
+            if observable != self._observable:
+                raise ValueError("Observation has an incompatible observable with channel %r" % (sample, self))
+        else:
+            self._observable = observable
+        self._observation = sumw
+
+    def getObservation(self):
+        '''
+        Return the current observation set for this Channel as plain numpy array
+        '''
+        if self._observation is None:
+            raise RuntimeError("Channel %r has no observation set" % self)
+        return self._observation
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -130,9 +157,16 @@ class Channel():
     def parameters(self):
         return reduce(set.union, (s.parameters for s in self), set())
 
+    @property
+    def observable(self):
+        if self._observable is None:
+            raise RuntimeError("No observable set for channel %r yet.  Add a sample or observation to set observable." % self)
+        return self._observable
+
     def renderRoofit(self, workspace):
         '''
         Render each sample in the channel and add them into an extended RooAddPdf
+        Also render the observation
         '''
         # TODO: build RooAddPdf from sample pdfs (and norms)
         pdfs = []
@@ -144,15 +178,16 @@ class Channel():
 
         # addpdf = ROOT.RooAddPdf(self.name, self.name, ROOT.RooArgList(pdfs)...)
         # return addpdf
+
+        rooObservable = self.observable.renderRoofit(workspace)
+        name = self.name + '_data_obs'  # combine convention
+        rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(self.getObservation(), self.observable.binning, self.observable.name))
+        workspace.add(rooTemplate)
+
         return None
 
     def renderCard(self, outputFilename, workspaceName):
-        observation = [s for s in self if s.sampletype == Sample.OBSERVATION]
-        if len(observation) == 0:
-            raise RuntimeError("Channel %r has no observation attached to it")
-        if len(observation) > 1:
-            raise RuntimeError("Channel %r has more than one observation attached to it")
-        observation = observation[0]
+        observation = self.getObservation()
         signalSamples = [s for s in self if s.sampletype == Sample.SIGNAL]
         nSig = len(signalSamples)
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
@@ -171,7 +206,7 @@ class Channel():
             fout.write("kmax %d # number of nuisance parameters\n" % len(nuisanceParams))
             fout.write("shapes * {1} {0}.root {0}:{1}_$PROCESS {1}_$PROCESS_$SYSTEMATIC\n".format(workspaceName, self.name))
             fout.write("bin %s\n" % self.name)
-            fout.write("observation %.3f\n" % observation.normalization())
+            fout.write("observation %.3f\n" % observation.sum())
             table = []
             table.append(['bin'] + [self.name]*(nSig + nBkg))
             table.append(['sample'] + [s.name for s in signalSamples + bkgSamples])

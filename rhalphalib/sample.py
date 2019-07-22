@@ -1,100 +1,15 @@
 import ROOT
-from coffea import hist
 import numpy as np
 import numbers
-from .parameter import DependentParameter
-
-
-def _to_numpy(hinput):
-    if isinstance(hinput, ROOT.TH1):
-        sumw = np.zeros(hinput.GetNBinsX())
-        binning = np.zeros(sumw.size + 1)
-        name = hinput.GetName()
-        for i in range(1, sumw.size + 1):
-            sumw[i] = hinput.GetBinContent(i)
-            binning[i] = hinput.GetXaxis().GetBinLowEdge(i)
-        binning[i+1] = hinput.GetXaxis().GetBinUpEdge(i)
-        return (sumw, binning, name)
-    elif isinstance(hinput, hist.Hist):
-        sumw = hinput.values()[()]
-        binning = hinput.axes()[0].edges()
-        name = hinput.axes()[0].name
-        return (sumw, binning, name)
-    elif isinstance(hinput, tuple) and len(hinput) == 3:
-        return hinput
-    else:
-        raise ValueError
-
-
-def _to_TH1(sumw, binning, name):
-    h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
-    h.SetDirectory(0)
-    for i, w in enumerate(sumw):
-        h.SetBinContent(i, w)
-    return h
-
-
-class Observable(object):
-    '''
-    A simple struct that holds the name of an observable (e.g. x axis of discriminator histogram) and its binning
-    The first sample attached to a channel will dictate how the rendering of the observable is done.
-    Subequent samples attached will be checked against the first, and if they match, their observable will be set
-    to the first samples' instance of this class.
-    '''
-    def __init__(self, name, binning):
-        self._name = name
-        self._binning = np.array(binning)
-        self._attached = False
-
-    def __repr__(self):
-        return "<%s (%s) instance at 0x%x>" % (
-            self.__class__.__name__,
-            self._name,
-            id(self),
-        )
-
-    def __len__(self):
-        return len(self._binning) - 1
-
-    def __eq__(self, other):
-        if isinstance(other, Observable) and self._name == other._name and np.array_equal(self._binning, other._binning):
-            return True
-        return False
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def binning(self):
-        return self._binning
-
-    @property
-    def nbins(self):
-        return len(self)
-
-    def binningTArrayD(self):
-        return ROOT.TArrayD(len(self._binning), self._binning)
-
-    def renderRoofit(self, workspace):
-        '''
-        Return a RooObservable following the definition
-        '''
-        if workspace.var(self._name) != None:  # noqa: E711
-            return workspace.var(self._name)
-        var = ROOT.RooRealVar(self.name, self.name,
-                              self.binning[0],
-                              self.binning[-1]
-                              )
-        var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
-        return var
+from .parameter import DependentParameter, Observable
+from .util import _to_numpy, _to_TH1
 
 
 class Sample(object):
     """
     Sample base class
     """
-    SIGNAL, BACKGROUND, OBSERVATION = range(3)
+    SIGNAL, BACKGROUND = range(2)
 
     def __init__(self, name, sampletype):
         self._name = name
@@ -229,8 +144,7 @@ class TemplateSample(Sample):
     def renderRoofit(self, workspace):
         '''
         Import the necessary Roofit objects into the workspace for this sample
-        and return an extended pdf representing this sample's prediciton for
-        pdf and norm.  If the sample is an observation, return just a RooDataHist
+        and return an extended pdf representing this sample's prediciton for pdf and norm.
         '''
         rooObservable = self.observable.renderRoofit(workspace)
         rooTemplate = ROOT.RooDataHist(self.name, self.name, ROOT.RooArgList(rooObservable), _to_TH1(self._nominal, self.observable.binning, self.observable.name))

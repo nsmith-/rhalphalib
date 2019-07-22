@@ -200,3 +200,51 @@ class DependentParameter(Parameter):
             var = ROOT.RooFormulaVar(self._name, self._name, formula, ROOT.RooArgList.fromiter(rooVars))
             workspace.add(var)
         return workspace.function(self._name)
+
+
+class Observable(Parameter):
+    '''
+    A simple struct that holds the name of an observable (e.g. x axis of discriminator histogram) and its binning
+    The first sample attached to a channel will dictate how the rendering of the observable is done.
+    Subequent samples attached will be checked against the first, and if they match, their observable will be set
+    to the first samples' instance of this class.
+    '''
+    def __init__(self, name, binning):
+        super(Observable, self).__init__(name, np.nan)
+        self._binning = np.array(binning)
+
+    def __eq__(self, other):
+        if isinstance(other, Observable) and self._name == other._name and np.array_equal(self._binning, other._binning):
+            return True
+        return False
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def binning(self):
+        return self._binning
+
+    @property
+    def nbins(self):
+        return len(self._binning) - 1
+
+    def binningTArrayD(self):
+        return ROOT.TArrayD(len(self._binning), self._binning)
+
+    def renderRoofit(self, workspace):
+        '''
+        Return a RooObservable following the definition
+        '''
+        if workspace.var(self._name) != None:  # noqa: E711
+            return workspace.var(self._name)
+        var = ROOT.RooRealVar(self.name, self.name,
+                              self.binning[0],
+                              self.binning[-1]
+                              )
+        var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
+        return var
+
+    def formula(self):
+        raise RuntimeError("Observables cannot be used in formulas, as this would necessitate support for numeric integration, which is outside the scope of rhalphalib.")

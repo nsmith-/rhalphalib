@@ -3,13 +3,13 @@ from .model import (
     Channel,
 )
 from .sample import (
-    Observable,
     Sample,
     TemplateSample,
     ParametericSample,
     TransferFactorSample,
 )
 from .parameter import (
+    Observable,
     NuisanceParameter,
     IndependentParameter,
     DependentParameter,
@@ -21,11 +21,11 @@ from .function import (
 __all__ = [
     'Model',
     'Channel',
-    'Observable',
     'Sample',
     'TemplateSample',
     'ParametericSample',
     'TransferFactorSample',
+    'Observable',
     'NuisanceParameter',
     'IndependentParameter',
     'DependentParameter',
