@@ -1,6 +1,6 @@
 import numpy as np
 import numbers
-from .parameter import NuisanceParameter, DependentParameter, Observable
+from .parameter import ConstantParameter, NuisanceParameter, DependentParameter, Observable
 from .util import _to_numpy, _to_TH1
 
 
@@ -14,6 +14,7 @@ class Sample(object):
         self._name = name
         self._sampletype = sampletype
         self._observable = None
+        self._mask = None
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -45,8 +46,25 @@ class Sample(object):
     def parameters(self):
         raise NotImplementedError
 
-    def normalization(self):
-        raise NotImplementedError
+    @property
+    def mask(self):
+        '''
+        An array matching the observable binning that specifies which bins to populate
+        i.e. when mask[i] is False, the bin content will be set to 0.
+        '''
+        return self._mask
+
+    @mask.setter
+    def mask(self, mask):
+        if isinstance(mask, np.ndarray):
+            mask = mask.astype(bool)
+            if self.observable.nbins != len(mask):
+                raise ValueError("Mask shape does not match number of bins in observable")
+            # protect from mutation
+            mask.setflags(write=False)
+        elif mask is not None:
+            raise ValueError("Mask should be None or a numpy array")
+        self._mask = mask
 
     def setParamEffect(self, param, effect_up, effect_down=None):
         raise NotImplementedError
@@ -58,6 +76,9 @@ class Sample(object):
         raise NotImplementedError
 
     def renderRoofit(self, workspace):
+        raise NotImplementedError
+
+    def combineNormalization(self):
         raise NotImplementedError
 
     def combineParamEffect(self, param):
@@ -89,9 +110,6 @@ class TemplateSample(Sample):
         '''
         return set(self._paramEffectsUp.keys())
 
-    def normalization(self):
-        return self._nominal.sum()
-
     def setParamEffect(self, param, effect_up, effect_down=None):
         '''
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
@@ -117,7 +135,7 @@ class TemplateSample(Sample):
             if not np.array_equal(binning, self.observable.binning):
                 raise ValueError("effect_up has incompatible binning with sample %r" % self)
             zerobins = self._nominal <= 0.
-            effect_up[zerobins] = 0.
+            effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
         self._paramEffectsUp[param] = effect_up
 
@@ -133,7 +151,7 @@ class TemplateSample(Sample):
                 if not np.array_equal(binning, self.observable.binning):
                     raise ValueError("effect_down has incompatible binning with sample %r" % self)
                 zerobins = self._nominal <= 0.
-                effect_down[zerobins] = 0.
+                effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
             self._paramEffectsDown[param] = effect_down
         else:
@@ -156,8 +174,11 @@ class TemplateSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
+        nominalval = self._nominal.copy()
+        if self.mask is not None:
+            nominalval[~self.mask] = 0.
         if nominal:
-            return self._nominal
+            return nominalval
         else:
             # TODO: construct a DependentParameter per bin, as a function of the nuisance params
             raise NotImplementedError
@@ -169,7 +190,8 @@ class TemplateSample(Sample):
         '''
         import ROOT
         rooObservable = self.observable.renderRoofit(workspace)
-        rooTemplate = ROOT.RooDataHist(self.name, self.name, ROOT.RooArgList(rooObservable), _to_TH1(self._nominal, self.observable.binning, self.observable.name))
+        nominal = self.getExpectation(nominal=True)
+        rooTemplate = ROOT.RooDataHist(self.name, self.name, ROOT.RooArgList(rooObservable), _to_TH1(nominal, self.observable.binning, self.observable.name))
         workspace.add(rooTemplate)
         for param in self.parameters:
             effect_up = self.getParamEffect(param, up=True)
@@ -177,16 +199,19 @@ class TemplateSample(Sample):
                 # Normalization systematics can just go into combine datacards
                 continue
             name = self.name + '_' + param.name + 'Up'
-            shape = self._nominal * effect_up
+            shape = nominal * effect_up
             rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
             workspace.add(rooTemplate)
             name = self.name + '_' + param.name + 'Down'
-            shape = self._nominal * self.getParamEffect(param, up=False)
+            shape = nominal * self.getParamEffect(param, up=False)
             rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
             workspace.add(rooTemplate)
 
         # TODO build the pdf from the data hist, maybe or maybe not with systematics, return pdf and normalization
         return None, None
+
+    def combineNormalization(self):
+        return self.getExpectation(nominal=True).sum()
 
     def combineParamEffect(self, param):
         '''
@@ -236,13 +261,6 @@ class ParametericSample(Sample):
         pset.update(self._paramEffectsUp.keys())
         return pset
 
-    def normalization(self):
-        '''
-        For combine, the normalization in the card is used to scale the parameteric process PDF
-        Since we provide an explicit normalization function, this should always stay at 1.
-        '''
-        return 1.
-
     def setParamEffect(self, param, effect_up, effect_down=None):
         '''
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
@@ -265,7 +283,9 @@ class ParametericSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
-        params = self._params
+        params = self._params.copy()  # this is a shallow copy
+        if self.mask is not None:
+            params[~self.mask] = [ConstantParameter(params[i].name, 0) for i in np.flatnonzero(~self.mask)]
         if nominal:
             return np.array([p.value for p in params])
         else:
@@ -317,6 +337,13 @@ class ParametericSample(Sample):
             workspace.add(rooTemplate)
             rooNorm = norm.renderRoofit(workspace)  # already rendered but we want to return it
         return rooTemplate, rooNorm
+
+    def combineNormalization(self):
+        '''
+        For combine, the normalization in the card is used to scale the parameteric process PDF
+        Since we provide an explicit normalization function, this should always stay at 1.
+        '''
+        return 1.
 
     def combineParamEffect(self, param):
         '''

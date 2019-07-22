@@ -2,6 +2,7 @@ from collections import OrderedDict
 import datetime
 from functools import reduce
 import os
+import numpy as np
 from .sample import Sample
 from .parameter import Observable
 from .util import _to_numpy, _to_TH1, install_roofit_helpers
@@ -87,6 +88,7 @@ class Channel():
         self._samples = OrderedDict()
         self._observable = None
         self._observation = None
+        self._mask = None
 
     def __getitem__(self, key):
         return self._samples[key]
@@ -111,6 +113,7 @@ class Channel():
             sample.observable = self._observable
         else:
             self._observable = sample.observable
+        sample.mask = self.mask
         self._samples[sample.name] = sample
 
     def setObservation(self, obs):
@@ -136,7 +139,10 @@ class Channel():
         '''
         if self._observation is None:
             raise RuntimeError("Channel %r has no observation set" % self)
-        return self._observation
+        obs = self._observation.copy()
+        if self.mask is not None:
+            obs[~self.mask] = 0.
+        return obs
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -162,6 +168,29 @@ class Channel():
         if self._observable is None:
             raise RuntimeError("No observable set for channel %r yet.  Add a sample or observation to set observable." % self)
         return self._observable
+
+    @property
+    def mask(self):
+        '''
+        An array matching the observable binning that specifies which bins to populate
+        i.e. when mask[i] is False, the bin content for all samples and the observation will be set to 0
+        Useful for blinding!
+        '''
+        return self._mask
+
+    @mask.setter
+    def mask(self, mask):
+        if isinstance(mask, np.ndarray):
+            mask = mask.astype(bool)
+            if self.observable.nbins != len(mask):
+                raise ValueError("Mask shape does not match number of bins in observable")
+            # protect from mutation
+            mask.setflags(write=False)
+        elif mask is not None:
+            raise ValueError("Mask should be None or a numpy array")
+        self._mask = mask
+        for sample in self:
+            sample.mask = self.mask
 
     def renderRoofit(self, workspace):
         '''
@@ -213,7 +242,7 @@ class Channel():
             # combine calls 'sample' a 'process', here also we remove channel prefix
             table.append(['process'] + [s.name[s.name.find('_')+1:] for s in signalSamples + bkgSamples])
             table.append(['process'] + [str(i) for i in range(1 - nSig, nBkg + 1)])
-            table.append(['rate'] + ["%.3f" % s.normalization() for s in signalSamples + bkgSamples])
+            table.append(['rate'] + ["%.3f" % s.combineNormalization() for s in signalSamples + bkgSamples])
             for param in nuisanceParams:
                 table.append([param.name + ' ' + param.combinePrior] + [s.combineParamEffect(param) for s in signalSamples + bkgSamples])
 

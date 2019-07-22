@@ -51,8 +51,9 @@ def install_roofit_helpers():
     import ROOT as _ROOT
     import numbers as _numbers
 
-    # TODO: Configure verbosity? Kill the splash screen
-    # ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.WARNING)
+    _ROOT.gEnv.SetValue("RooFit.Banner=0")
+    # TODO: configurable verbosity
+    _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
 
     def _embed_ref(obj, dependents):
         # python reference counting gc will drop rvalue dependents

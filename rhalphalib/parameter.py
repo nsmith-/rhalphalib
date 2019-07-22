@@ -107,6 +107,19 @@ class Parameter(object):
         return self._binary_op(('_div_', '/', False), other)
 
 
+class ConstantParameter(Parameter):
+    def __init__(self, name, value):
+        super(ConstantParameter, self).__init__(name, value)
+
+    def renderRoofit(self, workspace):
+        import ROOT
+        if workspace.var(self._name) == None:  # noqa: E711
+            var = ROOT.RooRealVar(self._name, self._name, self.value)
+            var.setAttribute("Constant", True)
+            workspace.add(var)
+        return workspace.var(self._name)
+
+
 class IndependentParameter(Parameter):
     DefaultRange = (-10, 10)
 

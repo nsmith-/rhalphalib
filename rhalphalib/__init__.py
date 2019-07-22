@@ -10,6 +10,7 @@ from .sample import (
 )
 from .parameter import (
     Observable,
+    ConstantParameter,
     NuisanceParameter,
     IndependentParameter,
     DependentParameter,
@@ -26,6 +27,7 @@ __all__ = [
     'ParametericSample',
     'TransferFactorSample',
     'Observable',
+    'ConstantParameter',
     'NuisanceParameter',
     'IndependentParameter',
     'DependentParameter',

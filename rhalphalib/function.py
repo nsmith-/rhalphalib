@@ -5,13 +5,14 @@ from .parameter import IndependentParameter
 
 
 class BernsteinPoly(object):
-    def __init__(self, name, order, dim_names=None, init_params=None):
+    def __init__(self, name, order, dim_names=None, init_params=None, limits=None):
         '''
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
             order: tuple of order in each dimension
             dim_names: optional, names of each dimension
             initial_params: ndarray of initial params
+            limits: tuple of independent parameter limits, default: (0, 10)
         '''
         self._name = name
         if not isinstance(order, tuple):
@@ -53,25 +54,30 @@ class BernsteinPoly(object):
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
+        shape = None
         for x in vals:
-            if not isinstance(x, numbers.Number):
-                raise ValueError("BernsteinPoly can only accept scalars to eval")
-            if not (x >= 0) & (x <= 1):
+            if isinstance(x, numbers.Number):
+                x = np.array(x)
+            if not np.all((x >= 0) & (x <= 1)):
                 raise ValueError("Bernstein polynomials are only defined on the interval [0, 1]")
-            xvals.append(x)
+            if shape is None:
+                shape = x.shape
+            elif shape != x.shape:
+                raise ValueError("BernsteinPoly: all variables must have same shape")
+            xvals.append(x.flatten())
 
         # evaluate Bernstein polynomial product tensor
-        bpolyval = np.array(1)
+        bpolyval = np.ones_like(xvals[0])
         for x, n, B in zip(xvals, self._order, self._bmatrices):
-            xpow = np.power(x, np.arange(n + 1))
-            Bx = np.dot(B, xpow)
-            bpolyval = np.multiply.outer(bpolyval, Bx)
+            xpow = np.power.outer(x, np.arange(n + 1))
+            bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
 
         # Multiply by our coefficients and reduce to scalar
-        out = (bpolyval * self._params).sum()
+        out = (bpolyval * self._params).reshape(len(xvals[0]), -1).sum(axis=1)
 
         # Label it nicely
-        dimstr = '_'.join('%s%.3f' % (d, v) for d, v in zip(self._dim_names, xvals))
-        out.name = self.name + '_eval_' + dimstr.replace('.', 'p')
-        out.intermediate = False
-        return out
+        for i, p in enumerate(out):
+            dimstr = '_'.join('%s%.3f' % (d, v[i]) for d, v in zip(self._dim_names, xvals))
+            p.name = self.name + '_eval_' + dimstr.replace('.', 'p')
+            p.intermediate = False
+        return out.reshape(shape)
