@@ -77,8 +77,8 @@ class Model(object):
             channel.renderCard(os.path.join(outputPath, "%s.txt" % channel.name), self.name)
         with open(os.path.join(outputPath, "build.sh"), "w") as fout:
             cstr = " ".join("{0}={0}.txt".format(channel.name) for channel in self)
-            fout.write("combineCards.py %s > %s.txt\n" % (cstr, self.name))
-            fout.write("text2workspace.py %s.txt\n" % self.name)
+            fout.write("combineCards.py %s > %s_combined.txt\n" % (cstr, self.name))
+            fout.write("text2workspace.py %s_combined.txt\n" % self.name)
 
 
 class Channel():
