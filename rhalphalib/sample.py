@@ -1,4 +1,3 @@
-import ROOT
 import numpy as np
 import numbers
 from .parameter import NuisanceParameter, DependentParameter, Observable
@@ -97,8 +96,9 @@ class TemplateSample(Sample):
         '''
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         param: a Parameter object
-        effect_up: a numpy array representing the multiplicative effect of the parameter on the yield, or a single number
-            TODO: or pass TH1 with yield and nominal is found automatically
+        effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
+                   or a single number representing the relative effect on the sample normalization,
+                   or a histogram representing the *bin yield* under the effect of the parameter (i.e. not relative)
         effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
@@ -112,11 +112,13 @@ class TemplateSample(Sample):
         elif isinstance(effect_up, numbers.Number):
             if 'shape' in param.combinePrior:
                 effect_up = np.full(self.observable.nbins, effect_up)
-        elif isinstance(effect_up, ROOT.TH1):
-            raise NotImplementedError("Convert TH1 yield to effect numpy array")
-            # effect_up = ... / self._nominal
         else:
-            raise ValueError("effect_up is not a valid type")
+            effect_up, binning, _ = _to_numpy(effect_up)
+            if not np.array_equal(binning, self.observable.binning):
+                raise ValueError("effect_up has incompatible binning with sample %r" % self)
+            zerobins = self._nominal <= 0.
+            effect_up[zerobins] = 0.
+            effect_up[~zerobins] /= self._nominal[~zerobins]
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
@@ -126,15 +128,16 @@ class TemplateSample(Sample):
             elif isinstance(effect_down, numbers.Number):
                 if 'shape' in param.combinePrior:
                     effect_down = np.full(self.observable.nbins, effect_down)
-            elif isinstance(effect_down, ROOT.TH1):
-                raise NotImplementedError("Convert TH1 yield to effect numpy array")
-                # effect_down = ... / self._nominal
             else:
-                raise ValueError("effect_down is not a valid type")
+                effect_down, binning, _ = _to_numpy(effect_down)
+                if not np.array_equal(binning, self.observable.binning):
+                    raise ValueError("effect_down has incompatible binning with sample %r" % self)
+                zerobins = self._nominal <= 0.
+                effect_down[zerobins] = 0.
+                effect_down[~zerobins] /= self._nominal[~zerobins]
             self._paramEffectsDown[param] = effect_down
         else:
-            # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
-            self._paramEffectsDown[param] = 1. / effect_up
+            self._paramEffectsDown[param] = None
 
     def getParamEffect(self, param, up=True):
         '''
@@ -143,6 +146,9 @@ class TemplateSample(Sample):
         if up:
             return self._paramEffectsUp[param]
         else:
+            if self._paramEffectsDown[param] is None:
+                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                return 1. / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
 
     def getExpectation(self, nominal=False):
@@ -161,19 +167,21 @@ class TemplateSample(Sample):
         Import the necessary Roofit objects into the workspace for this sample
         and return an extended pdf representing this sample's prediciton for pdf and norm.
         '''
+        import ROOT
         rooObservable = self.observable.renderRoofit(workspace)
         rooTemplate = ROOT.RooDataHist(self.name, self.name, ROOT.RooArgList(rooObservable), _to_TH1(self._nominal, self.observable.binning, self.observable.name))
         workspace.add(rooTemplate)
-        for param in self._paramEffectsUp:
-            if not isinstance(self._paramEffectsUp[param], np.ndarray):
+        for param in self.parameters:
+            effect_up = self.getParamEffect(param, up=True)
+            if not isinstance(effect_up, np.ndarray):
                 # Normalization systematics can just go into combine datacards
                 continue
             name = self.name + '_' + param.name + 'Up'
-            shape = self._nominal * self._paramEffectsUp[param]
+            shape = self._nominal * effect_up
             rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
             workspace.add(rooTemplate)
             name = self.name + '_' + param.name + 'Down'
-            shape = self._nominal * self._paramEffectsDown[param]
+            shape = self._nominal * self.getParamEffect(param, up=False)
             rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
             workspace.add(rooTemplate)
 
@@ -192,7 +200,10 @@ class TemplateSample(Sample):
         else:
             up = self._paramEffectsUp[param]
             down = self._paramEffectsDown[param]
-            return '%.3f/%.3f' % (up, down)
+            if down is None:
+                return '%.3f' % up
+            else:
+                return '%.3f/%.3f' % (up, down)
 
 
 class ParametericSample(Sample):
@@ -270,6 +281,7 @@ class ParametericSample(Sample):
         '''
         Produce a RooParametricHist and add to workspace
         '''
+        import ROOT
         rooObservable = self.observable.renderRoofit(workspace)
         params = self.getExpectation()
 

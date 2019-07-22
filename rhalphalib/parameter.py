@@ -1,4 +1,3 @@
-import ROOT
 import numbers
 import warnings
 import numpy as np
@@ -117,6 +116,7 @@ class IndependentParameter(Parameter):
         self._hi = hi if hi is not None else self.DefaultRange[1]
 
     def renderRoofit(self, workspace):
+        import ROOT
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self._name, self._name, self.value, self._lo, self._hi)
             workspace.add(var)
@@ -202,6 +202,7 @@ class DependentParameter(Parameter):
         return "(" + self._formula.format(*(p.formula() for p in self._dependents)) + ")"
 
     def renderRoofit(self, workspace):
+        import ROOT
         if workspace.function(self._name) == None:  # noqa: E711
             if self.intermediate:
                 # This is a warning because we should make sure the name does not conflict as
@@ -246,12 +247,14 @@ class Observable(Parameter):
         return len(self._binning) - 1
 
     def binningTArrayD(self):
+        import ROOT
         return ROOT.TArrayD(len(self._binning), self._binning)
 
     def renderRoofit(self, workspace):
         '''
         Return a RooObservable following the definition
         '''
+        import ROOT
         if workspace.var(self._name) != None:  # noqa: E711
             return workspace.var(self._name)
         var = ROOT.RooRealVar(self.name, self.name,

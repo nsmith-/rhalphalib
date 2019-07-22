@@ -2,10 +2,9 @@ from collections import OrderedDict
 import datetime
 from functools import reduce
 import os
-import ROOT
 from .sample import Sample
 from .parameter import Observable
-from .util import _to_numpy, _to_TH1
+from .util import _to_numpy, _to_TH1, install_roofit_helpers
 
 
 class Model(object):
@@ -57,6 +56,8 @@ class Model(object):
         return self
 
     def renderCombine(self, outputPath):
+        import ROOT
+        install_roofit_helpers()
         if not os.path.exists(outputPath):
             os.makedirs(outputPath)
         workspace = ROOT.RooWorkspace(self.name)
@@ -167,6 +168,7 @@ class Channel():
         Render each sample in the channel and add them into an extended RooAddPdf
         Also render the observation
         '''
+        import ROOT
         # TODO: build RooAddPdf from sample pdfs (and norms)
         pdfs = []
         norms = []

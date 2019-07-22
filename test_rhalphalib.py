@@ -63,9 +63,10 @@ def test_simple():
     pass_sample = rl.TransferFactorSample('pt450to500Pass_qcd', rl.Sample.BACKGROUND, tf_params, fail_sample)
     model['pt450to500Pass'].addSample(pass_sample)
 
-    # import ROOT
-    # ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.WARNING)
+    import sys
+    print("ROOT used? ", 'ROOT' in sys.modules)
     model.renderCombine("simplemodel")
+    print("ROOT used? ", 'ROOT' in sys.modules)
 
 
 if __name__ == '__main__':
