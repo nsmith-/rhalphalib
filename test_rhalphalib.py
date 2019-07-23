@@ -8,6 +8,8 @@ def dummy_rhalphabet():
     jec = rl.NuisanceParameter('CMS_jec', 'lnN')
     massScale = rl.NuisanceParameter('CMS_msdScale', 'shape')
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    tqqeffSF = rl.IndependentParameter('tqqeffSF', 1.)
+    tqqnormSF = rl.IndependentParameter('tqqnormSF', 1.)
 
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
     npt = len(ptbins) - 1
@@ -30,7 +32,7 @@ def dummy_rhalphabet():
             model.addChannel(ch)
 
             notqcdsum = np.zeros(nmsd)
-            for sName in ['zqq', 'wqq', 'hqq']:
+            for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
                 # some mock expectations
                 templ = (np.random.exponential(5, size=nmsd), msdbins, 'msd')
                 notqcdsum += templ[0]
@@ -72,9 +74,18 @@ def dummy_rhalphabet():
         scaledparams = initial_qcd + sigmascale*np.sqrt(initial_qcd)*qcdparams
         fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, obs, scaledparams)
         failCh.addSample(fail_qcd)
-
         pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_params[ptbin, :], fail_qcd)
         model['ptbin%dpass' % ptbin].addSample(pass_qcd)
+
+        tqqpass = model['ptbin%dpass_tqq' % ptbin]
+        tqqfail = model['ptbin%dfail_tqq' % ptbin]
+        tqqPF = tqqpass.getExpectation(nominal=True).sum() / tqqfail.getExpectation(nominal=True).sum()
+        tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
+        tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
+        tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
+        tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
+
+        # Fill in muon CR
 
     import pickle
     with open("model.pkl", "wb") as fout:

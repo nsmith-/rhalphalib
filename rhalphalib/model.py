@@ -257,3 +257,8 @@ class Channel():
             for param in otherParams:
                 table.append([param.name, param.combinePrior])
                 fout.write(param.name + ' ' + param.combinePrior + "\n")
+                # identify any normalization modifiers
+                for sample in signalSamples + bkgSamples:
+                    effect = sample.combineParamEffect(param)
+                    if effect != '-':
+                        fout.write(effect + "\n")

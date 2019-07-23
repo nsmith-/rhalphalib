@@ -1,6 +1,12 @@
 import numpy as np
 import numbers
-from .parameter import ConstantParameter, NuisanceParameter, DependentParameter, Observable
+from .parameter import (
+    ConstantParameter,
+    IndependentParameter,
+    NuisanceParameter,
+    DependentParameter,
+    Observable,
+)
 from .util import _to_numpy, _to_TH1
 
 
@@ -117,12 +123,22 @@ class TemplateSample(Sample):
         effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
                    or a single number representing the relative effect on the sample normalization,
                    or a histogram representing the *bin yield* under the effect of the parameter (i.e. not relative)
+                   or a DependentParameter representing the value to scale the *normalization* of this process
         effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         '''
         if not isinstance(param, NuisanceParameter):
-            raise ValueError("Template morphing can only be done via independent parameters with priors (i.e. a NuisanceParameter)")
+            if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
+                if effect_up.getDependents(deep=True) != {param}:
+                    raise NotImplementedError("Support for normalization modifier dependent on multiple parameters... just use ParametericSample")
+                if effect_down is not None:
+                    raise ValueError("Asymmetric normalization modifiers not supported. You can encode the effect in the dependent parameter")
+                effect_up.name = param.name + '_effect_' + self.name
+                self._paramEffectsUp[param] = effect_up
+                return
+            else:
+                raise ValueError("Template morphing can only be done via a NuisanceParameter")
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
@@ -196,7 +212,7 @@ class TemplateSample(Sample):
         for param in self.parameters:
             effect_up = self.getParamEffect(param, up=True)
             if 'shape' not in param.combinePrior:
-                # Normalization systematics can just go into combine datacards
+                # Normalization systematics can just go into combine datacards (although if we build PDF here, will need it)
                 continue
             name = self.name + '_' + param.name + 'Up'
             shape = nominal * effect_up
@@ -222,6 +238,14 @@ class TemplateSample(Sample):
             return '-'
         elif 'shape' in param.combinePrior:
             return '1'
+        elif isinstance(self.getParamEffect(param, up=True), DependentParameter):
+            dep = self.getParamEffect(param, up=True)
+            # about here's where I start to feel painted into a corner
+            return '{0} rateParam * {1} {2} {3}'.format(dep.name,
+                                                        self.name,
+                                                        dep.formula(rendering=True).format(**{param.name: '@0'}), 
+                                                        param.name,
+                                                        )
         else:
             up = self.getParamEffect(param, up=True)
             down = self.getParamEffect(param, up=False)
