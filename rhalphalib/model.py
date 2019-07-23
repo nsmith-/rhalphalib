@@ -254,9 +254,9 @@ class Channel():
             rowfmt = ("{:<%d}" % colWidths[0]) + " ".join("{:>%d}" % w for w in colWidths[1:]) + "\n"
             for row in table:
                 fout.write(rowfmt.format(*row))
+
             for param in otherParams:
-                table.append([param.name, param.combinePrior])
-                fout.write(param.name + ' ' + param.combinePrior + "\n")
+                fout.write("{0} extArg {1}.root:{1}\n".format(param.name, workspaceName))
                 # identify any normalization modifiers
                 for sample in signalSamples + bkgSamples:
                     effect = sample.combineParamEffect(param)

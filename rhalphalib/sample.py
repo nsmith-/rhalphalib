@@ -213,6 +213,9 @@ class TemplateSample(Sample):
             effect_up = self.getParamEffect(param, up=True)
             if 'shape' not in param.combinePrior:
                 # Normalization systematics can just go into combine datacards (although if we build PDF here, will need it)
+                if isinstance(effect_up, DependentParameter):
+                    # this is a rateParam, we should add the IndependentParameter to the workspace
+                    param.renderRoofit(workspace)
                 continue
             name = self.name + '_' + param.name + 'Up'
             shape = nominal * effect_up
@@ -239,13 +242,16 @@ class TemplateSample(Sample):
         elif 'shape' in param.combinePrior:
             return '1'
         elif isinstance(self.getParamEffect(param, up=True), DependentParameter):
-            dep = self.getParamEffect(param, up=True)
             # about here's where I start to feel painted into a corner
-            return '{0} rateParam * {1} {2} {3}'.format(dep.name,
-                                                        self.name,
-                                                        dep.formula(rendering=True).format(**{param.name: '@0'}), 
-                                                        param.name,
-                                                        )
+            dep = self.getParamEffect(param, up=True)
+            channel, sample = self.name[:self.name.find('_')], self.name[self.name.find('_') + 1:]
+            formula = dep.formula(rendering=True).format(**{param.name: '@0'})
+            return '{0} rateParam {1} {2} {3} {4}'.format(dep.name,
+                                                          channel,
+                                                          sample,
+                                                          formula,
+                                                          param.name,
+                                                         )
         else:
             up = self.getParamEffect(param, up=True)
             down = self.getParamEffect(param, up=False)
