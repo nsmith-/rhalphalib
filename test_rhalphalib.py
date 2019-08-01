@@ -1,5 +1,6 @@
 import rhalphalib as rl
 import numpy as np
+import pickle
 
 
 def dummy_rhalphabet():
@@ -87,14 +88,10 @@ def dummy_rhalphabet():
 
         # Fill in muon CR
 
-    import pickle
-    with open("model.pkl", "wb") as fout:
+    with open("testModel.pkl", "wb") as fout:
         pickle.dump(model, fout)
 
-    import sys
-    print("ROOT used? ", 'ROOT' in sys.modules)
     model.renderCombine("testModel")
-    print("ROOT used? ", 'ROOT' in sys.modules)
 
 
 def dummy_monojet():
@@ -147,14 +144,16 @@ def dummy_monojet():
     gammaTransferFactor = gammaJetsMC.getExpectation() / zvvJetsMC.getExpectation()
     gammaJets = rl.TransferFactorSample('gammaCh_gammaJets', rl.Sample.BACKGROUND, gammaTransferFactor, zvvJets)
     gammaJets.setParamEffect(gamma_to_z_ewk, np.linspace(1.01, 1.05, recoil.nbins))
-    print("\n".join(b.formula(rendering=True) for b in gammaJets.getExpectation()))
     gammaCh.addSample(gammaJets)
 
     gammaCh.setObservation((np.random.poisson(4000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+
+    with open("monojetModel.pkl", "wb") as fout:
+        pickle.dump(model, fout)
 
     model.renderCombine("monojetModel")
 
 
 if __name__ == '__main__':
-    # dummy_rhalphabet()
+    dummy_rhalphabet()
     dummy_monojet()
