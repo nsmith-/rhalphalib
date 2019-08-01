@@ -109,9 +109,14 @@ def dummy_monojet():
     signalCh = rl.Channel("signalCh")
     model.addChannel(signalCh)
 
-    zvvBinYields = np.array([rl.IndependentParameter('zvvYield_recoilbin%d' % i, 0) for i in range(recoil.nbins)])
+    # these parameters are large, should probably log-transform them
+    zvvBinYields = np.array([rl.IndependentParameter('tmp', 1, 0, 1e4) for _ in range(recoil.nbins)])  # name will be changed by ParametericSample
     zvvJets = rl.ParametericSample('signalCh_zvvJets', rl.Sample.BACKGROUND, recoil, zvvBinYields)
     signalCh.addSample(zvvJets)
+
+    dmTemplate = (np.random.poisson(10*np.exp(-0.2*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    dmSample = rl.TemplateSample('signalCh_someDarkMatter', rl.Sample.SIGNAL, dmTemplate)
+    signalCh.addSample(dmSample)
 
     signalCh.setObservation((np.random.poisson(1000*(20/6.6)*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
 
@@ -130,6 +135,11 @@ def dummy_monojet():
     zllTransferFactor = zllJetsMC.getExpectation() / zvvJetsMC.getExpectation()
     zllJets = rl.TransferFactorSample('zllCh_zllJets', rl.Sample.BACKGROUND, zllTransferFactor, zvvJets)
     zllCh.addSample(zllJets)
+
+    otherbkgTemplate = (np.random.poisson(20*np.exp(-0.2*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    otherbkg = rl.TemplateSample('zllCh_otherbkg', rl.Sample.BACKGROUND, otherbkgTemplate)
+    otherbkg.setParamEffect(jec, np.random.normal(loc=1, scale=0.01, size=recoil.nbins))
+    zllCh.addSample(otherbkg)
 
     zllCh.setObservation((np.random.poisson(1000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
 

@@ -443,23 +443,14 @@ class ParametericSample(Sample):
         For combine, the normalization in the card is used to scale the parameteric process PDF
         Since we provide an explicit normalization function, this should always stay at 1.
         '''
+        # TODO: optionally we could set the normalization here and leave only normalization modifiers
         return 1.
 
     def combineParamEffect(self, param):
         '''
-        Combine cannot build shape param effects for parameterized templates, so we have to do it in the model
-        For normalization effects, I am not sure what happens.. if combine adds the nuisance properly then we just
-        need the effect size line as below, and we correspondingly should ignore it when calculating effects ourselves.
-        This would be annoying though, because then getExpectation() needs to behave different between combine rendering and otherwise.
+        Combine cannot build shape param effects for parameterized templates, so we have to do it in the model.
         '''
-        if param not in self._paramEffectsUp:
-            return '-'
-        elif 'shape' in param.combinePrior:
-            return '1'
-        else:
-            up = self._paramEffectsUp[param]
-            down = self._paramEffectsDown[param]
-            return '%.3f/%.3f' % (up, down)
+        return '-'
 
 
 class TransferFactorSample(ParametericSample):

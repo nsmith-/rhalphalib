@@ -247,13 +247,24 @@ class Channel():
             table.append(['process'] + [s.name[s.name.find('_')+1:] for s in signalSamples + bkgSamples])
             table.append(['process'] + [str(i) for i in range(1 - nSig, nBkg + 1)])
             table.append(['rate'] + ["%.3f" % s.combineNormalization() for s in signalSamples + bkgSamples])
+
+            # if a param with prior does not have any effect here, the effect must be embedded in a sample PDF
+            # in that case, we declare it as 'param' later in the card
+            nuisancesNoCardEffect = []
             for param in nuisanceParams:
-                table.append([param.name + ' ' + param.combinePrior] + [s.combineParamEffect(param) for s in signalSamples + bkgSamples])
+                effects = [s.combineParamEffect(param) for s in signalSamples + bkgSamples]
+                if all(e == '-' for e in effects):
+                    nuisancesNoCardEffect.append(param)
+                else:
+                    table.append([param.name + ' ' + param.combinePrior] + effects)
 
             colWidths = [max(len(table[row][col]) + 1 for row in range(len(table))) for col in range(nSig + nBkg + 1)]
             rowfmt = ("{:<%d}" % colWidths[0]) + " ".join("{:>%d}" % w for w in colWidths[1:]) + "\n"
             for row in table:
                 fout.write(rowfmt.format(*row))
+
+            for param in nuisancesNoCardEffect:
+                fout.write("{0} param 0 1\n".format(param.name))
 
             for param in otherParams:
                 fout.write("{0} extArg {1}.root:{1}\n".format(param.name, workspaceName))
