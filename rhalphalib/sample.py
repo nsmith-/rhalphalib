@@ -5,6 +5,7 @@ from .parameter import (
     IndependentParameter,
     NuisanceParameter,
     DependentParameter,
+    SmoothStep,
     Observable,
 )
 from .util import _to_numpy, _to_TH1
@@ -196,8 +197,23 @@ class TemplateSample(Sample):
         if nominal:
             return nominalval
         else:
-            # TODO: construct a DependentParameter per bin, as a function of the nuisance params
-            raise NotImplementedError
+            out = np.array([ConstantParameter(self.name + "_bin%d_nominal" % i, v) for i, v in enumerate(nominalval)])
+            # TODO: additive and multiplicative effects? Or restrict to multiplicative only?
+            for param in self.parameters:
+                effect_up = self.getParamEffect(param, up=True)
+                if effect_up is None:
+                    pass
+                if isinstance(effect_up, DependentParameter):
+                    out = out * effect_up
+                if self._paramEffectsDown[param] is None:
+                    out = out * (effect_up**param)
+                else:
+                    effect_down = self.getParamEffect(param, up=False)
+                    smoothStep = SmoothStep(param)
+                    combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                    out = out * combined_effect
+
+            return out
 
     def renderRoofit(self, workspace):
         '''
@@ -251,7 +267,7 @@ class TemplateSample(Sample):
                                                           sample,
                                                           formula,
                                                           param.name,
-                                                         )
+                                                          )
         else:
             up = self.getParamEffect(param, up=True)
             down = self.getParamEffect(param, up=False)
@@ -288,7 +304,7 @@ class ParametericSample(Sample):
         if len(params) != observable.nbins:
             raise ValueError
         self._observable = observable
-        self._params = np.array(params)
+        self._nominal = np.array(params)
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
 
@@ -306,37 +322,80 @@ class ParametericSample(Sample):
         '''
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         param: a Parameter object
-        effect_up: a numpy array representing the multiplicative effect of the parameter on the yield, or a single number
+        effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
+                   or a single number representing the relative effect on the sample normalization,
         effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
 
-        For ParametericSample, only relative effects are supported.  Not sure if they are useful though.
+        N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         '''
-        raise NotImplementedError
+        if not isinstance(param, NuisanceParameter):
+            raise ValueError("Template morphing can only be done via a NuisanceParameter")
+
+        if isinstance(effect_up, np.ndarray):
+            if len(effect_up) != self.observable.nbins:
+                raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
+        elif isinstance(effect_up, numbers.Number):
+            if 'shape' in param.combinePrior:
+                effect_up = np.full(self.observable.nbins, effect_up)
+        else:
+            raise ValueError("unrecognized effect_up type")
+        self._paramEffectsUp[param] = effect_up
+
+        if effect_down is not None:
+            if isinstance(effect_down, np.ndarray):
+                if len(effect_down) != self.observable.nbins:
+                    raise ValueError("effect_down has the wrong number of bins (%d, expected %d)" % (len(effect_down), self.observable.nbins))
+            elif isinstance(effect_down, numbers.Number):
+                if 'shape' in param.combinePrior:
+                    effect_down = np.full(self.observable.nbins, effect_down)
+            else:
+                raise ValueError("unrecognized effect_down type")
+            self._paramEffectsDown[param] = effect_down
+        else:
+            self._paramEffectsDown[param] = None
 
     def getParamEffect(self, param, up=True):
         '''
         Get the parameter effect
         '''
-        raise NotImplementedError
+        if up:
+            return self._paramEffectsUp[param]
+        else:
+            if self._paramEffectsDown[param] is None:
+                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                return 1. / self._paramEffectsUp[param]
+            return self._paramEffectsDown[param]
 
     def getExpectation(self, nominal=False):
         '''
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
-        params = self._params.copy()  # this is a shallow copy
+        out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
-            params[~self.mask] = [ConstantParameter("masked", 0) for _ in range((~self.mask).sum())]
+            out[~self.mask] = [ConstantParameter("masked", 0) for _ in range((~self.mask).sum())]
         if nominal:
-            return np.array([p.value for p in params])
+            return np.array([p.value for p in out])
         else:
-            # TODO: create morph/modifier of self._params with any additional effects in _paramEffectsUp/Down
-            for i, p in enumerate(params):
+            for param in self._paramEffectsUp.keys():
+                effect_up = self.getParamEffect(param, up=True)
+                if effect_up is None:
+                    pass
+                if self._paramEffectsDown[param] is None:
+                    out = out * (effect_up**param)
+                else:
+                    effect_down = self.getParamEffect(param, up=False)
+                    smoothStep = SmoothStep(param)
+                    combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                    out = out * combined_effect
+
+            for i, p in enumerate(out):
                 p.name = self.name + '_bin%d' % i
                 if isinstance(p, DependentParameter):
                     # Let's make sure to render these
                     p.intermediate = False
-            return params
+
+            return out
 
     def renderRoofit(self, workspace):
         '''
@@ -349,7 +408,7 @@ class ParametericSample(Sample):
         if self.UseRooParametricHist:
             rooParams = [p.renderRoofit(workspace) for p in params]
             # need a dummy hist to generate proper binning
-            dummyHist = _to_TH1(np.zeros(len(self._params)), self.observable.binning, self.observable.name)
+            dummyHist = _to_TH1(np.zeros(self.observable.nbins), self.observable.binning, self.observable.name)
             rooTemplate = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
             rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
             workspace.add(rooTemplate)

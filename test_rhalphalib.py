@@ -97,5 +97,64 @@ def dummy_rhalphabet():
     print("ROOT used? ", 'ROOT' in sys.modules)
 
 
+def dummy_monojet():
+    model = rl.Model("testMonojet")
+
+    # lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    jec = rl.NuisanceParameter('CMS_jec', 'shape')
+    ele_id_eff = rl.NuisanceParameter('CMS_ele_id_eff', 'shape')
+    pho_id_eff = rl.NuisanceParameter('CMS_pho_id_eff', 'shape')
+    gamma_to_z_ewk = rl.NuisanceParameter('Theory_gamma_z_ewk', 'shape')
+
+    recoilbins = np.linspace(300, 1200, 13)
+    recoil = rl.Observable('recoil', recoilbins)
+
+    signalCh = rl.Channel("signalCh")
+    model.addChannel(signalCh)
+
+    zvvBinYields = np.array([rl.IndependentParameter('zvvYield_recoilbin%d' % i, 0) for i in range(recoil.nbins)])
+    zvvJets = rl.ParametericSample('signalCh_zvvJets', rl.Sample.BACKGROUND, recoil, zvvBinYields)
+    signalCh.addSample(zvvJets)
+
+    signalCh.setObservation((np.random.poisson(1000*(20/6.6)*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+
+    zllCh = rl.Channel("zllCh")
+    model.addChannel(zllCh)
+
+    zllTemplate = (np.random.poisson(1000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    zllJetsMC = rl.TemplateSample('zllJetsMC', rl.Sample.BACKGROUND, zllTemplate)
+    zllJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.05, size=recoil.nbins))
+    zllJetsMC.setParamEffect(ele_id_eff, np.random.normal(loc=1, scale=0.02, size=recoil.nbins), np.random.normal(loc=1, scale=0.02, size=recoil.nbins))
+
+    zvvTemplate = (np.random.poisson(1000*(20/6.6)*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    zvvJetsMC = rl.TemplateSample('zvvJetsMC', rl.Sample.BACKGROUND, zvvTemplate)
+    zvvJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.01, size=recoil.nbins))
+
+    zllTransferFactor = zllJetsMC.getExpectation() / zvvJetsMC.getExpectation()
+    zllJets = rl.TransferFactorSample('zllCh_zllJets', rl.Sample.BACKGROUND, zllTransferFactor, zvvJets)
+    zllCh.addSample(zllJets)
+
+    zllCh.setObservation((np.random.poisson(1000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+
+    gammaCh = rl.Channel("gammaCh")
+    model.addChannel(gammaCh)
+
+    gammaTemplate = (np.random.poisson(4000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    gammaJetsMC = rl.TemplateSample('gammaJetsMC', rl.Sample.BACKGROUND, gammaTemplate)
+    gammaJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.05, size=recoil.nbins))
+    gammaJetsMC.setParamEffect(pho_id_eff, np.random.normal(loc=1, scale=0.02, size=recoil.nbins))
+
+    gammaTransferFactor = gammaJetsMC.getExpectation() / zvvJetsMC.getExpectation()
+    gammaJets = rl.TransferFactorSample('gammaCh_gammaJets', rl.Sample.BACKGROUND, gammaTransferFactor, zvvJets)
+    gammaJets.setParamEffect(gamma_to_z_ewk, np.linspace(1.01, 1.05, recoil.nbins))
+    print("\n".join(b.formula(rendering=True) for b in gammaJets.getExpectation()))
+    gammaCh.addSample(gammaJets)
+
+    gammaCh.setObservation((np.random.poisson(4000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+
+    model.renderCombine("monojetModel")
+
+
 if __name__ == '__main__':
-    dummy_rhalphabet()
+    # dummy_rhalphabet()
+    dummy_monojet()

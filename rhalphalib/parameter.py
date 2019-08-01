@@ -80,7 +80,7 @@ class Parameter(object):
                 out = DependentParameter(name, "{0}%s%r" % (op, other), self)
             out.intermediate = True
             return out
-        raise TypeError("unsupported operand type(s) for %s: '%s' and '%s'" % (op, str(type(self)), str(type(other))))
+        return NotImplemented
 
     def __radd__(self, other):
         return self._binary_op(('_add_', '+', True), other)
@@ -94,6 +94,9 @@ class Parameter(object):
     def __rtruediv__(self, other):
         return self._binary_op(('_div_', '/', True), other)
 
+    def __rpow__(self, other):
+        return self._binary_op(('_pow_', '**', True), other)
+
     def __add__(self, other):
         return self._binary_op(('_add_', '+', False), other)
 
@@ -105,6 +108,9 @@ class Parameter(object):
 
     def __truediv__(self, other):
         return self._binary_op(('_div_', '/', False), other)
+
+    def __pow__(self, other):
+        return self._binary_op(('_pow_', '**', False), other)
 
 
 class ConstantParameter(Parameter):
@@ -169,6 +175,7 @@ class DependentParameter(Parameter):
         super(DependentParameter, self).__init__(name, np.nan)
         if not all(isinstance(d, Parameter) for d in dependents):
             raise ValueError
+        # TODO: validate formula for allowed functions
         self._formula = formula
         self._dependents = dependents
 
@@ -224,6 +231,34 @@ class DependentParameter(Parameter):
             # Originally just passed the named variables to RooFormulaVar but it seems the TFormula class
             # is more sensitive to variable names than is reasonable, so we reindex here
             formula = self.formula(rendering=True).format(**{var.GetName(): '@%d' % i for i, var in enumerate(rooVars)})
+            var = ROOT.RooFormulaVar(self._name, self._name, formula, ROOT.RooArgList.fromiter(rooVars))
+            workspace.add(var)
+        return workspace.function(self._name)
+
+
+class SmoothStep(DependentParameter):
+    def __init__(self, param):
+        if not isinstance(param, Parameter):
+            raise ValueError("Expected a Parameter instance, got %r" % param)
+        if param.intermediate:
+            raise ValueError("SmoothStep can only depend on a non-intermediate parameter")
+        super(SmoothStep, self).__init__(param.name + '_smoothstep', '{0}', param)
+        self.intermediate = False
+
+    @property
+    def value(self):
+        raise NotImplementedError
+
+    def formula(self, rendering=False):
+        return "{" + self.name + "}"
+
+    def renderRoofit(self, workspace):
+        import ROOT
+        if workspace.function(self._name) == None:  # noqa: E711
+            formula = "(-0.25*@0**3 + 0.75*@0 + 0.5)*TMath::Sign(1, 1+@0)*TMath::Sign(1, 1-@0) + 1 - TMath::Sign(1, 1-@0)"
+            rooVars = [v.renderRoofit(workspace) for v in self.getDependents(rendering=True)]
+            if len(rooVars) != 1:
+                raise RuntimeError("Unexpected number of parameters encountered while rendering SmoothStep")
             var = ROOT.RooFormulaVar(self._name, self._name, formula, ROOT.RooArgList.fromiter(rooVars))
             workspace.add(var)
         return workspace.function(self._name)
