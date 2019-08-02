@@ -1,6 +1,17 @@
 import rhalphalib as rl
 import numpy as np
+import scipy.stats
 import pickle
+
+
+def expo_sample(norm, scale, obs):
+    cdf = scipy.stats.expon.cdf(scale=scale, x=obs.binning) * norm
+    return (np.diff(cdf), obs.binning, obs.name)
+
+
+def gaus_sample(norm, loc, scale, obs):
+    cdf = scipy.stats.norm.cdf(loc=loc, scale=scale, x=obs.binning) * norm
+    return (np.diff(cdf), obs.binning, obs.name)
 
 
 def dummy_rhalphabet():
@@ -9,13 +20,13 @@ def dummy_rhalphabet():
     jec = rl.NuisanceParameter('CMS_jec', 'lnN')
     massScale = rl.NuisanceParameter('CMS_msdScale', 'shape')
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
-    tqqeffSF = rl.IndependentParameter('tqqeffSF', 1.)
-    tqqnormSF = rl.IndependentParameter('tqqnormSF', 1.)
+    tqqeffSF = rl.IndependentParameter('tqqeffSF', 1., 0, 10)
+    tqqnormSF = rl.IndependentParameter('tqqnormSF', 1., 0, 10)
 
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
     npt = len(ptbins) - 1
     msdbins = np.linspace(40, 201, 24)
-    nmsd = len(msdbins) - 1
+    msd = rl.Observable('msd', msdbins)
 
     tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'])
     # here we derive these all at once with 2D array
@@ -32,18 +43,19 @@ def dummy_rhalphabet():
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
 
-            notqcdsum = np.zeros(nmsd)
-            for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
+            notqcdsum = np.zeros(msd.nbins)
+            for sName, peak in [('zqq', 90), ('wqq', 80), ('tqq', 140), ('hqq', 125)]:
                 # some mock expectations
-                templ = (np.random.exponential(5, size=nmsd), msdbins, 'msd')
+                templ = gaus_sample(100, peak, 10, msd)
+                print(sName, templ)
                 notqcdsum += templ[0]
                 stype = rl.Sample.SIGNAL if sName == 'hqq' else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                 # mock systematics
-                jecup_ratio = np.random.normal(loc=1, scale=0.05, size=nmsd)
-                msdUp = np.linspace(0.9, 1.1, nmsd)
-                msdDn = np.linspace(1.2, 0.8, nmsd)
+                jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
+                msdUp = np.linspace(0.9, 1.1, msd.nbins)
+                msdDn = np.linspace(1.2, 0.8, msd.nbins)
 
                 # for jec we set lnN prior, shape will automatically be converted to norm systematic
                 sample.setParamEffect(jec, jecup_ratio)
@@ -53,7 +65,8 @@ def dummy_rhalphabet():
                 ch.addSample(sample)
 
             # make up a data_obs
-            data_obs = (np.random.poisson(notqcdsum + 50), msdbins, 'msd')
+            data_obs = (expo_sample(10000, 40, msd)[0] + notqcdsum, msd.binning, msd.name)
+            print('data_obs', data_obs)
             ch.setObservation(data_obs)
 
             # drop bins outside rho validity
@@ -65,14 +78,14 @@ def dummy_rhalphabet():
         # steal observable definition from fail channel
         failCh = model['ptbin%dfail' % ptbin]
         obs = failCh.observable
-        qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(nmsd)])
+        qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(msd.nbins)])
         initial_qcd = failCh.getObservation().astype(float)  # was integer, and numpy complained about subtracting float from it
         for sample in failCh:
             initial_qcd -= sample.getExpectation(nominal=True)
         if np.any(initial_qcd < 0.):
             raise ValueError("uh-oh")
         sigmascale = 10  # to scale the deviation from initial
-        scaledparams = initial_qcd + sigmascale*np.sqrt(initial_qcd)*qcdparams
+        scaledparams = initial_qcd * (1 + sigmascale/np.maximum(1., np.sqrt(initial_qcd)))**qcdparams
         fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, obs, scaledparams)
         failCh.addSample(fail_qcd)
         pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_params[ptbin, :], fail_qcd)
@@ -109,44 +122,44 @@ def dummy_monojet():
     signalCh = rl.Channel("signalCh")
     model.addChannel(signalCh)
 
+    zvvTemplate = expo_sample(1000, 400, recoil)
+    zvvJetsMC = rl.TemplateSample('zvvJetsMC', rl.Sample.BACKGROUND, zvvTemplate)
+    zvvJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.01, size=recoil.nbins))
+
     # these parameters are large, should probably log-transform them
-    zvvBinYields = np.array([rl.IndependentParameter('tmp', 1, 0, 1e4) for _ in range(recoil.nbins)])  # name will be changed by ParametericSample
+    zvvBinYields = np.array([rl.IndependentParameter('tmp', b, 0, zvvTemplate[0].max()*2) for b in zvvTemplate[0]])  # name will be changed by ParametericSample
     zvvJets = rl.ParametericSample('signalCh_zvvJets', rl.Sample.BACKGROUND, recoil, zvvBinYields)
     signalCh.addSample(zvvJets)
 
-    dmTemplate = (np.random.poisson(10*np.exp(-0.2*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    dmTemplate = expo_sample(100, 800, recoil)
     dmSample = rl.TemplateSample('signalCh_someDarkMatter', rl.Sample.SIGNAL, dmTemplate)
     signalCh.addSample(dmSample)
 
-    signalCh.setObservation((np.random.poisson(1000*(20/6.6)*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+    signalCh.setObservation(expo_sample(1000, 400, recoil))
 
     zllCh = rl.Channel("zllCh")
     model.addChannel(zllCh)
 
-    zllTemplate = (np.random.poisson(1000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    zllTemplate = expo_sample(1000*6.6/20, 400, recoil)
     zllJetsMC = rl.TemplateSample('zllJetsMC', rl.Sample.BACKGROUND, zllTemplate)
     zllJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.05, size=recoil.nbins))
     zllJetsMC.setParamEffect(ele_id_eff, np.random.normal(loc=1, scale=0.02, size=recoil.nbins), np.random.normal(loc=1, scale=0.02, size=recoil.nbins))
-
-    zvvTemplate = (np.random.poisson(1000*(20/6.6)*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
-    zvvJetsMC = rl.TemplateSample('zvvJetsMC', rl.Sample.BACKGROUND, zvvTemplate)
-    zvvJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.01, size=recoil.nbins))
 
     zllTransferFactor = zllJetsMC.getExpectation() / zvvJetsMC.getExpectation()
     zllJets = rl.TransferFactorSample('zllCh_zllJets', rl.Sample.BACKGROUND, zllTransferFactor, zvvJets)
     zllCh.addSample(zllJets)
 
-    otherbkgTemplate = (np.random.poisson(20*np.exp(-0.2*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    otherbkgTemplate = expo_sample(200, 250, recoil)
     otherbkg = rl.TemplateSample('zllCh_otherbkg', rl.Sample.BACKGROUND, otherbkgTemplate)
     otherbkg.setParamEffect(jec, np.random.normal(loc=1, scale=0.01, size=recoil.nbins))
     zllCh.addSample(otherbkg)
 
-    zllCh.setObservation((np.random.poisson(1000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+    zllCh.setObservation(expo_sample(1200, 380, recoil))
 
     gammaCh = rl.Channel("gammaCh")
     model.addChannel(gammaCh)
 
-    gammaTemplate = (np.random.poisson(4000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name)
+    gammaTemplate = expo_sample(2000, 450, recoil)
     gammaJetsMC = rl.TemplateSample('gammaJetsMC', rl.Sample.BACKGROUND, gammaTemplate)
     gammaJetsMC.setParamEffect(jec, np.random.normal(loc=1, scale=0.05, size=recoil.nbins))
     gammaJetsMC.setParamEffect(pho_id_eff, np.random.normal(loc=1, scale=0.02, size=recoil.nbins))
@@ -156,7 +169,7 @@ def dummy_monojet():
     gammaJets.setParamEffect(gamma_to_z_ewk, np.linspace(1.01, 1.05, recoil.nbins))
     gammaCh.addSample(gammaJets)
 
-    gammaCh.setObservation((np.random.poisson(4000*np.exp(-0.5*np.arange(recoil.nbins))), recoil.binning, recoil.name))
+    gammaCh.setObservation(expo_sample(2000, 450, recoil))
 
     with open("monojetModel.pkl", "wb") as fout:
         pickle.dump(model, fout)

@@ -8,7 +8,7 @@ from .parameter import (
     SmoothStep,
     Observable,
 )
-from .util import _to_numpy, _to_TH1
+from .util import _to_numpy, _to_TH1, _pairwise_sum
 
 
 class Sample(object):
@@ -290,7 +290,7 @@ class TemplateSample(Sample):
 
 
 class ParametericSample(Sample):
-    UseRooParametricHist = False
+    PreferRooParametricHist = True
 
     def __init__(self, name, sampletype, observable, params):
         '''
@@ -399,13 +399,15 @@ class ParametericSample(Sample):
 
     def renderRoofit(self, workspace):
         '''
-        Produce a RooParametricHist and add to workspace
+        Produce a RooParametricHist (if available) or RooParametricStepFunction and add to workspace
+        Note: for RooParametricStepFunction, bin values cannot be zero due to this ridiculous line:
+        https://github.com/root-project/root/blob/master/roofit/roofit/src/RooParametricStepFunction.cxx#L212-L213
         '''
         import ROOT
         rooObservable = self.observable.renderRoofit(workspace)
         params = self.getExpectation()
 
-        if self.UseRooParametricHist:
+        if hasattr(ROOT, 'RooParametricHist') and self.PreferRooParametricHist:
             rooParams = [p.renderRoofit(workspace) for p in params]
             # need a dummy hist to generate proper binning
             dummyHist = _to_TH1(np.zeros(self.observable.nbins), self.observable.binning, self.observable.name)
@@ -415,7 +417,8 @@ class ParametericSample(Sample):
             workspace.add(rooNorm)
         else:
             # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)
-            norm = params.sum()
+            norm = _pairwise_sum(params)
+            print(norm.formula(rendering=True))
             norm.name = self.name + '_norm'
             norm.intermediate = False
 

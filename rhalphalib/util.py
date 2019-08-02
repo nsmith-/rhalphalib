@@ -39,6 +39,15 @@ def _to_TH1(sumw, binning, name):
     return h
 
 
+def _pairwise_sum(array):
+    if len(array) == 1:
+        return array[0]
+    elif len(array) % 2 != 0:
+        # would be better to pick pseudorandom elements to merge
+        array = np.append(array[:-2], array[-2] + array[-1])
+    return _pairwise_sum(array[0::2] + array[1::2])
+
+
 ROOFIT_HELPERS_INSTALLED = False
 
 
