@@ -255,7 +255,8 @@ class SmoothStep(DependentParameter):
     def renderRoofit(self, workspace):
         import ROOT
         if workspace.function(self._name) == None:  # noqa: E711
-            formula = "(-0.25*@0**3 + 0.75*@0 + 0.5)*TMath::Sign(1, 1+@0)*TMath::Sign(1, 1-@0) + 1 - TMath::Sign(1, 1-@0)"
+            # Formula satisfies f(x<=-1) = 0, f(x>=1) = 1, f'(-1) = f'(1) = f''(-1) = f''(1) = 0
+            formula = "(((0.1875*@0*@0 - 0.625)*@0*@0 + 0.9375)*@0 + 0.5)*TMath::Sign(1, 1+@0)*TMath::Sign(1, 1-@0) + 1 - TMath::Sign(1, 1-@0)"
             rooVars = [v.renderRoofit(workspace) for v in self.getDependents(rendering=True)]
             if len(rooVars) != 1:
                 raise RuntimeError("Unexpected number of parameters encountered while rendering SmoothStep")
