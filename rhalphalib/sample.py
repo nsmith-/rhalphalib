@@ -418,7 +418,6 @@ class ParametericSample(Sample):
         else:
             # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)
             norm = _pairwise_sum(params)
-            print(norm.formula(rendering=True))
             norm.name = self.name + '_norm'
             norm.intermediate = False
 

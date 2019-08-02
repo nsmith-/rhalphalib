@@ -72,12 +72,16 @@ class BernsteinPoly(object):
             xpow = np.power.outer(x, np.arange(n + 1))
             bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
 
-        # Multiply by our coefficients and reduce to scalar
-        out = (bpolyval * self._params).reshape(len(xvals[0]), -1).sum(axis=1)
+        coefficients = bpolyval.reshape(len(xvals[0]), -1)
+        parameters = self._params.reshape(-1)
 
-        # Label it nicely
-        for i, p in enumerate(out):
+        out = np.full(len(xvals[0]), None)
+        for i in range(len(xvals[0])):
+            # sum small coefficients first
+            order = np.argsort(coefficients[i])
+            p = np.sum(parameters[order]*coefficients[i][order])
             dimstr = '_'.join('%s%.3f' % (d, v[i]) for d, v in zip(self._dim_names, xvals))
             p.name = self.name + '_eval_' + dimstr.replace('.', 'p')
             p.intermediate = False
+            out[i] = p
         return out.reshape(shape)

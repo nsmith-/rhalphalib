@@ -28,7 +28,7 @@ def dummy_rhalphabet():
     msdbins = np.linspace(40, 201, 24)
     msd = rl.Observable('msd', msdbins)
 
-    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'])
+    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'], limits=(0, 2))
     # here we derive these all at once with 2D array
     ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins), msdbins[:-1] + 0.3 * np.diff(msdbins), indexing='ij')
     rhopts = 2*np.log(msdpts/ptpts)
@@ -43,11 +43,19 @@ def dummy_rhalphabet():
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
 
+            isPass = region == 'pass'
+            ptnorm = 1.
+            templates = {
+                'wqq': gaus_sample(norm=ptnorm*(100 if isPass else 300), loc=80, scale=8, obs=msd),
+                'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
+                'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
+                'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
+                'qcd': expo_sample(norm=ptnorm*(10000 if isPass else 1000), scale=40, obs=msd),
+            }
             notqcdsum = np.zeros(msd.nbins)
-            for sName, peak in [('zqq', 90), ('wqq', 80), ('tqq', 140), ('hqq', 125)]:
+            for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
                 # some mock expectations
-                templ = gaus_sample(100, peak, 10, msd)
-                print(sName, templ)
+                templ = templates[sName]
                 notqcdsum += templ[0]
                 stype = rl.Sample.SIGNAL if sName == 'hqq' else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
@@ -65,14 +73,13 @@ def dummy_rhalphabet():
                 ch.addSample(sample)
 
             # make up a data_obs
-            data_obs = (expo_sample(10000, 40, msd)[0] + notqcdsum, msd.binning, msd.name)
-            print('data_obs', data_obs)
+            data_obs = (templates['qcd'][0] + notqcdsum, msd.binning, msd.name)
             ch.setObservation(data_obs)
 
             # drop bins outside rho validity
             mask = validbins[ptbin]
-            # blind bins 4,5
-            mask[4:6] = False
+            # blind bins 11, 12, 13
+            # mask[11:14] = False
             ch.mask = mask
 
         # steal observable definition from fail channel
