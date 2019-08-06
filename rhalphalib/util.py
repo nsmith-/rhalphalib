@@ -14,7 +14,6 @@ def _to_numpy(hinput):
         return hinput
     elif str(type(hinput)) == "<class 'ROOT.TH1D'>":
         sumw = np.zeros(hinput.GetNbinsX())
-        print(sumw.shape)
         binning = np.zeros(sumw.size + 1)
         name = hinput.GetName()
         for i in range(1, sumw.size + 1):
