@@ -19,7 +19,7 @@ def _to_numpy(hinput):
         for i in range(1, sumw.size + 1):
             sumw[i-1] = hinput.GetBinContent(i)
             binning[i-1] = hinput.GetXaxis().GetBinLowEdge(i)
-            binning[i] = hinput.GetXaxis().GetBinUpEdge(i)
+        binning[i] = hinput.GetXaxis().GetBinUpEdge(i)
         return (sumw, binning, name)
     elif str(type(hinput)) == "<class 'coffea.hist.hist_tools.Hist'>":
         sumw = hinput.values()[()]
