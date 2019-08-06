@@ -1,6 +1,7 @@
 import numpy as np
 import numbers
 from .parameter import (
+    Parameter,
     ConstantParameter,
     IndependentParameter,
     NuisanceParameter,
@@ -305,6 +306,8 @@ class ParametericSample(Sample):
             raise ValueError
         self._observable = observable
         self._nominal = np.array(params)
+        if not all(isinstance(p, Parameter) for p in self._nominal):
+            raise ValueError("ParametericSample expects parameters to derive from Parameter type.")
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
 
