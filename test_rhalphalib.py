@@ -37,8 +37,8 @@ def dummy_rhalphabet():
     validbins = (rhoscaled >= 0) & (rhoscaled <= 1)
     rhoscaled[~validbins] = 1  # we will mask these out later
 
-    order = (2, 3)
-    initial = np.full((order[0] + 1, order[1] + 1), 0.1)
+    order = (2, 2)
+    initial = np.full((order[0] + 1, order[1] + 1), 1.)
     tf = rl.BernsteinPoly("qcd_pass_rhalphTF", order, ['pt', 'rho'], initial, limits=(0, 10))
     tf_params = tf(ptscaled, rhoscaled)
 
@@ -86,9 +86,25 @@ def dummy_rhalphabet():
             # mask[11:14] = False
             ch.mask = mask
 
-        # steal observable definition from fail channel
+    # compute overall qcd efficiency (to scale transfer factor close to 1)
+    qcdpass, qcdfail = 0., 0.
+    for ptbin in range(npt):
         failCh = model['ptbin%dfail' % ptbin]
-        obs = failCh.observable
+        passCh = model['ptbin%dpass' % ptbin]
+        qcdfail += failCh.getObservation().sum()
+        for sample in failCh:
+            qcdfail -= sample.getExpectation(nominal=True).sum()
+        qcdpass += passCh.getObservation().sum()
+        for sample in passCh:
+            qcdpass -= sample.getExpectation(nominal=True).sum()
+
+    qcdeff = qcdpass / qcdfail
+    tf_params = tf_params * qcdeff
+
+    for ptbin in range(npt):
+        failCh = model['ptbin%dfail' % ptbin]
+        passCh = model['ptbin%dpass' % ptbin]
+
         qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(msd.nbins)])
         initial_qcd = failCh.getObservation().astype(float)  # was integer, and numpy complained about subtracting float from it
         for sample in failCh:
@@ -97,13 +113,13 @@ def dummy_rhalphabet():
             raise ValueError("initial_qcd negative for some bins..", initial_qcd)
         sigmascale = 10  # to scale the deviation from initial
         scaledparams = initial_qcd * (1 + sigmascale/np.maximum(1., np.sqrt(initial_qcd)))**qcdparams
-        fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, obs, scaledparams)
+        fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         failCh.addSample(fail_qcd)
         pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_params[ptbin, :], fail_qcd)
-        model['ptbin%dpass' % ptbin].addSample(pass_qcd)
+        passCh.addSample(pass_qcd)
 
-        tqqpass = model['ptbin%dpass_tqq' % ptbin]
-        tqqfail = model['ptbin%dfail_tqq' % ptbin]
+        tqqpass = passCh['tqq']
+        tqqfail = failCh['tqq']
         tqqPF = tqqpass.getExpectation(nominal=True).sum() / tqqfail.getExpectation(nominal=True).sum()
         tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
         tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)

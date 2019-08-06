@@ -95,7 +95,9 @@ class Channel(object):
         self._mask = None
 
     def __getitem__(self, key):
-        return self._samples[key]
+        if key in self._samples:
+            return self._samples[key]
+        return self._samples[self.name + '_' + key]
 
     def __iter__(self):
         for item in self._samples.values():
