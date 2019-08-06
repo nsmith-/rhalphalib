@@ -25,12 +25,14 @@ class BernsteinPoly(object):
             self._dim_names = dim_names
         else:
             self._dim_names = ['dim%d' % i for i in range(len(self._order))]
-        if init_params:
+        if isinstance(init_params, np.ndarray):
             if init_params.shape != self._shape:
                 raise ValueError
             self._init_params = init_params
-        else:
+        elif init_params is None:
             self._init_params = np.ones(shape=self._shape)
+        else:
+            raise ValueError
 
         # Construct Bernstein matrix for each dimension
         self._bmatrices = []

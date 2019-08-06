@@ -302,14 +302,11 @@ class Observable(Parameter):
         Return a RooObservable following the definition
         '''
         import ROOT
-        if workspace.var(self._name) != None:  # noqa: E711
-            return workspace.var(self._name)
-        var = ROOT.RooRealVar(self.name, self.name,
-                              self.binning[0],
-                              self.binning[-1]
-                              )
-        var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
-        return var
+        if workspace.var(self._name) == None:  # noqa: E711
+            var = ROOT.RooRealVar(self.name, self.name, self.binning[0], self.binning[-1])
+            var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
+            workspace.add(var)
+        return workspace.var(self._name)
 
     def formula(self):
         raise RuntimeError("Observables cannot be used in formulas, as this would necessitate support for numeric integration, which is outside the scope of rhalphalib.")

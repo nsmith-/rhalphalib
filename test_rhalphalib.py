@@ -29,7 +29,6 @@ def dummy_rhalphabet():
     msdbins = np.linspace(40, 201, 24)
     msd = rl.Observable('msd', msdbins)
 
-    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'], limits=(0, 2))
     # here we derive these all at once with 2D array
     ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins), msdbins[:-1] + 0.3 * np.diff(msdbins), indexing='ij')
     rhopts = 2*np.log(msdpts/ptpts)
@@ -37,6 +36,8 @@ def dummy_rhalphabet():
     rhoscaled = (rhopts - (-6)) / ((-2.1) - (-6))
     validbins = (rhoscaled >= 0) & (rhoscaled <= 1)
     rhoscaled[~validbins] = 1  # we will mask these out later
+    initial = np.full((3, 4), 0.1)
+    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'], initial, limits=(0, 2))
     tf_params = tf(ptscaled, rhoscaled)
 
     for ptbin in range(npt):
@@ -51,7 +52,7 @@ def dummy_rhalphabet():
                 'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
                 'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
                 'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
-                'qcd': expo_sample(norm=ptnorm*(10000 if isPass else 1000), scale=40, obs=msd),
+                'qcd': expo_sample(norm=ptnorm*(1e5 if isPass else 1e4), scale=40, obs=msd),
             }
             notqcdsum = np.zeros(msd.nbins)
             for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
@@ -107,7 +108,39 @@ def dummy_rhalphabet():
         tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
         tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
-        # Fill in muon CR
+    # Fill in muon CR
+    for region in ['pass', 'fail']:
+        ch = rl.Channel("muonCR%s" % (region, ))
+        model.addChannel(ch)
+
+        isPass = region == 'pass'
+        templates = {
+            'tqq': gaus_sample(norm=10*(30 if isPass else 60), loc=150, scale=20, obs=msd),
+            'qcd': expo_sample(norm=10*(5e2 if isPass else 1e3), scale=40, obs=msd),
+        }
+        templSum = np.zeros(msd.nbins)
+        for sName, templ in templates.items():
+            templSum += templ[0]
+            stype = rl.Sample.BACKGROUND
+            sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+
+            # mock systematics
+            jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
+            sample.setParamEffect(jec, jecup_ratio)
+
+            ch.addSample(sample)
+
+        # make up a data_obs
+        data_obs = (templSum, msd.binning, msd.name)
+        ch.setObservation(data_obs)
+
+    tqqpass = model['muonCRpass_tqq']
+    tqqfail = model['muonCRfail_tqq']
+    tqqPF = tqqpass.getExpectation(nominal=True).sum() / tqqfail.getExpectation(nominal=True).sum()
+    tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
+    tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
+    tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
+    tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
     with open("testModel.pkl", "wb") as fout:
         pickle.dump(model, fout)
