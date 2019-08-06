@@ -13,12 +13,16 @@ Take a look at the folders `testModel` and `monojetModel`.
 
 ## Requirements
 Standalone model creation requires:
-  - Python 3
+  - Python 2.7+ or 3.6+
   - `numpy >= 1.14`
 
 RooFit+combine rendering requires:
-  - `ROOT < 6.18` (i.e. LCG96 is too recent, combine+CMSSW8 cannot handle it.  LCG95a is fine)
+  - `ROOT < 6.18` (i.e. LCG96 is too recent, CMSSW 8 combine cannot handle it.  LCG95a is fine)
 
 Use in combine requires, well, [combine](https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit).
-There is a python 3 compatible standalone fork of combine [available](https://github.com/guitargeek/combine),
-however it is also possible to render the model folder, and then move the folder or switch environments to a CMSSW+combine environment and proceed from there.
+The CMSSW 10 (CC7) [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version)
+satisfies the requirements, however the CMSSW 8 recipe has a too old version of numpy.
+
+There is a python 3 compatible standalone fork of combine [available](https://github.com/guitargeek/combine).
+It is also possible to render the model folder using the quickstart recipe, and then move the folder or switch
+environments to a CMSSW+combine environment and proceed from there.
