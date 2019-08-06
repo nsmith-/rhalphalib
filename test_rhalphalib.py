@@ -36,8 +36,10 @@ def dummy_rhalphabet():
     rhoscaled = (rhopts - (-6)) / ((-2.1) - (-6))
     validbins = (rhoscaled >= 0) & (rhoscaled <= 1)
     rhoscaled[~validbins] = 1  # we will mask these out later
-    initial = np.full((3, 4), 0.1)
-    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", (2, 3), ['pt', 'rho'], initial, limits=(0, 2))
+
+    order = (2, 3)
+    initial = np.full((order[0] + 1, order[1] + 1), 0.1)
+    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", order, ['pt', 'rho'], initial, limits=(0, 10))
     tf_params = tf(ptscaled, rhoscaled)
 
     for ptbin in range(npt):
@@ -52,7 +54,7 @@ def dummy_rhalphabet():
                 'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
                 'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
                 'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
-                'qcd': expo_sample(norm=ptnorm*(1e5 if isPass else 1e4), scale=40, obs=msd),
+                'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e4), scale=40, obs=msd),
             }
             notqcdsum = np.zeros(msd.nbins)
             for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
