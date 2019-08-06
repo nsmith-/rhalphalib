@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import rhalphalib as rl
 import numpy as np
 import scipy.stats
@@ -90,7 +91,7 @@ def dummy_rhalphabet():
         for sample in failCh:
             initial_qcd -= sample.getExpectation(nominal=True)
         if np.any(initial_qcd < 0.):
-            raise ValueError("uh-oh")
+            raise ValueError("initial_qcd negative for some bins..", initial_qcd)
         sigmascale = 10  # to scale the deviation from initial
         scaledparams = initial_qcd * (1 + sigmascale/np.maximum(1., np.sqrt(initial_qcd)))**qcdparams
         fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, obs, scaledparams)
