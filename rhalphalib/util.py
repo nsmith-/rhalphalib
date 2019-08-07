@@ -12,7 +12,7 @@ def _to_numpy(hinput):
         if hinput[0].size != hinput[1].size - 1:
             raise ValueError("Counts array and binning array are incompatible in tuple %r" % hinput)
         return hinput
-    elif str(type(hinput)) == "<class 'ROOT.TH1D'>":
+    elif "<class 'ROOT.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())
         binning = np.zeros(sumw.size + 1)
         name = hinput.GetName()
