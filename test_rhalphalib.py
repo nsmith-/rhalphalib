@@ -16,6 +16,8 @@ def gaus_sample(norm, loc, scale, obs):
 
 
 def dummy_rhalphabet():
+    throwPoisson = False
+
     model = rl.Model("testModel")
 
     jec = rl.NuisanceParameter('CMS_jec', 'lnN')
@@ -56,11 +58,9 @@ def dummy_rhalphabet():
                 'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
                 'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e4), scale=40, obs=msd),
             }
-            notqcdsum = np.zeros(msd.nbins)
             for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
                 # some mock expectations
                 templ = templates[sName]
-                notqcdsum += templ[0]
                 stype = rl.Sample.SIGNAL if sName == 'hqq' else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -76,8 +76,18 @@ def dummy_rhalphabet():
 
                 ch.addSample(sample)
 
-            # make up a data_obs
-            data_obs = (templates['qcd'][0] + notqcdsum, msd.binning, msd.name)
+            # make up a data_obs, with possibly different yield values
+            templates = {
+                'wqq': gaus_sample(norm=ptnorm*(100 if isPass else 300), loc=80, scale=8, obs=msd),
+                'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
+                'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
+                'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
+                'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e4), scale=40, obs=msd),
+            }
+            yields = sum(tpl[0] for tpl in templates.values())
+            if throwPoisson:
+                yields = np.random.poisson(yields)
+            data_obs = (yields, msd.binning, msd.name)
             ch.setObservation(data_obs)
 
             # drop bins outside rho validity
@@ -136,9 +146,7 @@ def dummy_rhalphabet():
             'tqq': gaus_sample(norm=10*(30 if isPass else 60), loc=150, scale=20, obs=msd),
             'qcd': expo_sample(norm=10*(5e2 if isPass else 1e3), scale=40, obs=msd),
         }
-        templSum = np.zeros(msd.nbins)
         for sName, templ in templates.items():
-            templSum += templ[0]
             stype = rl.Sample.BACKGROUND
             sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -149,7 +157,14 @@ def dummy_rhalphabet():
             ch.addSample(sample)
 
         # make up a data_obs
-        data_obs = (templSum, msd.binning, msd.name)
+        templates = {
+            'tqq': gaus_sample(norm=10*(30 if isPass else 60), loc=150, scale=20, obs=msd),
+            'qcd': expo_sample(norm=10*(5e2 if isPass else 1e3), scale=40, obs=msd),
+        }
+        yields = sum(tpl[0] for tpl in templates.values())
+        if throwPoisson:
+            yields = np.random.poisson(yields)
+        data_obs = (yields, msd.binning, msd.name)
         ch.setObservation(data_obs)
 
     tqqpass = model['muonCRpass_tqq']
