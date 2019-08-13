@@ -69,6 +69,7 @@ class Model(object):
             rooSimul = ROOT.RooSimultaneous(self.name + '_simPdf', self.name + '_simPdf', channelCat)
             obsmap = ROOT.std.map('string, RooDataHist*')()
             for channel in self:
+                channelCat.defineType(channel.name)
                 pdf, obs = channel.renderRoofit(workspace)
                 rooSimul.addPdf(pdf, channel.name)
                 # const string magic: https://root.cern.ch/phpBB3/viewtopic.php?f=15&t=16882&start=15#p86985

@@ -52,6 +52,10 @@ class BernsteinPoly(object):
     def name(self):
         return self._name
 
+    @property
+    def parameters(self):
+        return self._params
+
     def __call__(self, *vals):
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")

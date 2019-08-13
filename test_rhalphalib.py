@@ -39,10 +39,52 @@ def dummy_rhalphabet():
     validbins = (rhoscaled >= 0) & (rhoscaled <= 1)
     rhoscaled[~validbins] = 1  # we will mask these out later
 
-    order = (2, 2)
-    initial = np.full((order[0] + 1, order[1] + 1), 1.)
-    tf = rl.BernsteinPoly("qcd_pass_rhalphTF", order, ['pt', 'rho'], initial, limits=(0, 10))
-    tf_params = tf(ptscaled, rhoscaled)
+    # Build qcd MC pass+fail model and fit to polynomial
+    qcdmodel = rl.Model("qcdmodel")
+    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], limits=(0, 10))
+    tf_MCtempl_params = tf_MCtempl(ptscaled, rhoscaled)
+    qcdpass, qcdfail = 0., 0.
+    for ptbin in range(npt):
+        failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
+        passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
+        qcdmodel.addChannel(failCh)
+        qcdmodel.addChannel(passCh)
+        # mock template
+        ptnorm = 1
+        failTempl = expo_sample(norm=ptnorm*1e4, scale=40, obs=msd)
+        passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
+        failCh.setObservation(failTempl)
+        passCh.setObservation(passTempl)
+
+        failObs = failCh.getObservation()
+        qcdfail += failObs.sum()
+        qcdpass += passCh.getObservation().sum()
+        qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(msd.nbins)])
+        sigmascale = 10.
+        scaledparams = failObs * (1 + sigmascale/np.maximum(1., np.sqrt(failObs)))**qcdparams
+        fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
+        failCh.addSample(fail_qcd)
+        pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_MCtempl_params[ptbin, :], fail_qcd)
+        passCh.addSample(pass_qcd)
+
+    import ROOT
+    qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
+    simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
+    qcdfit = simpdf.fitTo(obs,
+                          ROOT.RooFit.Extended(True),
+                          ROOT.RooFit.SumW2Error(True),
+                          ROOT.RooFit.Strategy(2),
+                          ROOT.RooFit.Save(),
+                          ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
+                          ROOT.RooFit.PrintLevel(-1),
+                          )
+    qcdfit_ws.add(qcdfit)
+    qcdfit_ws.writeToFile('qcdfit.root')
+    if qcdfit.status() != 0:
+        raise RuntimeError('Could not fit qcd')
+
+    tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'], limits=(0, 10))
+    tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
 
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
@@ -56,7 +98,6 @@ def dummy_rhalphabet():
                 'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
                 'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
                 'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
-                'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e4), scale=40, obs=msd),
             }
             for sName in ['zqq', 'wqq', 'tqq', 'hqq']:
                 # some mock expectations
@@ -109,7 +150,7 @@ def dummy_rhalphabet():
             qcdpass -= sample.getExpectation(nominal=True).sum()
 
     qcdeff = qcdpass / qcdfail
-    tf_params = tf_params * qcdeff
+    tf_params = tf_dataResidual_params * qcdeff
 
     for ptbin in range(npt):
         failCh = model['ptbin%dfail' % ptbin]

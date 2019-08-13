@@ -136,11 +136,15 @@ class IndependentParameter(Parameter):
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
 
+    @Parameter.value.setter
+    def value(self, val):
+        self._value = val
+
     def renderRoofit(self, workspace):
         import ROOT
         install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
-            var = ROOT.RooRealVar(self._name, self._name, self.value, self._lo, self._hi)
+            var = ROOT.RooRealVar(self._name, self._name, self._value, self._lo, self._hi)
             workspace.add(var)
         return workspace.var(self._name)
 
