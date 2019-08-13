@@ -199,19 +199,34 @@ class TemplateSample(Sample):
             return nominalval
         else:
             out = np.array([ConstantParameter(self.name + "_bin%d_nominal" % i, v) for i, v in enumerate(nominalval)])
-            # TODO: additive and multiplicative effects? Or restrict to multiplicative only?
             for param in self.parameters:
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
-                    pass
-                if isinstance(effect_up, DependentParameter):
+                    continue
+                elif isinstance(effect_up, DependentParameter):
                     out = out * effect_up
-                if self._paramEffectsDown[param] is None:
-                    out = out * (effect_up**param)
+                elif self._paramEffectsDown[param] is None:
+                    if param.combinePrior == 'shape':
+                        out = out * (1 + effect_up*param)
+                    elif param.combinePrior == 'shapeN':
+                        out = out * (effect_up**param)
+                    elif param.combinePrior == 'lnN':
+                        # TODO: ensure scalar effect
+                        out = out * (effect_up**param)
+                    else:
+                        raise NotImplementedError('per-bin effects for other nuisance parameter types')
                 else:
                     effect_down = self.getParamEffect(param, up=False)
                     smoothStep = SmoothStep(param)
-                    combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                    if param.combinePrior == 'shape':
+                        combined_effect = smoothStep * (1 + effect_up*param) + (1 - smoothStep) * (1 + effect_down*param)
+                    elif param.combinePrior == 'shapeN':
+                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                    elif param.combinePrior == 'lnN':
+                        # TODO: ensure scalar effect
+                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                    else:
+                        raise NotImplementedError('per-bin effects for other nuisance parameter types')
                     out = out * combined_effect
 
             return out
