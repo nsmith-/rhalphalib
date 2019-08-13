@@ -1,6 +1,7 @@
 import numbers
 import warnings
 import numpy as np
+from .util import install_roofit_helpers
 
 
 class Parameter(object):
@@ -119,6 +120,7 @@ class ConstantParameter(Parameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+        install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self._name, self._name, self.value)
             var.setAttribute("Constant", True)
@@ -136,6 +138,7 @@ class IndependentParameter(Parameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+        install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self._name, self._name, self.value, self._lo, self._hi)
             workspace.add(var)
@@ -221,6 +224,7 @@ class DependentParameter(Parameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+        install_roofit_helpers()
         if workspace.function(self._name) == None:  # noqa: E711
             if self.intermediate:
                 # This is a warning because we should make sure the name does not conflict as
@@ -254,6 +258,7 @@ class SmoothStep(DependentParameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+        install_roofit_helpers()
         if workspace.function(self._name) == None:  # noqa: E711
             # Formula satisfies f(x<=-1) = 0, f(x>=1) = 1, f'(-1) = f'(1) = f''(-1) = f''(1) = 0
             formula = "(((0.1875*@0*@0 - 0.625)*@0*@0 + 0.9375)*@0 + 0.5)*TMath::Sign(1, 1+@0)*TMath::Sign(1, 1-@0) + 1 - TMath::Sign(1, 1-@0)"
@@ -302,6 +307,7 @@ class Observable(Parameter):
         Return a RooObservable following the definition
         '''
         import ROOT
+        install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self.name, self.name, self.binning[0], self.binning[-1])
             var.setBinning(ROOT.RooBinning(self.nbins, self.binning))
