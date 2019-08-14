@@ -114,37 +114,49 @@ class Parameter(object):
         return self._binary_op(('_pow_', '**', False), other)
 
 
-class ConstantParameter(Parameter):
-    def __init__(self, name, value):
-        super(ConstantParameter, self).__init__(name, value)
-
-    def renderRoofit(self, workspace):
-        import ROOT
-        install_roofit_helpers()
-        if workspace.var(self._name) == None:  # noqa: E711
-            var = ROOT.RooRealVar(self._name, self._name, self.value)
-            var.setAttribute("Constant", True)
-            workspace.add(var)
-        return workspace.var(self._name)
-
-
 class IndependentParameter(Parameter):
     DefaultRange = (-10, 10)
 
-    def __init__(self, name, value, lo=None, hi=None):
+    def __init__(self, name, value, lo=None, hi=None, constant=False):
         super(IndependentParameter, self).__init__(name, value)
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
+        self._constant = constant
 
     @Parameter.value.setter
     def value(self, val):
         self._value = val
+
+    @property
+    def lo(self):
+        return self._lo
+
+    @lo.setter
+    def lo(self, lo):
+        self._lo = lo
+
+    @property
+    def hi(self):
+        return self._hi
+
+    @hi.setter
+    def hi(self, hi):
+        self._hi = hi
+
+    @property
+    def constant(self):
+        return self._constant
+
+    @constant.setter
+    def constant(self, const):
+        self._constant = const
 
     def renderRoofit(self, workspace):
         import ROOT
         install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self._name, self._name, self._value, self._lo, self._hi)
+            var.setAttribute("Constant", self._constant)
             workspace.add(var)
         return workspace.var(self._name)
 

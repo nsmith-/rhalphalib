@@ -19,9 +19,9 @@ class BernsteinPoly(object):
             raise ValueError
         self._order = order
         self._shape = tuple(n + 1 for n in order)
-        if len(order) != len(dim_names):
-            raise ValueError
         if dim_names:
+            if len(order) != len(dim_names):
+                raise ValueError
             self._dim_names = dim_names
         else:
             self._dim_names = ['dim%d' % i for i in range(len(self._order))]
@@ -56,6 +56,15 @@ class BernsteinPoly(object):
     def parameters(self):
         return self._params
 
+    def coefficients(self, *xvals):
+        # evaluate Bernstein polynomial product tensor
+        bpolyval = np.ones_like(xvals[0])
+        for x, n, B in zip(xvals, self._order, self._bmatrices):
+            xpow = np.power.outer(x, np.arange(n + 1))
+            bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
+
+        return bpolyval
+
     def __call__(self, *vals):
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
@@ -72,17 +81,11 @@ class BernsteinPoly(object):
                 raise ValueError("BernsteinPoly: all variables must have same shape")
             xvals.append(x.flatten())
 
-        # evaluate Bernstein polynomial product tensor
-        bpolyval = np.ones_like(xvals[0])
-        for x, n, B in zip(xvals, self._order, self._bmatrices):
-            xpow = np.power.outer(x, np.arange(n + 1))
-            bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
-
-        coefficients = bpolyval.reshape(len(xvals[0]), -1)
         parameters = self._params.reshape(-1)
+        coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
 
-        out = np.full(len(xvals[0]), None)
-        for i in range(len(xvals[0])):
+        out = np.full(coefficients.shape[0], None)
+        for i in range(coefficients.shape[0]):
             # sum small coefficients first
             order = np.argsort(coefficients[i])
             p = np.sum(parameters[order]*coefficients[i][order])

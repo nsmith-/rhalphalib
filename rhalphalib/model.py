@@ -1,10 +1,11 @@
 from collections import OrderedDict
 import datetime
 from functools import reduce
+from itertools import chain
 import os
 import numpy as np
 from .sample import Sample
-from .parameter import Observable
+from .parameter import Observable, IndependentParameter
 from .util import _to_numpy, _to_TH1, install_roofit_helpers
 
 
@@ -55,6 +56,21 @@ class Model(object):
             raise ValueError("Model %r already has a channel named %s" % (self, channel.name))
         self._channels[channel.name] = channel
         return self
+
+    def readRooFitResult(self, res):
+        '''
+        Update all independent parameters with the values given in the fit result
+        res: a RooFitResult object
+        '''
+        install_roofit_helpers()
+        params = {p.name: p for p in self.parameters if isinstance(p, IndependentParameter)}
+        for p_in in chain(res.floatParsFinal(), res.constPars()):
+            if p_in.GetName() in params:
+                p = params[p_in.GetName()]
+                p.value = p_in.getVal()
+                p.lo = p_in.getMin()
+                p.hi = p_in.getMax()
+                p.constant = p_in.isConstant()
 
     def renderRoofit(self, workspace):
         import ROOT

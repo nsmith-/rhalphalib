@@ -2,7 +2,6 @@ import numpy as np
 import numbers
 from .parameter import (
     Parameter,
-    ConstantParameter,
     IndependentParameter,
     NuisanceParameter,
     DependentParameter,
@@ -198,7 +197,7 @@ class TemplateSample(Sample):
         if nominal:
             return nominalval
         else:
-            out = np.array([ConstantParameter(self.name + "_bin%d_nominal" % i, v) for i, v in enumerate(nominalval)])
+            out = np.array([IndependentParameter(self.name + "_bin%d_nominal" % i, v, constant=True) for i, v in enumerate(nominalval)])
             for param in self.parameters:
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
@@ -265,7 +264,7 @@ class TemplateSample(Sample):
 
             rooShape = ROOT.RooHistPdf(self.name, self.name, ROOT.RooArgSet(rooObservable), workspace.data(self.name))
             workspace.add(rooShape)
-            rooNorm = ConstantParameter(normName, nominal.sum()).renderRoofit(workspace)
+            rooNorm = IndependentParameter(normName, nominal.sum(), constant=True).renderRoofit(workspace)
             # TODO build the pdf with systematics
         elif rooShape == None or rooNorm == None:  # noqa: E711
             raise RuntimeError('Sample %r has either a shape or norm already embedded in workspace %r' % (self, workspace))
@@ -403,7 +402,7 @@ class ParametericSample(Sample):
         '''
         out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
-            out[~self.mask] = [ConstantParameter("masked", 0) for _ in range((~self.mask).sum())]
+            out[~self.mask] = [IndependentParameter("masked", 0, constant=True) for _ in range((~self.mask).sum())]
         if nominal:
             return np.array([p.value for p in out])
         else:

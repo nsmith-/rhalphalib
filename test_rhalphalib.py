@@ -67,6 +67,9 @@ def dummy_rhalphabet():
         pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin, rl.Sample.BACKGROUND, tf_MCtempl_params[ptbin, :], fail_qcd)
         passCh.addSample(pass_qcd)
 
+        failCh.mask = validbins[ptbin]
+        passCh.mask = validbins[ptbin]
+
     import ROOT
     qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
     simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
@@ -83,6 +86,7 @@ def dummy_rhalphabet():
     if qcdfit.status() != 0:
         raise RuntimeError('Could not fit qcd')
 
+    qcdmodel.readRooFitResult(qcdfit)
     tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'], limits=(0, 10))
     tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
 
