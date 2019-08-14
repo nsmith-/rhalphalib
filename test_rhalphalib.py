@@ -32,7 +32,7 @@ def dummy_rhalphabet():
     msd = rl.Observable('msd', msdbins)
 
     # here we derive these all at once with 2D array
-    ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins), msdbins[:-1] + 0.3 * np.diff(msdbins), indexing='ij')
+    ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins), msdbins[:-1] + 0.5 * np.diff(msdbins), indexing='ij')
     rhopts = 2*np.log(msdpts/ptpts)
     ptscaled = (ptpts - 450.) / (1200. - 450.)
     rhoscaled = (rhopts - (-6)) / ((-2.1) - (-6))
