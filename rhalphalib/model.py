@@ -20,8 +20,10 @@ class Model(object):
     def __getitem__(self, key):
         if key in self._channels:
             return self._channels[key]
-        channel = key[:key.find('_')]
-        return self[channel][key]
+        if '_' in key:
+            channel = key[:key.find('_')]
+            return self[channel][key]
+        raise KeyError
 
     def __iter__(self):
         for item in self._channels.values():
@@ -133,7 +135,9 @@ class Channel(object):
     def __getitem__(self, key):
         if key in self._samples:
             return self._samples[key]
-        return self._samples[self.name + '_' + key]
+        elif self.name + '_' + key in self._samples:
+            return self._samples[self.name + '_' + key]
+        raise KeyError
 
     def __iter__(self):
         for item in self._samples.values():
