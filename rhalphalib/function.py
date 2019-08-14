@@ -56,6 +56,19 @@ class BernsteinPoly(object):
     def parameters(self):
         return self._params
 
+    @parameters.setter
+    def parameters(self, newparams):
+        if not isinstance(newparams, np.ndarray):
+            raise ValueError("newparams should be numpy array")
+        elif newparams.shape != self._params.shape:
+            raise ValueError("newparams shape does not match")
+        for pnew, pold in zip(newparams.reshape(-1), self._params.reshape(-1)):
+            pnew.name = pold.name
+            # probably worth caching
+            if pnew.intermediate:
+                pnew.intermediate = False
+        self._params = newparams
+
     def coefficients(self, *xvals):
         # evaluate Bernstein polynomial product tensor
         bpolyval = np.ones_like(xvals[0])

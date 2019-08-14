@@ -160,3 +160,30 @@ def install_roofit_helpers():
         raise TypeError("unsupported operand type(s) for *: '%s' and '%s'" % (str(type(self)), str(type(other))))
 
     _ROOT.RooAbsReal.__mul__ = _RooAbsReal__mul__
+
+    def _RooFitResult_nameArray(self):
+        '''
+        Returns a numpy array of floating parameter names
+        '''
+        return np.array([p.GetName() for p in self.floatParsFinal()])
+
+    _ROOT.RooFitResult.nameArray = _RooFitResult_nameArray
+
+    def _RooFitResult_valueArray(self):
+        '''
+        Returns a numpy array of floating parameter values
+        '''
+        return np.array([p.getVal() for p in self.floatParsFinal()])
+
+    _ROOT.RooFitResult.valueArray = _RooFitResult_valueArray
+
+    def _RooFitResult_covarianceArray(self):
+        '''
+        Returns a numpy array of floating parameter covariances
+        '''
+        param_cov = self.covarianceMatrix()
+        param_cov = np.frombuffer(param_cov.GetMatrixArray(), dtype='d', count=param_cov.GetNoElements())
+        param_cov = param_cov.reshape(int(np.sqrt(param_cov.size)), -1)
+        return param_cov
+
+    _ROOT.RooFitResult.covarianceArray = _RooFitResult_covarianceArray

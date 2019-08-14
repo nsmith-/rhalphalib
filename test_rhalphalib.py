@@ -41,7 +41,7 @@ def dummy_rhalphabet():
 
     # Build qcd MC pass+fail model and fit to polynomial
     qcdmodel = rl.Model("qcdmodel")
-    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], limits=(0, 10))
+    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], init_params=np.full((3, 3), 0.01), limits=(0, 10))
     tf_MCtempl_params = tf_MCtempl(ptscaled, rhoscaled)
     qcdpass, qcdfail = 0., 0.
     for ptbin in range(npt):
@@ -51,7 +51,7 @@ def dummy_rhalphabet():
         qcdmodel.addChannel(passCh)
         # mock template
         ptnorm = 1
-        failTempl = expo_sample(norm=ptnorm*1e4, scale=40, obs=msd)
+        failTempl = expo_sample(norm=ptnorm*1e5, scale=40, obs=msd)
         passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
@@ -86,7 +86,17 @@ def dummy_rhalphabet():
     if qcdfit.status() != 0:
         raise RuntimeError('Could not fit qcd')
 
-    qcdmodel.readRooFitResult(qcdfit)
+    names = [p.GetName() for p in qcdfit.floatParsFinal()]
+    pnames = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
+    pidx = np.array([names.index(pname) for pname in pnames])
+    means = qcdfit.valueArray()[pidx]
+    cov = qcdfit.covarianceArray()[np.ix_(pidx, pidx)]
+    _, s, v = np.linalg.svd(cov)
+    deco = np.array([rl.NuisanceParameter(tf_MCtempl.name + '_deco%d' % i, 'param') for i in range(pidx.size)])
+    depparams = np.dot(deco, np.sqrt(s)[:, None] * v) + means
+    tf_MCtempl.parameters = depparams.reshape(tf_MCtempl.parameters.shape)
+    tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
+
     tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'], limits=(0, 10))
     tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
 
@@ -127,7 +137,7 @@ def dummy_rhalphabet():
                 'zqq': gaus_sample(norm=ptnorm*(200 if isPass else 100), loc=91, scale=8, obs=msd),
                 'tqq': gaus_sample(norm=ptnorm*(40 if isPass else 80), loc=150, scale=20, obs=msd),
                 'hqq': gaus_sample(norm=ptnorm*(20 if isPass else 5), loc=125, scale=8, obs=msd),
-                'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e4), scale=40, obs=msd),
+                'qcd': expo_sample(norm=ptnorm*(1e3 if isPass else 1e5), scale=40, obs=msd),
             }
             yields = sum(tpl[0] for tpl in templates.values())
             if throwPoisson:
@@ -154,7 +164,7 @@ def dummy_rhalphabet():
             qcdpass -= sample.getExpectation(nominal=True).sum()
 
     qcdeff = qcdpass / qcdfail
-    tf_params = tf_dataResidual_params * qcdeff
+    tf_params = tf_MCtempl_params_final * tf_dataResidual_params * qcdeff
 
     for ptbin in range(npt):
         failCh = model['ptbin%dfail' % ptbin]

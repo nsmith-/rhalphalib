@@ -174,7 +174,7 @@ class NuisanceParameter(IndependentParameter):
         '''
         super(NuisanceParameter, self).__init__(name, value, lo, hi)
         self._hasPrior = True
-        if combinePrior not in {'shape', 'shapeN', 'shapeU', 'lnN', 'lnU', 'gmM', 'trG'}:
+        if combinePrior not in {'shape', 'shapeN', 'shapeU', 'lnN', 'lnU', 'gmM', 'trG', 'param'}:
             raise ValueError("Unrecognized combine prior %s" % combinePrior)
         self._prior = combinePrior
 
