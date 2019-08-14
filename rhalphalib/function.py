@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.special import binom
 import numbers
-from .parameter import IndependentParameter
+from .parameter import IndependentParameter, NuisanceParameter
+from .util import install_roofit_helpers
 
 
 class BernsteinPoly(object):
@@ -107,3 +108,49 @@ class BernsteinPoly(object):
             p.intermediate = False
             out[i] = p
         return out.reshape(shape)
+
+
+class DecorrelatedNuisanceVector(object):
+    def __init__(self, prefix, param_in, param_cov):
+        if not isinstance(param_in, np.ndarray):
+            raise ValueError("Expecting param_in to be numpy array")
+        if not isinstance(param_cov, np.ndarray):
+            raise ValueError("Expecting param_cov to be numpy array")
+        if not (len(param_in.shape) == 1
+                and len(param_cov.shape) == 2
+                and param_cov.shape[0] == param_in.shape[0]
+                and param_cov.shape[1] == param_in.shape[0]):
+            raise ValueError("param_in and param_cov have mismatched shapes")
+
+        _, s, v = np.linalg.svd(param_cov)
+        self._transform = np.sqrt(s)[:, None] * v
+        self._parameters = np.array([NuisanceParameter(prefix + str(i), 'param') for i in range(param_in.size)])
+        self._correlated = np.full(self._parameters.shape, None)
+        for i in range(self._parameters.size):
+            coef = self._transform[:, i]
+            order = np.argsort(np.abs(coef))
+            self._correlated[i] = np.sum(self._parameters[order]*coef[order]) + param_in[i]
+
+    @classmethod
+    def fromRooFitResult(cls, prefix, fitresult, param_names=None):
+        install_roofit_helpers()
+        names = [p.GetName() for p in fitresult.floatParsFinal()]
+        means = fitresult.valueArray()
+        cov = fitresult.covarianceArray()
+        if param_names is not None:
+            pidx = np.array([names.index(pname) for pname in param_names])
+            means = means[pidx]
+            cov = cov[np.ix_(pidx, pidx)]
+        out = cls(prefix, means, cov)
+        if param_names is not None:
+            for p, name in zip(out.correlated_params, param_names):
+                p.name = name
+        return out
+
+    @property
+    def parameters(self):
+        return self._parameters
+
+    @property
+    def correlated_params(self):
+        return self._correlated

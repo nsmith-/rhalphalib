@@ -3,6 +3,8 @@ import rhalphalib as rl
 import numpy as np
 import scipy.stats
 import pickle
+import ROOT
+rl.util.install_roofit_helpers()
 
 
 def expo_sample(norm, scale, obs):
@@ -51,8 +53,8 @@ def dummy_rhalphabet():
         passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
-        qcdfail += failCh.getObservation()
-        qcdpass += passCh.getObservation()
+        qcdfail += failCh.getObservation().sum()
+        qcdpass += passCh.getObservation().sum()
 
     qcdeff = qcdpass / qcdfail
     tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], limits=(0, 10))
@@ -72,7 +74,6 @@ def dummy_rhalphabet():
         failCh.mask = validbins[ptbin]
         passCh.mask = validbins[ptbin]
 
-    import ROOT
     qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
     simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
     qcdfit = simpdf.fitTo(obs,
@@ -88,16 +89,9 @@ def dummy_rhalphabet():
     if qcdfit.status() != 0:
         raise RuntimeError('Could not fit qcd')
 
-    names = [p.GetName() for p in qcdfit.floatParsFinal()]
-    pnames = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
-    pidx = np.array([names.index(pname) for pname in pnames])
-    means = qcdfit.valueArray()[pidx]
-    cov = qcdfit.covarianceArray()[np.ix_(pidx, pidx)]
-    _, s, v = np.linalg.svd(cov)
-    deco = np.array([rl.NuisanceParameter(tf_MCtempl.name + '_deco%d' % i, 'param') for i in range(pidx.size)])
-    depparams = np.dot(deco, np.sqrt(s)[:, None] * v) + means
-
-    tf_MCtempl.parameters = depparams.reshape(tf_MCtempl.parameters.shape)
+    param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
+    decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(tf_MCtempl.name + '_deco', qcdfit, param_names)
+    tf_MCtempl.parameters = decoVector.correlated_params.reshape(tf_MCtempl.parameters.shape)
     tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
     tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'], limits=(0, 10))
     tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)

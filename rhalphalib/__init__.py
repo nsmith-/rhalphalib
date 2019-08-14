@@ -16,6 +16,7 @@ from .parameter import (
 )
 from .function import (
     BernsteinPoly,
+    DecorrelatedNuisanceVector,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     'IndependentParameter',
     'DependentParameter',
     'BernsteinPoly',
+    'DecorrelatedNuisanceVector',
 ]
