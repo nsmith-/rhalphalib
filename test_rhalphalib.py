@@ -18,8 +18,6 @@ def gaus_sample(norm, loc, scale, obs):
 def dummy_rhalphabet():
     throwPoisson = False
 
-    model = rl.Model("testModel")
-
     jec = rl.NuisanceParameter('CMS_jec', 'lnN')
     massScale = rl.NuisanceParameter('CMS_msdScale', 'shape')
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -41,8 +39,6 @@ def dummy_rhalphabet():
 
     # Build qcd MC pass+fail model and fit to polynomial
     qcdmodel = rl.Model("qcdmodel")
-    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], init_params=np.full((3, 3), 0.01), limits=(0, 10))
-    tf_MCtempl_params = tf_MCtempl(ptscaled, rhoscaled)
     qcdpass, qcdfail = 0., 0.
     for ptbin in range(npt):
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
@@ -55,10 +51,16 @@ def dummy_rhalphabet():
         passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
+        qcdfail += failCh.getObservation()
+        qcdpass += passCh.getObservation()
 
+    qcdeff = qcdpass / qcdfail
+    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'], limits=(0, 10))
+    tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
+    for ptbin in range(npt):
+        failCh = qcdmodel['ptbin%dfail' % ptbin]
+        passCh = qcdmodel['ptbin%dpass' % ptbin]
         failObs = failCh.getObservation()
-        qcdfail += failObs.sum()
-        qcdpass += passCh.getObservation().sum()
         qcdparams = np.array([rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0) for i in range(msd.nbins)])
         sigmascale = 10.
         scaledparams = failObs * (1 + sigmascale/np.maximum(1., np.sqrt(failObs)))**qcdparams
@@ -94,11 +96,15 @@ def dummy_rhalphabet():
     _, s, v = np.linalg.svd(cov)
     deco = np.array([rl.NuisanceParameter(tf_MCtempl.name + '_deco%d' % i, 'param') for i in range(pidx.size)])
     depparams = np.dot(deco, np.sqrt(s)[:, None] * v) + means
+
     tf_MCtempl.parameters = depparams.reshape(tf_MCtempl.parameters.shape)
     tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
-
     tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'], limits=(0, 10))
     tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
+    tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
+
+    # build actual fit model now
+    model = rl.Model("testModel")
 
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
@@ -150,21 +156,6 @@ def dummy_rhalphabet():
             # blind bins 11, 12, 13
             # mask[11:14] = False
             ch.mask = mask
-
-    # compute overall qcd efficiency (to scale transfer factor close to 1)
-    qcdpass, qcdfail = 0., 0.
-    for ptbin in range(npt):
-        failCh = model['ptbin%dfail' % ptbin]
-        passCh = model['ptbin%dpass' % ptbin]
-        qcdfail += failCh.getObservation().sum()
-        for sample in failCh:
-            qcdfail -= sample.getExpectation(nominal=True).sum()
-        qcdpass += passCh.getObservation().sum()
-        for sample in passCh:
-            qcdpass -= sample.getExpectation(nominal=True).sum()
-
-    qcdeff = qcdpass / qcdfail
-    tf_params = tf_MCtempl_params_final * tf_dataResidual_params * qcdeff
 
     for ptbin in range(npt):
         failCh = model['ptbin%dfail' % ptbin]
