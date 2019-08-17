@@ -34,6 +34,8 @@ class BernsteinPoly(object):
             self._init_params = np.ones(shape=self._shape)
         else:
             raise ValueError
+        if limits is None:
+            limits = (0., 10.)
 
         # Construct Bernstein matrix for each dimension
         self._bmatrices = []
@@ -46,7 +48,7 @@ class BernsteinPoly(object):
         # Construct parameter tensor
         self._params = np.full(self._shape, None)
         for ipar, initial in np.ndenumerate(self._init_params):
-            param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=0.)
+            param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=limits[0], hi=limits[1])
             self._params[ipar] = param
 
     @property
