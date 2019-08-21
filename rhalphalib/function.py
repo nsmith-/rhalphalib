@@ -6,7 +6,7 @@ from .util import install_roofit_helpers
 
 
 class BernsteinPoly(object):
-    def __init__(self, name, order, dim_names=None, init_params=None, limits=None):
+    def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
         '''
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
@@ -14,6 +14,7 @@ class BernsteinPoly(object):
             dim_names: optional, names of each dimension
             initial_params: ndarray of initial params
             limits: tuple of independent parameter limits, default: (0, 10)
+            coefficient_transform: callable to transform coefficients before multiplying by parameters
         '''
         self._name = name
         if not isinstance(order, tuple):
@@ -36,6 +37,7 @@ class BernsteinPoly(object):
             raise ValueError
         if limits is None:
             limits = (0., 10.)
+        self._transform = coefficient_transform
 
         # Construct Bernstein matrix for each dimension
         self._bmatrices = []
@@ -79,6 +81,8 @@ class BernsteinPoly(object):
             xpow = np.power.outer(x, np.arange(n + 1))
             bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
 
+        if self._transform is not None:
+            bpolyval = self._transform(bpolyval)
         return bpolyval
 
     def __call__(self, *vals):
