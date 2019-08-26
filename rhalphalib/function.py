@@ -85,7 +85,7 @@ class BernsteinPoly(object):
             bpolyval = self._transform(bpolyval)
         return bpolyval
 
-    def __call__(self, *vals):
+    def __call__(self, *vals, nominal=False):
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
@@ -103,6 +103,9 @@ class BernsteinPoly(object):
 
         parameters = self._params.reshape(-1)
         coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
+        if nominal:
+            parameters = np.vectorize(lambda p: p.value)(parameters)
+            return (parameters*coefficients).sum(axis=1).reshape(shape)
 
         out = np.full(coefficients.shape[0], None)
         for i in range(coefficients.shape[0]):
