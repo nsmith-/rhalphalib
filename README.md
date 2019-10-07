@@ -11,6 +11,16 @@ python test_rhalphalib.py
 ```
 Take a look at the folders `testModel` and `monojetModel`.
 
+### Hcc
+Follow the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version) from combine. and clone to CMSSW environment.
+```
+cd CMSSW_10_2_13/src
+cmsenv
+git clone git@github.com:andrzejnovak-/rhalphalib.git
+cd rhalphalib
+python make_Hxx.py
+```
+
 ## Requirements
 Standalone model creation requires:
   - Python 2.7+ or 3.6+
