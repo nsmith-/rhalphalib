@@ -27,15 +27,15 @@ def dummy_rhalphabet():
     tqqnormSF = rl.IndependentParameter('tqqnormSF', 1., 0, 10)
 
     JES = rl.NuisanceParameter('JES', 'lnN')
-    JER = rl.NuisanceParameter('JER', 'lnN')
+    #JER = rl.NuisanceParameter('JER', 'lnN')
     Pu = rl.NuisanceParameter('Pu', 'lnN')
-    trigger = rl.NuisanceParameter('trigger', 'lnN')
+    #trigger = rl.NuisanceParameter('trigger', 'lnN')
 
     ddxeff = rl.NuisanceParameter('DDXeff', 'lnN')
     eleveto = rl.NuisanceParameter('eleveto', 'lnN')
     muveto = rl.NuisanceParameter('muveto', 'lnN')
-    h_pt = rl.NuisanceParameter('h_pt', 'lnN')
-    h_pt_shape = rl.NuisanceParameter('h_pt_shape', 'shape')
+    #h_pt = rl.NuisanceParameter('h_pt', 'lnN')
+    #h_pt_shape = rl.NuisanceParameter('h_pt_shape', 'shape')
 
     veff = rl.NuisanceParameter('veff', 'lnN')
     wznormEW = rl.NuisanceParameter('wznormEW', 'lnN')
@@ -121,9 +121,11 @@ def dummy_rhalphabet():
 
     # Load templates
     import uproot
-    f = uproot.open('~/nobackup/coffeandbacon/analysis/hist_1DZcc_pt_scalesmear.root')
+    #f = uproot.open('~/nobackup/coffeandbacon/analysis/hist_1DZcc_pt_scalesmear.root')
+    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
     templates = {}
-    sys_list = ['JES', 'JER', 'trigger', 'Pu']  # Sys list
+    #sys_list = ['JES', 'JER', 'trigger', 'Pu']  # Sys list
+    sys_list = ['JES']  # Sys list
     sysud_list = sum([[sys+"Up", sys+"Down"] for sys in sys_list], [])  # Sys name list
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
@@ -163,46 +165,50 @@ def dummy_rhalphabet():
                 _isScalar = sample.startswith('z') or sample.startswith('h')
                 _isBoson = sample.startswith('z') or sample.startswith('h') or sample.startswith('w')
                 if _isScalar:
-                    if region == 'pass':
-                        SF *= sf_dict['BB_SF']
-                    else:
-                        templates[region][sName]
-                        passInt = f.Get(sample + '_pass').Integral()
-                        failInt = f.Get(sample + '_fail').Integral()
-                        if failInt > 0:
-                            SF *= (1. + (1. - sf_dict['BB_SF']) * passInt / failInt)
+                    SF *= 1.
+                    # if region == 'pass':
+                    #     SF *= sf_dict['BB_SF']
+                    # else:
+                    #     templates[region][sName]
+                    #     passInt = f.Get(sample + '_pass').Integral()
+                    #     failInt = f.Get(sample + '_fail').Integral()
+                    #     if failInt > 0:
+                    #         SF *= (1. + (1. - sf_dict['BB_SF']) * passInt / failInt)
 
-                if _isBoson:
-                    SF *= sf_dict['V_SF']
-
+                #if _isBoson:
+                #    SF *= sf_dict['V_SF']
+                #print(SF)
                 return SF
 
             for sName in ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']:
                 templ = templates[region+str(ptbin)][sName]
-                stype = rl.Sample.SIGNAL if sName == 'zcc' else rl.Sample.BACKGROUND
+                stype = rl.Sample.SIGNAL if sName in ['zcc', 'hcc'] else rl.Sample.BACKGROUND
+                # stype = rl.Sample.SIGNAL if sName in ['hcc'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                 # mock systematics
-                jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
-                msdUp = np.linspace(0.9, 1.1, msd.nbins)
-                msdDn = np.linspace(1.2, 0.8, msd.nbins)
+                # jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
+                # msdUp = np.linspace(0.9, 1.1, msd.nbins)
+                # msdDn = np.linspace(1.2, 0.8, msd.nbins)
 
                 # for jec we set lnN prior, shape will automatically be converted to norm systematic
-                sample.setParamEffect(jec, jecup_ratio)
-                sample.setParamEffect(massScale, msdUp, msdDn)
+                # sample.setParamEffect(jec, jecup_ratio)
+                # sample.setParamEffect(massScale, msdUp, msdDn)
                 # sample.setParamEffect(lumi, 1.027)
 
                 # Shape systematics general
-                sys_list = ['JES', 'JER', 'trigger', 'Pu']
-                for sys_name, sys in zip(sys_list, [JES, JER, trigger, Pu]):
+                #sys_list = ['JES', 'JER', 'trigger', 'Pu']
+                sys_list = ['JES']
+                #for sys_name, sys in zip(sys_list, [JES, JER, trigger, Pu]):
+                for sys_name, sys in zip(sys_list, [JES]):
                     _up = templates[region+str(ptbin)][sName+"_"+sys_name+"Up"]
                     _dn = templates[region+str(ptbin)][sName+"_"+sys_name+"Down"]
                     _sf = GetSF(sName, region+str(ptbin), templates)
-                    sample.setParamEffect(sys, _up*_sf, _dn*_sf)
+                    sample.setParamEffect(sys, _up[0]*_sf, _dn[0]*_sf)
 
                 # Systematics by group
-                if sName.startswith("h"):
-                    sample.setParamEffect(h_pt, 1.3)
+                # if sName.startswith("h"):
+                    # sample.setParamEffect(h_pt, 1.3)
                     # sample.setParamEffect(h_pt_shape, 1.0)
                 if sName not in ["qcd"]:
                     sample.setParamEffect(eleveto, 1.005)

@@ -19,6 +19,10 @@ cmsenv
 git clone git@github.com:andrzejnovak-/rhalphalib.git
 cd rhalphalib
 python make_Hxx.py
+
+# Go to hxxModel/
+bash build.sh
+combine -M FitDiagnostics hxxModel_combined.root
 ```
 
 ## Requirements
