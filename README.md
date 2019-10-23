@@ -16,7 +16,12 @@ Follow the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#
 ```
 cd CMSSW_10_2_13/src
 cmsenv
-git clone git@github.com:andrzejnovak-/rhalphalib.git
+```
+```
+# For now log out and back in to undo CMS environment
+git clone git@github.com:andrzejnovak/rhalphalib.git
+git fetch
+git checkout -b origin/hxx
 cd rhalphalib
 python make_Hxx.py
 
