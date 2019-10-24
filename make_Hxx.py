@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats
 import pickle
 import ROOT
+import uproot
 rl.util.install_roofit_helpers()
 
 
@@ -61,15 +62,32 @@ def dummy_rhalphabet():
     # Build qcd MC pass+fail model and fit to polynomial
     qcdmodel = rl.Model("qcdmodel")
     qcdpass, qcdfail = 0., 0.
+
+    def get_templ(region, sample, ptbin):
+        import uproot
+        f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+        hist_name = '{}_{}'.format(sample, region)
+        h_vals = f[hist_name].values[:, ptbin]
+        h_edges = f[hist_name].edges[0]
+        h_key = 'msd'
+        return (h_vals, h_edges, h_key)
+
     for ptbin in range(npt):
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
         qcdmodel.addChannel(failCh)
         qcdmodel.addChannel(passCh)
+
+        passTempl = get_templ("pass", "qcd", ptbin)
+        failTempl = get_templ("fail", "qcd", ptbin)
+
         # mock template
-        ptnorm = 1
-        failTempl = expo_sample(norm=ptnorm*1e5, scale=40, obs=msd)
-        passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
+        #ptnorm = 1
+        #failTempl = expo_sample(norm=ptnorm*1e5, scale=40, obs=msd)
+        #print(failTempl)
+        #passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
+        #import sys
+        #sys.exit()
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
         qcdfail += failCh.getObservation().sum()
