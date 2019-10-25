@@ -78,14 +78,14 @@ def dummy_rhalphabet():
         qcdmodel.addChannel(failCh)
         qcdmodel.addChannel(passCh)
 
-        passTempl = get_templ("pass", "qcd", ptbin)
-        failTempl = get_templ("fail", "qcd", ptbin)
+        #passTempl = get_templ("pass", "qcd", ptbin)
+        #failTempl = get_templ("fail", "qcd", ptbin)
 
         # mock template
-        #ptnorm = 1
-        #failTempl = expo_sample(norm=ptnorm*1e5, scale=40, obs=msd)
+        ptnorm = 1
+        failTempl = expo_sample(norm=ptnorm*1e5, scale=40, obs=msd)
         #print(failTempl)
-        #passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
+        passTempl = expo_sample(norm=ptnorm*1e3, scale=40, obs=msd)
         #import sys
         #sys.exit()
         failCh.setObservation(failTempl)
