@@ -298,7 +298,7 @@ def dummy_rhalphabet():
 
         templates = {}
         f = uproot.open(
-            '~/nobackup/coffeandbacon/analysis/hist_1DZcc_pt_scalesmear.root')
+            'hxx/hist_1DZcc_pt_scalesmear.root')
         for sample in ['tqq', 'qcd']:
             hist_name = '{}_{}'.format(sample, region)
             h_vals = f[hist_name].values[:, ptbin]
