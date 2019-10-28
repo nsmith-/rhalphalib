@@ -17,15 +17,28 @@ Follow the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#
 cd CMSSW_10_2_13/src
 cmsenv
 ```
+Then ideally in a separte window (no `cmsenv`) if you don't have conda setup, install conda (will manage all your packages, needs few GB of space)
 ```
-# For now log out and back in to undo CMS environment
+wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+```
+Setup a new environment to keep pacakges separate. Root needs to be 6.16
+```
+conda create -n myenv python
+conda activate myenv
+conda config --add channels conda-forge
+conda install root==6.16
+```
+
+```
 git clone git@github.com:andrzejnovak/rhalphalib.git
+cd rhalphalib
 git fetch
 git checkout -b origin/hxx
-cd rhalphalib
 python make_Hxx.py
 
-# Go to hxxModel/
+# Go to hxxModel/ and sourc cmsenv to get combine 
+cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
 ```
