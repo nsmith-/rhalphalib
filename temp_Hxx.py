@@ -100,6 +100,7 @@ def dummy_rhalphabet():
 
             if not pseudo:
                 data_obs = templates[region+str(ptbin)]['data_obs']
+                print("Reading real data")
 
             else:
                 yields = sum(tpl[0] for samp, tpl in templates[region+str(ptbin)].items() if  samp in [*include_samples, 'qcd'])

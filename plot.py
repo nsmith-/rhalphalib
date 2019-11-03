@@ -22,7 +22,12 @@ parser.add_argument("--space",
                     default='prefit',
                     dest='namespace',
                     help="fitDiagnostics namespace to plot")
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('--data',action='store_false', dest='pseudo')
+group.add_argument('--MC',action='store_true', dest='pseudo')
+
 args = parser.parse_args()
+print(args.pseudo)
 
 
 def make_dirs(dirname):
@@ -127,10 +132,19 @@ def full_plot(cats, pseudo=True):
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
         ax.step(bins, h, where='post', label=label, c=cdict[label], **kwargs)
 
-    avail_samples = [
-        k.decode(encoding="utf-8").split(';')[0] for k in cats[0].keys()
-        if b'total' not in k
-    ]
+    # Sample proofing
+    by_cat_samples = []
+    for _cat in cats:
+        cat_samples = [ k.decode(encoding="utf-8").split(';')[0] for k in _cat.keys() if b'total' not in k]
+        by_cat_samples.append(cat_samples)
+
+    from collections import Counter
+    count = Counter(sum(by_cat_samples, []))
+    k, v = list(count.keys()), list(count.values())
+    for _sample in np.array(k)[np.array(v) != max(v)]:
+        print("Sample {} is partially or entirely missing and won't be plotted".format(_sample))
+
+    avail_samples = list(np.array(k)[np.array(v) == max(v)])
 
     # Plotting
     fig, (ax, rax) = plt.subplots(2,
@@ -230,10 +244,13 @@ def full_plot(cats, pseudo=True):
     rax.set_ylim(rax.get_ylim()[0] * 1.3, rax.get_ylim()[1] * 1.3)
 
     ipt = int(str(cats[0].name, 'utf-8').split('ptbin')[1][0]) if b'ptbin' in cats[0].name else 0
-    if len(cats) == 1 or b'muon' not in cats[0].name:
+    if len(cats) == 1:
         pt_range = str(pbins[ipt]) + "$< \mathrm{p_T} <$" + str(
             pbins[ipt + 1]) + " GeV"
     else:
+        pt_range = str(pbins[0]) + "$< \mathrm{p_T} <$" + str(
+            pbins[-1]) + " GeV"
+    if b'muon' in cats[0].name:
         pt_range = str(pbins[0]) + "$< \mathrm{p_T} <$" + str(
             pbins[-1]) + " GeV"
 
@@ -287,12 +304,12 @@ for region in ['pass', 'fail']:
             raise ValueError(
                 "Namespace {} is not available, only following namespaces were found in the file: {}"
                 .format(args.namespace, f.keys()))
-        full_plot([cat])
-    full_plot([f[shape_type]['ptbin{}{};1'.format(i, region)] for i in range(0, 6)])
+        full_plot([cat], pseudo=args.pseudo)
+    full_plot([f[shape_type]['ptbin{}{};1'.format(i, region)] for i in range(0, 6)], pseudo=args.pseudo)
     # MuonCR if included
     try:
         cat = f[shape_type]['muonCR{};1'.format(region)]
-        full_plot([cat])
+        full_plot([cat], pseudo=args.pseudo)
         print("Plotted muCR")
     except:
         pass

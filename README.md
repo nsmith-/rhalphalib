@@ -37,10 +37,11 @@ git fetch
 git checkout -b origin/hxx
 python make_Hxx.py
 
-# Go to hxxModel/ and sourc cmsenv to get combine 
+# Go to hxxModel/ and sourc cmsenv to get combine
 cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
+combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes
 ```
 
 ## Requirements
