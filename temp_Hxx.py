@@ -10,7 +10,7 @@ rl.util.install_roofit_helpers()
 def dummy_rhalphabet():
     throwPoisson = True
     fitTF = True
-    pseudo = False
+    pseudo = True
 
     # Default lumi (needs at least one systematics for prefit)
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -112,9 +112,8 @@ def dummy_rhalphabet():
 
             # drop bins outside rho validity
             mask = validbins[ptbin]
-            # blind bins 11, 12, 13
             if not pseudo:
-                mask[11:14] = False
+                mask[10:14] = False
             ch.mask = mask
 
     if fitTF:

@@ -12,10 +12,20 @@ python test_rhalphalib.py
 Take a look at the folders `testModel` and `monojetModel`.
 
 ### Hcc
-Follow the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version) from combine. and clone to CMSSW environment.
+Following the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version) from combine. and clone to CMSSW environment.
 ```
 cd CMSSW_10_2_13/src
 cmsenv
+git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+cd HiggsAnalysis/CombinedLimit
+cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit
+git fetch origin
+git checkout v8.0.1
+scramv1 b clean; scramv1 b
+
+git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester
+scram b -j8
+
 ```
 Then ideally in a separte window (no `cmsenv`) if you don't have conda setup, install conda (will manage all your packages, needs few GB of space)
 ```
@@ -42,6 +52,10 @@ cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
 combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes
+
+# To extract shapes/norms use combine harvester
+PostFitShapesFromWorkspace -w tempModel/tempModel_combined.root -o shapes.root --print --postfit --sampling -f tempModel/fitDiagnostics.root:fit_s
+python plot.py -i shapes.root --data --fit postfit
 ```
 
 ## Requirements

@@ -1,8 +1,8 @@
-import os, errno
+import os
+import errno
 import argparse
 from collections import OrderedDict
 
-#import ROOT as r
 import uproot
 
 import matplotlib.pyplot as plt
@@ -11,23 +11,29 @@ import numpy as np
 
 import mplhep as hep
 plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
-plt.switch_backend('agg')
+# plt.switch_backend('agg')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i",
                     "--input-file",
-                    default='hxxModel/fitDiagnostics.root',
-                    help="Input fitDiagnostics file")
-parser.add_argument("--space",
+                    default='hxxModel/shapes.root',
+                    help="Input shapes file")
+parser.add_argument("--fit",
                     default='prefit',
-                    dest='namespace',
-                    help="fitDiagnostics namespace to plot")
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument('--data',action='store_false', dest='pseudo')
-group.add_argument('--MC',action='store_true', dest='pseudo')
+                    choices={"prefit", "postfit"},
+                    dest='fit',
+                    help="Shapes to plot")
+
+parser.add_argument("-o", "--output-folder",
+                    default='plots',
+                    dest='output_folder',
+                    help="Folder to store plots - will be created if it doesn't exist.")
+
+pseudo = parser.add_mutually_exclusive_group(required=True)
+pseudo.add_argument('--data', action='store_false', dest='pseudo')
+pseudo.add_argument('--MC', action='store_true', dest='pseudo')
 
 args = parser.parse_args()
-print(args.pseudo)
 
 
 def make_dirs(dirname):
@@ -43,7 +49,6 @@ def make_dirs(dirname):
 
 make_dirs('plots')
 
-#rf = r.TFile.Open(args.i)
 
 cdict = {
     'hqq': 'blue',
@@ -56,6 +61,19 @@ cdict = {
     'zcc': 'red',
     'zqq': 'turquoise',
 }
+
+sdict = {
+    'hqq': '-',
+    'hcc': '-',
+    'wqq': '-',
+    'wcq': '-',
+    'qcd': '-',
+    'tqq': '-',
+    'zbb': '-',
+    'zcc': '-',
+    'zqq': '-',
+}
+
 
 label_dict = OrderedDict({
     'Data': 'Data',
@@ -74,10 +92,11 @@ label_dict = OrderedDict({
 
 
 def full_plot(cats, pseudo=True):
+
+    # For masking 0 bins (don't want to show them)
     class Ugh():
         def __init__(self):
             self.plot_bins = None
-
     ugh = Ugh()
 
     def tgasym_to_err(tgasym):
@@ -105,8 +124,10 @@ def full_plot(cats, pseudo=True):
                 ugh.plot_bins = [y != 0][0]
             else:
                 ugh.plot_bins = (ugh.plot_bins & [y != 0][0])
+
         x = np.array(x)[ugh.plot_bins]
         y = np.array(y)[ugh.plot_bins]
+
         yerr = [
             np.array(yerr[0])[ugh.plot_bins],
             np.array(yerr[1])[ugh.plot_bins]
@@ -115,6 +136,7 @@ def full_plot(cats, pseudo=True):
             np.array(xerr)[0][ugh.plot_bins],
             np.array(xerr)[1][ugh.plot_bins]
         ]
+
         ax.errorbar(x,
                     y,
                     yerr,
@@ -125,9 +147,15 @@ def full_plot(cats, pseudo=True):
 
     def th1_to_step(th1):
         _h, _bins = th1.numpy()
-        _binwidths = [_bins[i + 1] - _bins[i] for i in range(len(_bins[:-1]))]
-        _h *= _binwidths
         return _bins, np.r_[_h, _h[-1]]
+
+    def th1_to_err(th1):
+        _h, _bins = th1.numpy()
+        _x = _bins[:-1] + np.diff(_bins)/2
+        _xerr = [abs(_bins[:-1] - _x), _bins[1:] - _x]
+        _var = th1.variances
+
+        return _x, _h, _var, [_xerr[0], _xerr[1]]
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
         ax.step(bins, h, where='post', label=label, c=cdict[label], **kwargs)
@@ -135,36 +163,39 @@ def full_plot(cats, pseudo=True):
     # Sample proofing
     by_cat_samples = []
     for _cat in cats:
-        cat_samples = [ k.decode(encoding="utf-8").split(';')[0] for k in _cat.keys() if b'total' not in k]
+        cat_samples = [
+            k.decode(encoding="utf-8").split(';')[0] for k in _cat.keys()
+            if b'total' not in k
+        ]
         by_cat_samples.append(cat_samples)
 
     from collections import Counter
     count = Counter(sum(by_cat_samples, []))
     k, v = list(count.keys()), list(count.values())
     for _sample in np.array(k)[np.array(v) != max(v)]:
-        print("Sample {} is partially or entirely missing and won't be plotted".format(_sample))
+        print("Sample {} is partially or entirely missing and won't be plotted".format(
+            _sample))
 
     avail_samples = list(np.array(k)[np.array(v) == max(v)])
 
     # Plotting
-    fig, (ax, rax) = plt.subplots(2,
-                                  1,
+    fig, (ax, rax) = plt.subplots(2, 1,
                                   gridspec_kw={'height_ratios': (3, 1)},
                                   sharex=True)
     plt.subplots_adjust(hspace=0)
 
-    ## Main
-    res = np.array(list(map(tgasym_to_err, [cat['data'] for cat in cats])))
-    ### Sum along y, keep only first one for x
-    _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0),
-    _yerrlo, _yerrhi = np.sum(res[:, 2], axis=0), np.sum(res[:, 3], axis=0)
-    _xerrlo, _xerrhi = res[:, 4][0], res[:, 5][0]
-    plot_data(_x, _y, [_yerrlo, _yerrhi], [_xerrlo, _xerrhi], ax=ax, ugh=ugh)
+    #  Main
+    res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
+    _x, _h = res[:, 0][0], np.sum(res[:, 1], axis=0)
+    _xerr = res[:, -1][0]
+    _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+    plot_data(_x, _h, yerr=[_yerr, _yerr], xerr=_xerr, ax=ax, ugh=ugh)
 
-    ### Stack qcd/ttbar
+    # Stack qcd/ttbar
     tot_h, bins = None, None
     for mc, zo in zip(['qcd', 'tqq'], [1, 0]):
-        if mc not in avail_samples: continue
+        if mc not in avail_samples:
+            continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
@@ -174,10 +205,11 @@ def full_plot(cats, pseudo=True):
             plot_step(bins, h + tot_h, label=mc, ax=ax, zorder=zo)
             tot_h += h
 
-    ### Stack plots
+    # Stack plots
     tot_h, bins = None, None
     for mc in ['hqq', 'hcc', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']:
-        if mc not in avail_samples: continue
+        if mc not in avail_samples:
+            continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
@@ -188,40 +220,50 @@ def full_plot(cats, pseudo=True):
             tot_h += h
 
     #######
-    ## Ratio plot
+    # Ratio plot
     rax.axhline(0, c='gray', ls='--')
 
-    ### Caculate diff
-    res = np.array(list(map(tgasym_to_err, [cat['data'] for cat in cats])))
-    _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0),
-    _yerrlo, _yerrhi = np.sum(res[:, 2], axis=0), np.sum(res[:, 3], axis=0)
-    _xerrlo, _xerrhi = res[:, 4][0], res[:, 5][0]
-    #### Subtract MC
+    # Caculate diff
+    res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
+    _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0)
+    _xerr = res[:, -1][0]
+    _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+
     y = np.copy(_y)
     for mc in ['qcd', 'tqq']:
-        if mc not in avail_samples: continue
+        if mc not in avail_samples:
+            continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
-        y -= h[:-1]  # Last step duplicate is not needed
-    #### Scale by data uncertainty
-    y /= (_yerrlo + _yerrhi)
-    plot_data(_x,
-              y, [_yerrlo / _yerrlo, _yerrhi / _yerrhi], [_xerrlo, _xerrhi],
-              ax=rax,
-              ugh=ugh)
-    _scale_for_mc = np.r_[(_yerrlo + _yerrhi), (_yerrlo + _yerrhi)[-1]]
+        y -= h[:-1]
 
-    ### Stack plots
+    y /= _yerr
+    _scale_for_mc = np.r_[_yerr,  _yerr[-1]]
+
+    def prop_err(A, B, C, a, b, c):
+        # Error propagation for (Data - Bkg)/Sigma_{Data} plot
+        e = C**2 * (a**2 + b**2) + c**2 * (A - B)**2
+        e /= C**4
+        e = np.sqrt(e)
+        return e
+
+    # Error propagation, not sensitive to args[-1]
+    err = prop_err(_y, _y-y, np.sqrt(_y), np.sqrt(_y), np.sqrt(_y-y), 1)
+
+    plot_data(_x, y, yerr=[err, err], xerr=_xerr, ax=rax, ugh=ugh)
+
+    # Stack plots
     tot_h, bins = None, None
     for mc in ['hqq', 'hcc', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']:
-        if mc not in avail_samples: continue
+        if mc not in avail_samples:
+            continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
             plot_step(bins, h / _scale_for_mc, ax=rax, label=mc)
             tot_h = h
         else:
-            plot_step(bins, (h + tot_h) / _scale_for_mc, label=mc, ax=rax)
+            plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
             tot_h += h
 
     ############
@@ -236,14 +278,18 @@ def full_plot(cats, pseudo=True):
 
     ax.set_xlim(40, 200)
     ax.set_ylim(0, ax.get_ylim()[1] * 1.4)
-    #ax.ticklabel_format(axis='y', style='sci', scilimits=(0,3), useOffset=False)
-    #ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.e'))
+    # ax.ticklabel_format(axis='y', style='sci', scilimits=(0,3), useOffset=False)
+    # ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.e'))
     f = mtick.ScalarFormatter(useOffset=False, useMathText=True)
-    g = lambda x, pos: "${}$".format(f._formatSciNotation('%1.10e' % x))
+    # g = lambda x, pos: "${}$".format(f._formatSciNotation('%1.10e' % x))
+    
+    def g(x, pos):
+        return "${}$".format(f._formatSciNotation('%1.10e' % x))
     ax.yaxis.set_major_formatter(mtick.FuncFormatter(g))
     rax.set_ylim(rax.get_ylim()[0] * 1.3, rax.get_ylim()[1] * 1.3)
 
-    ipt = int(str(cats[0].name, 'utf-8').split('ptbin')[1][0]) if b'ptbin' in cats[0].name else 0
+    ipt = int(str(cats[0].name,
+                  'utf-8').split('ptbin')[1][0]) if b'ptbin' in cats[0].name else 0
     if len(cats) == 1:
         pt_range = str(pbins[ipt]) + "$< \mathrm{p_T} <$" + str(
             pbins[ipt + 1]) + " GeV"
@@ -254,9 +300,9 @@ def full_plot(cats, pseudo=True):
         pt_range = str(pbins[0]) + "$< \mathrm{p_T} <$" + str(
             pbins[-1]) + " GeV"
 
-    annot = pt_range \
-            +'\nDeepDoubleX{}'.format(", MuonCR" if b'muon' in cats[0].name else "") \
-            +'\n{} Region'.format("Passing" if "pass" in str(cats[0].name, 'utf-8') else "Failing")
+    lab_mu = ", MuonCR" if b'muon' in cats[0].name else ""
+    lab_reg = "Passing" if "pass" in str(cats[0].name, 'utf-8') else "Failing"
+    annot = pt_range + '\nDeepDoubleX{}'.format(lab_mu) + '\n{} Region'.format(lab_reg)
 
     ax.annotate(annot,
                 linespacing=1.7,
@@ -284,32 +330,34 @@ def full_plot(cats, pseudo=True):
     name = str("pass" if "pass" in str(cats[0].name, 'utf-8') else "fail"
                ) + _iptname
 
-    fig.savefig('plots/{}.png'.format(args.namespace + "_" + name),
-                #transparent=True,
+    fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name), 
+                bbox_inches="tight")
+    fig.savefig('{}/{}.pdf'.format(args.output_folder, args.fit + "_" + name), 
                 bbox_inches="tight")
 
 
-shape_type = 'shapes_' + args.namespace
+shape_type = args.fit
 
 f = uproot.open(args.input_file)
 pbins = [450, 500, 550, 600, 675, 800, 1200]
-axees = []
 for region in ['pass', 'fail']:
     print("Plotting {} region".format(region))
     for i in range(0, 6):
-        cat_name = 'ptbin{}{};1'.format(i, region)
+        cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
         try:
-            cat = f[shape_type][cat_name]
-        except:
-            raise ValueError(
-                "Namespace {} is not available, only following namespaces were found in the file: {}"
-                .format(args.namespace, f.keys()))
-        full_plot([cat], pseudo=args.pseudo)
-    full_plot([f[shape_type]['ptbin{}{};1'.format(i, region)] for i in range(0, 6)], pseudo=args.pseudo)
+            cat = f[cat_name]
+        except Exception:
+            raise ValueError("Namespace {} is not available, only following"
+                             "namespaces were found in the file: {}".format(
+                                 args.fit, f.keys()))
+
+        fig = full_plot([cat], pseudo=args.pseudo)
+    full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
+              pseudo=args.pseudo)
     # MuonCR if included
     try:
-        cat = f[shape_type]['muonCR{};1'.format(region)]
-        full_plot([cat], pseudo=args.pseudo)
+        cat = f['muonCR{}_{};1'.format(region, shape_type)]
+        full_plot([cat], args.pseudo)
         print("Plotted muCR")
-    except:
+    except Exception:
         pass
