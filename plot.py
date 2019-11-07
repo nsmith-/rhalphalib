@@ -332,8 +332,8 @@ def full_plot(cats, pseudo=True):
 
     fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name), 
                 bbox_inches="tight")
-    fig.savefig('{}/{}.pdf'.format(args.output_folder, args.fit + "_" + name), 
-                bbox_inches="tight")
+    # fig.savefig('{}/{}.pdf'.format(args.output_folder, args.fit + "_" + name), 
+    #             bbox_inches="tight")
 
 
 shape_type = args.fit

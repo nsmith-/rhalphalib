@@ -7,6 +7,7 @@ import ROOT
 import uproot
 rl.util.install_roofit_helpers()
 
+
 def dummy_rhalphabet():
     throwPoisson = True
     fitTF = True
@@ -76,6 +77,7 @@ def dummy_rhalphabet():
                         _outname += "_"+sys_name
                     h_vals = f[hist_name].values[:, ptbin]
                     h_edges = f[hist_name].edges[0]
+                    #if sample == 'data_obs': print(h_edges)
                     h_key = 'msd'
                     templates[region+str(ptbin)][_outname] = (h_vals, h_edges, h_key)
 
@@ -83,9 +85,6 @@ def dummy_rhalphabet():
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
-
-            #for sName in ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']:
-            #include_samples = ['zcc']
             include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
@@ -112,7 +111,7 @@ def dummy_rhalphabet():
 
             # drop bins outside rho validity
             mask = validbins[ptbin]
-            if not pseudo:
+            if not pseudo and region == 'pass':
                 mask[10:14] = False
             ch.mask = mask
 

@@ -47,15 +47,18 @@ git fetch
 git checkout -b origin/hxx
 python make_Hxx.py
 
-# Go to hxxModel/ and sourc cmsenv to get combine
+# Go to hxxModel/ and source cmsenv to get combine
 cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
 combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes
 
 # To extract shapes/norms use combine harvester
-PostFitShapesFromWorkspace -w tempModel/tempModel_combined.root -o shapes.root --print --postfit --sampling -f tempModel/fitDiagnostics.root:fit_s
-python plot.py -i shapes.root --data --fit postfit
+PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
+```
+And back in conda env:
+```
+python plot.py -i tempModel/shapes.root --data --fit postfit
 ```
 
 ## Requirements
