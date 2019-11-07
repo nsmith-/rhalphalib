@@ -1,5 +1,7 @@
+from __future__ import division
 import numpy as np
 import numbers
+import warnings
 from .parameter import (
     Parameter,
     IndependentParameter,
@@ -206,7 +208,7 @@ class TemplateSample(Sample):
                     out = out * effect_up
                 elif self._paramEffectsDown[param] is None:
                     if param.combinePrior == 'shape':
-                        out = out * (1 + effect_up*param)
+                        out = out * (1 + (effect_up - 1)*param)
                     elif param.combinePrior == 'shapeN':
                         out = out * (effect_up**param)
                     elif param.combinePrior == 'lnN':
@@ -218,12 +220,12 @@ class TemplateSample(Sample):
                     effect_down = self.getParamEffect(param, up=False)
                     smoothStep = SmoothStep(param)
                     if param.combinePrior == 'shape':
-                        combined_effect = smoothStep * (1 + effect_up*param) + (1 - smoothStep) * (1 + effect_down*param)
+                        combined_effect = smoothStep * (1 + (effect_up - 1)*param) + (1 - smoothStep) * (1 - (effect_down - 1)*param)
                     elif param.combinePrior == 'shapeN':
-                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) / (effect_down**param)
                     elif param.combinePrior == 'lnN':
                         # TODO: ensure scalar effect
-                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) * (effect_down**param)
+                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) / (effect_down**param)
                     else:
                         raise NotImplementedError('per-bin effects for other nuisance parameter types')
                     out = out * combined_effect
@@ -449,6 +451,10 @@ class ParametericSample(Sample):
                 workspace.add(rooShape)
                 workspace.add(rooNorm)
             else:
+                if self.PreferRooParametricHist:
+                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n" \
+                                  "Set ParametericSample.PreferRooParametricHist = False to disable this warning",
+                                  RuntimeWarning)
                 # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)
                 norm = _pairwise_sum(params)
                 norm.name = self.name + '_norm'

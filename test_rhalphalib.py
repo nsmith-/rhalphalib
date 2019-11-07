@@ -5,6 +5,7 @@ import scipy.stats
 import pickle
 import ROOT
 rl.util.install_roofit_helpers()
+rl.ParametericSample.PreferRooParametricHist = False
 
 
 def expo_sample(norm, scale, obs):

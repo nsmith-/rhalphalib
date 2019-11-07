@@ -6,7 +6,7 @@ from .util import install_roofit_helpers
 
 
 class BernsteinPoly(object):
-    def __init__(self, name, order, dim_names=None, init_params=None, limits=None):
+    def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
         '''
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
@@ -14,6 +14,7 @@ class BernsteinPoly(object):
             dim_names: optional, names of each dimension
             initial_params: ndarray of initial params
             limits: tuple of independent parameter limits, default: (0, 10)
+            coefficient_transform: callable to transform coefficients before multiplying by parameters
         '''
         self._name = name
         if not isinstance(order, tuple):
@@ -36,6 +37,7 @@ class BernsteinPoly(object):
             raise ValueError
         if limits is None:
             limits = (0., 10.)
+        self._transform = coefficient_transform
 
         # Construct Bernstein matrix for each dimension
         self._bmatrices = []
@@ -79,9 +81,19 @@ class BernsteinPoly(object):
             xpow = np.power.outer(x, np.arange(n + 1))
             bpolyval = np.einsum("vl,xl,x...->x...v", B, xpow, bpolyval)
 
+        if self._transform is not None:
+            bpolyval = self._transform(bpolyval)
         return bpolyval
 
-    def __call__(self, *vals):
+    def __call__(self, *vals, **kwargs):
+        '''
+        vals: a ndarray for each dimension's values to evaluate the polynomial at
+        kwargs:
+            nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
+        '''
+        nominal = kwargs.pop('nominal', False)
+        if len(kwargs) > 0:
+            raise ValueError("Extra keyword arguments supplied!")
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
@@ -99,6 +111,9 @@ class BernsteinPoly(object):
 
         parameters = self._params.reshape(-1)
         coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
+        if nominal:
+            parameters = np.vectorize(lambda p: p.value)(parameters)
+            return (parameters*coefficients).sum(axis=1).reshape(shape)
 
         out = np.full(coefficients.shape[0], None)
         for i in range(coefficients.shape[0]):
