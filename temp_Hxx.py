@@ -7,11 +7,8 @@ import uproot
 rl.util.install_roofit_helpers()
 
 
-def dummy_rhalphabet():
-    throwPoisson = True
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
     fitTF = True
-    pseudo = False
-    MCTF = True
 
     # Default lumi (needs at least one systematics for prefit)
     lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -33,10 +30,14 @@ def dummy_rhalphabet():
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    def get_templ(region, sample, ptbin):
-        import uproot
-        f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+
+    def get_templ(f, region, sample, ptbin, syst=None):
+        if sample in ["hcc", "hqq"]:
+            sample += "125"
         hist_name = '{}_{}'.format(sample, region)
+        if syst is not None:
+            hist_name += "_"+sys_name
         h_vals = f[hist_name].values[:, ptbin]
         h_edges = f[hist_name].edges[0]
         h_key = 'msd'
@@ -51,8 +52,8 @@ def dummy_rhalphabet():
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
 
-        passTempl = get_templ("pass", "qcd", ptbin)
-        failTempl = get_templ("fail", "qcd", ptbin)
+        passTempl = get_templ(f, "pass", "qcd", ptbin)
+        failTempl = get_templ(f, "fail", "qcd", ptbin)
 
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
@@ -120,29 +121,6 @@ def dummy_rhalphabet():
     # build actual fit model now
     model = rl.Model("tempModel")
 
-    # Load templates
-    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
-    templates = {}
-    sys_list = ['JES']  # Sys list
-    sysud_list = sum([[sys+"Up", sys+"Down"] for sys in sys_list], [])  # Sys name list
-    for ptbin in range(npt):
-        for region in ['pass', 'fail']:
-            templates[region+str(ptbin)] = {}
-            for sample in [
-                    'zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc125', 'tqq', 'hqq125', 'qcd',
-                    'data_obs'
-            ]:
-                for sys_name in [""] + sysud_list:
-                    hist_name = '{}_{}'.format(sample, region)
-                    _outname = sample.replace('125', '')
-                    if len(sys_name) > 0:
-                        hist_name += "_"+sys_name
-                        _outname += "_"+sys_name
-                    h_vals = f[hist_name].values[:, ptbin]
-                    h_edges = f[hist_name].edges[0]
-                    h_key = 'msd'
-                    templates[region+str(ptbin)][_outname] = (h_vals, h_edges, h_key)
-
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
@@ -151,7 +129,7 @@ def dummy_rhalphabet():
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
             for sName in include_samples:
-                templ = templates[region+str(ptbin)][sName]
+                templ = get_templ(f, region, sName, ptbin)
                 stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -160,7 +138,7 @@ def dummy_rhalphabet():
                 ch.addSample(sample)
 
             if not pseudo:
-                data_obs = templates[region+str(ptbin)]['data_obs']
+                data_obs = get_templ(f, region, 'data_obs', ptbin)
                 print("Reading real data")
 
             else:
@@ -272,6 +250,40 @@ def dummy_rhalphabet():
 
     model.renderCombine("tempModel")
 
-
 if __name__ == '__main__':
-    dummy_rhalphabet()
+    import argparse
+    parser = argparse.ArgumentParser()
+    
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+    
+    parser.add_argument("--throwPoisson",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="If plotting data, redraw from poisson distribution")
+    
+    parser.add_argument("--MCTF",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Fit QCD in MC first")
+
+    pseudo = parser.add_mutually_exclusive_group(required=True)
+    pseudo.add_argument('--data', action='store_false', dest='pseudo')
+    pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+
+    args = parser.parse_args()
+    print(args.MCTF)
+
+    dummy_rhalphabet(pseudo=args.pseudo, 
+                     throwPoisson=args.throwPoisson,
+                     MCTF=args.MCTF
+                     )
