@@ -56,7 +56,7 @@ def plotTF(TF, msd, pt, mask=None):
         contf = ax.contourf(msd, pt, TF, levels=levels, cmap='RdBu_r')
     cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
     cbar = fig.colorbar(contf, cax=cax)
-    cbar.set_ticks([np.arange(0.7, 1.3, 0.1)])
+    cbar.set_ticks([np.arange(zmin, zmax, 0.1)])
 
     ax.invert_yaxis()
 
@@ -74,7 +74,8 @@ def plotTF_ratio(in_ratio, mask):
     fig, ax = plt.subplots()
 
     H = np.ma.masked_where(in_ratio * mask <= 0.01, in_ratio * mask)
-    hep.hist2dplot(H, msdbins, ptbins, vmin=0.7, vmax=1.3, cmap='RdBu_r', cbar=False)
+    zmin, zmax = np.floor(10*np.min(TFres))/10, np.ceil(10*np.max(TFres))/10
+    hep.hist2dplot(H, msdbins, ptbins, vmin=zmin, vmax=zmax, cmap='RdBu_r', cbar=False)
     cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
     cbar = fig.colorbar(ax.get_children()[0], cax=cax)
 
@@ -226,8 +227,10 @@ if __name__ == '__main__':
     fail_qcd = np.array(fail_qcd)
     pass_qcd = np.array(pass_qcd)
 
-    q = (np.sum(pass_qcd/np.sum(fail_qcd)))
-    in_data_rat = (pass_qcd/(fail_qcd*q))
+    mask = ~np.isclose(pass_qcd, np.zeros_like(pass_qcd))
+    mask *= ~np.isclose(fail_qcd, np.zeros_like(fail_qcd))
+    q = np.sum(pass_qcd[mask])/np.sum(fail_qcd[mask])
+    in_data_rat = (pass_qcd/(fail_qcd * q))
 
     plotTF_ratio(in_data_rat, validbins)
 
