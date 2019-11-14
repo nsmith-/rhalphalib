@@ -59,6 +59,7 @@ PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --p
 And back in conda env:
 ```
 python plot.py -i tempModel/shapes.root --data --fit postfit
+python plotTF.py -i tempModel/shapes.root --fit tempModel/fitDiagnostics.root
 ```
 
 ## Requirements

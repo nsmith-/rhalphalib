@@ -1,5 +1,3 @@
-import os
-import errno
 import argparse
 from collections import OrderedDict
 
@@ -8,6 +6,8 @@ import uproot
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import numpy as np
+
+from utils import make_dirs
 
 import mplhep as hep
 plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
@@ -35,20 +35,7 @@ pseudo.add_argument('--MC', action='store_true', dest='pseudo')
 
 args = parser.parse_args()
 
-
-def make_dirs(dirname):
-    """
-    Ensure that a named directory exists; if it does not, attempt to create it.
-    """
-    try:
-        os.makedirs(dirname)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-
-
 make_dirs('plots')
-
 
 cdict = {
     'hqq': 'blue',
