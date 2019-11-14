@@ -166,7 +166,7 @@ def dummy_rhalphabet():
             else:
                 yields = sum(tpl[0]
                              for samp, tpl in templates[region + str(ptbin)].items()
-                             if samp in [*include_samples, 'qcd'])
+                             if samp in np.r_[include_samples, 'qcd'])
                 if throwPoisson:
                     yields = np.random.poisson(yields)
 
