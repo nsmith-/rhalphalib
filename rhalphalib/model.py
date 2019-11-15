@@ -162,33 +162,49 @@ class Channel(object):
         sample.mask = self.mask
         self._samples[sample.name] = sample
 
-    def setObservation(self, obs):
+    def setObservation(self, obs, read_sumw2=False):
         '''
         Set the observation of the channel.
         obs: Either a ROOT TH1, a 1D Coffea Hist object, or a numpy histogram
             in the latter case, please extend the numpy histogram tuple to define an observable name
             i.e. (sumw, binning, name)
             (for the others, the observable name is taken from the x axis name)
+        read_sumw2: bool
+            If true, don't assume observation is poisson, and read sumw2 for observation into model
         '''
-        sumw, binning, obs_name = _to_numpy(obs)
+        if read_sumw2:
+            sumw, binning, obs_name, sumw2 = _to_numpy(obs, read_sumw2=True)
+        else:
+            sumw, binning, obs_name = _to_numpy(obs)
         observable = Observable(obs_name, binning)
         if self._observable is not None:
             if not observable == self._observable:
                 raise ValueError("Observation has an incompatible observable with channel %r" % self)
         else:
             self._observable = observable
-        self._observation = sumw
+        if read_sumw2:
+            self._observation = (sumw, sumw2)
+        else:
+            self._observation = sumw
 
     def getObservation(self):
         '''
         Return the current observation set for this Channel as plain numpy array
+        If it is non-poisson, it will be returned as a tuple (sumw, sumw2)
         '''
         if self._observation is None:
             raise RuntimeError("Channel %r has no observation set" % self)
-        obs = self._observation.copy()
-        if self.mask is not None:
-            obs[~self.mask] = 0.
-        return obs
+        if isinstance(self._observation, tuple):
+            obs, var = (self._observation[0].copy(), self._observation[1].copy())
+            if self.mask is not None:
+                obs[~self.mask] = 0.
+                var[~self.mask] = 0.
+            return (obs, var)
+        else:
+            obs = self._observation.copy()
+            if self.mask is not None:
+                obs[~self.mask] = 0.
+            return obs
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -270,6 +286,8 @@ class Channel(object):
 
     def renderCard(self, outputFilename, workspaceName):
         observation = self.getObservation()
+        if isinstance(observation, tuple):
+            observation = observation[0]
         signalSamples = [s for s in self if s.sampletype == Sample.SIGNAL]
         nSig = len(signalSamples)
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]

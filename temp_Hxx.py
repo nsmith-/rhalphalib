@@ -33,13 +33,15 @@ def dummy_rhalphabet():
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    def get_templ(region, sample, ptbin):
-        import uproot
-        f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+    f_templates = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+    def get_templ(region, sample, ptbin, read_sumw2=False):
         hist_name = '{}_{}'.format(sample, region)
-        h_vals = f[hist_name].values[:, ptbin]
-        h_edges = f[hist_name].edges[0]
+        h_vals = f_templates[hist_name].values[:, ptbin]
+        h_edges = f_templates[hist_name].edges[0]
         h_key = 'msd'
+        if read_sumw2:
+            h_variances = f_templates[hist_name].variances[:, ptbin]
+            return (h_vals, h_edges, h_key, h_variances)
         return (h_vals, h_edges, h_key)
 
     # Get QCD efficiency
@@ -51,13 +53,15 @@ def dummy_rhalphabet():
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
 
-        passTempl = get_templ("pass", "qcd", ptbin)
-        failTempl = get_templ("fail", "qcd", ptbin)
+        passTempl = get_templ("pass", "qcd", ptbin, read_sumw2=True)
+        failTempl = get_templ("fail", "qcd", ptbin, read_sumw2=True)
+        print("pass qcd pt", ptbin, passTempl)
+        print("fail qcd pt", ptbin, failTempl)
 
-        failCh.setObservation(failTempl)
-        passCh.setObservation(passTempl)
-        qcdfail += failCh.getObservation().sum()
-        qcdpass += passCh.getObservation().sum()
+        failCh.setObservation(failTempl, read_sumw2=True)
+        passCh.setObservation(passTempl, read_sumw2=True)
+        qcdfail += failCh.getObservation()[0].sum()
+        qcdpass += passCh.getObservation()[0].sum()
 
         if MCTF:
             qcdmodel.addChannel(failCh)
@@ -75,7 +79,7 @@ def dummy_rhalphabet():
             print('ptbin%dfail' % ptbin)
             failCh = qcdmodel['ptbin%dfail' % ptbin]
             passCh = qcdmodel['ptbin%dpass' % ptbin]
-            failObs = failCh.getObservation()
+            failObs = failCh.getObservation()[0]
             qcdparams = np.array([
                 rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0)
                 for i in range(msd.nbins)
@@ -96,18 +100,20 @@ def dummy_rhalphabet():
 
         qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
         simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
+        ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.INFO)
         qcdfit = simpdf.fitTo(obs,
                               ROOT.RooFit.Extended(True),
                               ROOT.RooFit.SumW2Error(True),
                               ROOT.RooFit.Strategy(2),
                               ROOT.RooFit.Save(),
                               ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
-                              ROOT.RooFit.PrintLevel(-1),
+                              ROOT.RooFit.PrintLevel(1),
                               )
         qcdfit_ws.add(qcdfit)
         qcdfit_ws.writeToFile('qcdfit.root')
         if qcdfit.status() != 0:
             print("Fit Status:", qcdfit.status())
+            import pdb; pdb.set_trace()
             raise RuntimeError('Could not fit qcd')
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
@@ -166,7 +172,7 @@ def dummy_rhalphabet():
             else:
                 yields = sum(tpl[0]
                              for samp, tpl in templates[region + str(ptbin)].items()
-                             if samp in [*include_samples, 'qcd'])
+                             if samp in include_samples + ['qcd'])
                 if throwPoisson:
                     yields = np.random.poisson(yields)
 
