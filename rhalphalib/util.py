@@ -1,30 +1,40 @@
 import numpy as np
 
 
-def _to_numpy(hinput):
-    if isinstance(hinput, tuple) and len(hinput) == 3:
+def _to_numpy(hinput, read_sumw2=False):
+    if isinstance(hinput, tuple) and len(hinput) >= 3:
         if not isinstance(hinput[0], np.ndarray):
             raise ValueError("Expected numpy array for element 0 of tuple %r" % hinput)
         if not isinstance(hinput[1], np.ndarray):
             raise ValueError("Expected numpy array for element 1 of tuple %r" % hinput)
         if not isinstance(hinput[2], str):
             raise ValueError("Expected string for element 2 of tuple %r" % hinput)
+        if read_sumw2 and not isinstance(hinput[3], np.ndarray):
+            raise ValueError("Expected numpy array for eleement 3 of tuple %r, as read_sumw2=True" % hinput)
         if hinput[0].size != hinput[1].size - 1:
             raise ValueError("Counts array and binning array are incompatible in tuple %r" % hinput)
+        if read_sumw2 and hinput[3].size != hinput[1].size - 1:
+            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % hinput)
         return hinput
     elif "<class 'ROOT.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())
+        sumw2 = np.zeros(hinput.GetNbinsX())
         binning = np.zeros(sumw.size + 1)
         name = hinput.GetName()
         for i in range(1, sumw.size + 1):
             sumw[i-1] = hinput.GetBinContent(i)
+            sumw2[i-1] = hinput.GetBinError(i)**2
             binning[i-1] = hinput.GetXaxis().GetBinLowEdge(i)
         binning[i] = hinput.GetXaxis().GetBinUpEdge(i)
+        if read_sumw2:
+            return (sumw, binning, name, sumw2)
         return (sumw, binning, name)
     elif str(type(hinput)) == "<class 'coffea.hist.hist_tools.Hist'>":
-        sumw = hinput.values()[()]
+        sumw, sumw2 = hinput.values(sumw2=True)[()]
         binning = hinput.axes()[0].edges()
         name = hinput.axes()[0].name
+        if read_sumw2:
+            return (sumw, binning, name, sumw2)
         return (sumw, binning, name)
     else:
         raise ValueError("Cannot understand template type of %r" % hinput)
@@ -34,8 +44,13 @@ def _to_TH1(sumw, binning, name):
     import ROOT
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
     h.SetDirectory(0)
-    for i, w in enumerate(sumw):
-        h.SetBinContent(i + 1, w)
+    if isinstance(sumw, tuple):
+        for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
+            h.SetBinContent(i + 1, w)
+            h.SetBinError(i + 1, np.sqrt(w2))
+    else:
+        for i, w in enumerate(sumw):
+            h.SetBinContent(i + 1, w)
     return h
 
 
