@@ -55,8 +55,6 @@ def dummy_rhalphabet():
 
         passTempl = get_templ("pass", "qcd", ptbin, read_sumw2=True)
         failTempl = get_templ("fail", "qcd", ptbin, read_sumw2=True)
-        print("pass qcd pt", ptbin, passTempl)
-        print("fail qcd pt", ptbin, failTempl)
 
         failCh.setObservation(failTempl, read_sumw2=True)
         passCh.setObservation(passTempl, read_sumw2=True)
@@ -74,6 +72,8 @@ def dummy_rhalphabet():
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
                                       limits=(0, 10))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
+        print(qcdeff * tf_MCtempl(ptscaled, rhoscaled, nominal=True))
+        print(f_templates['qcd_pass'].values / f_templates['qcd_fail'].values)
 
         for ptbin in range(npt):
             print('ptbin%dfail' % ptbin)
@@ -113,6 +113,9 @@ def dummy_rhalphabet():
         qcdfit_ws.writeToFile('qcdfit.root')
         if qcdfit.status() != 0:
             print("Fit Status:", qcdfit.status())
+            nll = simpdf.createNLL(obs, ROOT.RooFit.Extended(True),)
+            chi2 = simpdf.createChi2(obs, ROOT.RooFit.Extended(True), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2))
+            chi2_pois = simpdf.createChi2(obs, ROOT.RooFit.Extended(True), ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson))
             import pdb; pdb.set_trace()
             raise RuntimeError('Could not fit qcd')
 
