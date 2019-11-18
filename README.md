@@ -3,13 +3,13 @@
 ![Ralph](https://upload.wikimedia.org/wikipedia/en/thumb/1/14/Ralph_Wiggum.png/220px-Ralph_Wiggum.png)
 
 ## Quickstart
+```bash
+# check your platform: CC7 shown below, for SL6 it would be "x86_64-slc6-gcc8-opt"
+source /cvmfs/sft.cern.ch/lcg/views/LCG_96python3/x86_64-centos7-gcc8-opt/setup.sh  # or .csh, etc.
+pip install --user https://github.com/nsmith-/rhalphalib/archive/master.zip
 ```
-source /cvmfs/sft.cern.ch/lcg/views/LCG_95apython3/x86_64-slc6-gcc8-opt/setup.sh
-git clone git@github.com:nsmith-/rhalphalib.git
-cd rhalphalib
-python test_rhalphalib.py
-```
-Take a look at the folders `testModel` and `monojetModel`.
+Take a look at [test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
+for examples of how to use the package.
 
 ## Requirements
 Standalone model creation requires:
