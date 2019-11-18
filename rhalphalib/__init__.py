@@ -18,6 +18,7 @@ from .function import (
     BernsteinPoly,
     DecorrelatedNuisanceVector,
 )
+from .version import __version__
 
 __all__ = [
     'Model',
@@ -32,4 +33,5 @@ __all__ = [
     'DependentParameter',
     'BernsteinPoly',
     'DecorrelatedNuisanceVector',
+    '__version__',
 ]

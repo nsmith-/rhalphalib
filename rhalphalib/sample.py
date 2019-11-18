@@ -452,7 +452,7 @@ class ParametericSample(Sample):
                 workspace.add(rooNorm)
             else:
                 if self.PreferRooParametricHist:
-                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n" \
+                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n"
                                   "Set ParametericSample.PreferRooParametricHist = False to disable this warning",
                                   RuntimeWarning)
                 # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)

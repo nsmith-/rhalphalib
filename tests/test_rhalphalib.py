@@ -1,4 +1,6 @@
 from __future__ import print_function, division
+import sys
+import os
 import rhalphalib as rl
 import numpy as np
 import scipy.stats
@@ -18,7 +20,7 @@ def gaus_sample(norm, loc, scale, obs):
     return (np.diff(cdf), obs.binning, obs.name)
 
 
-def dummy_rhalphabet():
+def test_rhalphabet(tmpdir):
     throwPoisson = False
 
     jec = rl.NuisanceParameter('CMS_jec', 'lnN')
@@ -86,7 +88,8 @@ def dummy_rhalphabet():
                           ROOT.RooFit.PrintLevel(-1),
                           )
     qcdfit_ws.add(qcdfit)
-    qcdfit_ws.writeToFile('qcdfit.root')
+    if "pytest" not in sys.modules:
+         qcdfit_ws.writeToFile(os.path.join(tmpdir, 'testModel_qcdfit.root'))
     if qcdfit.status() != 0:
         raise RuntimeError('Could not fit qcd')
 
@@ -216,13 +219,13 @@ def dummy_rhalphabet():
     tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
     tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
-    with open("testModel.pkl", "wb") as fout:
+    with open(os.path.join(tmpdir, 'testModel.pkl'), "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine("testModel")
+    model.renderCombine(os.path.join(tmpdir, 'testModel'))
 
 
-def dummy_monojet():
+def test_monojet(tmpdir):
     model = rl.Model("testMonojet")
 
     # lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -286,12 +289,14 @@ def dummy_monojet():
 
     gammaCh.setObservation(expo_sample(2000, 450, recoil))
 
-    with open("monojetModel.pkl", "wb") as fout:
+    with open(os.path.join(tmpdir, 'monojetModel.pkl'), "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine("monojetModel")
+    model.renderCombine(os.path.join(tmpdir, 'monojetModel'))
 
 
 if __name__ == '__main__':
-    dummy_rhalphabet()
-    dummy_monojet()
+    if not os.path.exists('tmp'):
+        os.mkdir('tmp')
+    test_rhalphabet('tmp')
+    test_monojet('tmp')
