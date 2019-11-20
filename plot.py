@@ -11,7 +11,7 @@ from utils import make_dirs
 
 import mplhep as hep
 plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
-# plt.switch_backend('agg')
+plt.switch_backend('agg')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i",
@@ -275,8 +275,8 @@ def full_plot(cats, pseudo=True):
     ax.yaxis.set_major_formatter(mtick.FuncFormatter(g))
     rax.set_ylim(rax.get_ylim()[0] * 1.3, rax.get_ylim()[1] * 1.3)
 
-    ipt = int(str(cats[0].name,
-                  'utf-8').split('ptbin')[1][0]) if b'ptbin' in cats[0].name else 0
+    ipt = int(str(cats[0].name
+                  ).split('ptbin')[1][0]) if b'ptbin' in cats[0].name else 0
     if len(cats) == 1:
         pt_range = str(pbins[ipt]) + "$< \mathrm{p_T} <$" + str(
             pbins[ipt + 1]) + " GeV"
@@ -288,7 +288,8 @@ def full_plot(cats, pseudo=True):
             pbins[-1]) + " GeV"
 
     lab_mu = ", MuonCR" if b'muon' in cats[0].name else ""
-    lab_reg = "Passing" if "pass" in str(cats[0].name, 'utf-8') else "Failing"
+    lab_reg = "Passing" if "pass" in str(cats[0].name) else "Failing"
+    print(lab_reg)
     annot = pt_range + '\nDeepDoubleX{}'.format(lab_mu) + '\n{} Region'.format(lab_reg)
 
     ax.annotate(annot,
@@ -314,13 +315,11 @@ def full_plot(cats, pseudo=True):
         _iptname = "MuonCR"
     else:
         _iptname = str(str(ipt) if len(cats) == 1 else "")
-    name = str("pass" if "pass" in str(cats[0].name, 'utf-8') else "fail"
+    name = str("pass" if "pass" in str(cats[0].name) else "fail"
                ) + _iptname
 
     fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name), 
                 bbox_inches="tight")
-    # fig.savefig('{}/{}.pdf'.format(args.output_folder, args.fit + "_" + name), 
-    #             bbox_inches="tight")
 
 
 shape_type = args.fit
