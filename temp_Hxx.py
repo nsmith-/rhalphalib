@@ -4,7 +4,11 @@ import numpy as np
 import pickle
 import ROOT
 import uproot
+from template_morph import AffineMorphTemplate
 rl.util.install_roofit_helpers()
+
+import warnings
+warnings.filterwarnings('error')
 
 SF2017 = {  # cristina Jun25
     'shift_SF': 0.979,
@@ -236,6 +240,19 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                     sample.setParamEffect(sys_wznormEW, 1.02)
                 if sName.startswith("h"):
                     sample.setParamEffect(sys_Hpt, 1.2)
+
+                # Scale and Smear
+                mtempl = AffineMorphTemplate((templ[0], templ[1]))
+                #import pprint.pprint as pprint
+                np.set_printoptions(linewidth=1000, precision=2)
+                if sName == "zcc" and ptbin == 4:
+                    print(region)
+                    print(templ[0])
+                    print(np.sum(templ[0]))
+                    print(mtempl.get(shift=-7.)[0])
+                    print(mtempl.get(shift=7.)[0])
+                sample.setParamEffect(sys_scale,
+                                      mtempl.get(shift=7.)[0], mtempl.get(shift=-7.)[0])
 
                 ch.addSample(sample)
 
