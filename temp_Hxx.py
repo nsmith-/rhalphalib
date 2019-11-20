@@ -6,37 +6,82 @@ import ROOT
 import uproot
 rl.util.install_roofit_helpers()
 
-SF2017={#cristina Jun25
-        'shift_SF'  : 0.979,           'shift_SF_ERR' : 0.012,
-        'smear_SF'  : 1.037,            'smear_SF_ERR' : 0.049   , # prelim SF @26% N2ddt 
-        'V_SF'      : 0.92,            'V_SF_ERR'     : 0.018,  
-        'BB_SF'     : 1.0,             'BB_SF_ERR' : 0.3        , # prelim ddb SF
+SF2017 = {  # cristina Jun25
+    'shift_SF': 0.979,
+    'shift_SF_ERR': 0.012,
+    'smear_SF': 1.037,
+    'smear_SF_ERR': 0.049,  # prelim SF @26% N2ddt
+    'V_SF': 0.92,
+    'V_SF_ERR': 0.018,
+    'BB_SF': 1.0,
+    'BB_SF_ERR': 0.3,  # prelim ddb SF
 }
+
+
+def ddx_SF(f, region, sName, ptbin, syst, mask):
+    if region == "pass":
+        return 1. + SF2017['BB_SF_ERR']/SF2017['BB_SF']
+    else:
+        _pass = get_templ(f, "pass", sName, ptbin)
+        _pass_rate = np.sum(_pass[0] * mask)
+        _fail = get_templ(f, "fail", sName, ptbin)
+        _fail_rate = np.sum(_fail[0] * mask)
+        if _fail_rate > 0:
+            return 1. - SF2017['BB_SF_ERR'] * (_pass_rate/_fail_rate)
+        else:
+            return 1
+
+
+def shape_to_num(f, region, sName, ptbin, syst, mask):
+    _nom = get_templ(f, region, sName, ptbin)
+    _nom_rate = np.sum(_nom[0] * mask)
+    if _nom_rate < .1:
+        return 1.0
+    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _up_rate = np.sum(_up[0] * mask)
+    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _down_rate = np.sum(_down[0] * mask)
+    _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
+    return 1.0 + _diff / (2. * _nom_rate)
+
+
+def get_templ(f, region, sample, ptbin, syst=None):
+    if sample in ["hcc", "hqq"]:
+        sample += "125"
+    hist_name = '{}_{}'.format(sample, region)
+    if syst is not None:
+        hist_name += "_" + syst
+    h_vals = f[hist_name].values[:, ptbin]
+    h_edges = f[hist_name].edges[0]
+    h_key = 'msd'
+    return (h_vals, h_edges, h_key)
 
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
-    lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
     # Systematics
-    JES = rl.NuisanceParameter('JES', 'lnN')
-    JER = rl.NuisanceParameter('JER', 'lnN')
-    Pu = rl.NuisanceParameter('Pu', 'lnN')
-    trigger = rl.NuisanceParameter('trigger', 'lnN')
-    
-    ddxeff = rl.NuisanceParameter('DDXeff', 'lnN')
-    eleveto = rl.NuisanceParameter('eleveto', 'lnN')
-    muveto = rl.NuisanceParameter('muveto', 'lnN')
-    
-    veff = rl.NuisanceParameter('veff', 'lnN')
-    wznormEW = rl.NuisanceParameter('wznormEW', 'lnN')
-    znormEW = rl.NuisanceParameter('znormEW', 'lnN')
-    znormQ = rl.NuisanceParameter('znormQ', 'lnN')
+    sys_JES = rl.NuisanceParameter('CMS_scale_j_2017 ', 'lnN')
+    sys_JER = rl.NuisanceParameter('CMS_res_j_2017 ', 'lnN')
+    sys_Pu = rl.NuisanceParameter('CMS_PU_2017', 'lnN')
+    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2018', 'lnN')
 
-    scale = rl.NuisanceParameter('scale', 'shape')
-    smear = rl.NuisanceParameter('smear', 'shape')
+    sys_ddxeff = rl.NuisanceParameter('CMS_eff_cc', 'lnN')
+    sys_eleveto = rl.NuisanceParameter('CMS_gghcc_e_veto', 'lnN')
+    sys_muveto = rl.NuisanceParameter('CMS_gghcc_m_veto', 'lnN')
 
+    sys_veff = rl.NuisanceParameter('CMS_gghcc_veff', 'lnN')
+    sys_wznormEW = rl.NuisanceParameter('CMS_gghcc_wznormEW', 'lnN')
+    sys_znormEW = rl.NuisanceParameter('CMS_gghcc_znormEW', 'lnN')
+    sys_znormQ = rl.NuisanceParameter('CMS_gghcc_znormQ', 'lnN')
+
+    sys_scale = rl.NuisanceParameter('scale', 'shape')
+    sys_smear = rl.NuisanceParameter('smear', 'shape')
+
+    sys_Hpt = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'lnN')
+    # sys_Hpt_shape = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'shape')
 
     # Define Bins
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
@@ -56,17 +101,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
 
     # Template reading
     f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
-
-    def get_templ(f, region, sample, ptbin, syst=None):
-        if sample in ["hcc", "hqq"]:
-            sample += "125"
-        hist_name = '{}_{}'.format(sample, region)
-        if syst is not None:
-            hist_name += "_" + syst
-        h_vals = f[hist_name].values[:, ptbin]
-        h_edges = f[hist_name].edges[0]
-        h_key = 'msd'
-        return (h_vals, h_edges, h_key)
 
     # Get QCD efficiency
     if MCTF:
@@ -155,7 +189,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
                 mask[10:14] = False
-                
+
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
             for sName in include_samples:
@@ -164,7 +198,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                 # Systematics
-                sample.setParamEffect(lumi, 1.023)
+                sample.setParamEffect(sys_lumi, 1.023)
+
                 # Shape systematics
                 # Not actuall in ggH
                 # sys_names = ['JES', "JER", 'trigger', 'Pu']
@@ -172,42 +207,36 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                 # for sys_name, sys in zip(sys_names, sys_list):
                 #     _up = get_templ(f, region, sName, ptbin, syst=sys_name+"Up")
                 #     _dn = get_templ(f, region, sName, ptbin, syst=sys_name+"Down")
-                #     sample.setParamEffect(sys, _up[0], _dn[0])       
-                    
-                def shape_to_num(f, region, sName, ptbin, syst, mask):
-                    _nom_rate = np.sum(sample.getExpectation(nominal=True)*mask)
-                    if _nom_rate < .1:
-                        return 1.0
-                    _up = get_templ(f, region, sName, ptbin, syst=sys_name+"Up")
-                    _up_rate = np.sum(_up[0] * mask)
-                    _down = get_templ(f, region, sName, ptbin, syst=sys_name+"Up")
-                    _down_rate = np.sum(_down[0] * mask)
-                    _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
-                    return 1.0 + _diff / (2. * _nom_rate)   
-                
+                #     sample.setParamEffect(sys, _up[0], _dn[0])
+
                 sys_names = ['JES', "JER", 'Pu']
-                sys_list = [JES, JER, Pu]
+                sys_list = [sys_JES, sys_JER, sys_Pu]
                 for sys_name, sys in zip(sys_names, sys_list):
                     _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
                     sample.setParamEffect(sys, _sys_ef)
 
-
                 # Sample specific
                 if sName not in ["qcd"]:
-                    sample.setParamEffect(eleveto, 1.005)
-                    sample.setParamEffect(muveto, 1.005)
-                    sample.setParamEffect(lumi, 1.025)
-                    sample.setParamEffect(trigger, 1.02)
+                    sample.setParamEffect(sys_eleveto, 1.005)
+                    sample.setParamEffect(sys_muveto, 1.005)
+                    sample.setParamEffect(sys_lumi, 1.025)
+                    sample.setParamEffect(sys_trigger, 1.02)
                 if sName not in ["qcd", 'tqq']:
-                    sample.setParamEffect(veff, 1.043)
+                    sample.setParamEffect(sys_veff,
+                                          1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
+                if sName not in ["qcd", "tqq", "wqq", "zqq"]:
+                    sample.setParamEffect(
+                        sys_ddxeff, ddx_SF(f, region, sName, ptbin, sys_name, mask))
                 if sName.startswith("z"):
-                    sample.setParamEffect(znormQ, 1.1)
-                    sample.setParamEffect(znormEW, 1.05)
+                    sample.setParamEffect(sys_znormQ, 1.1)
+                    sample.setParamEffect(sys_znormEW, 1.05)
                 if sName.startswith("w"):
-                    sample.setParamEffect(znormQ, 1.1)
-                    sample.setParamEffect(znormEW, 1.05)
-                    sample.setParamEffect(wznormEW, 1.02)
-                    
+                    sample.setParamEffect(sys_znormQ, 1.1)
+                    sample.setParamEffect(sys_znormEW, 1.05)
+                    sample.setParamEffect(sys_wznormEW, 1.02)
+                if sName.startswith("h"):
+                    sample.setParamEffect(sys_Hpt, 1.2)
+
                 ch.addSample(sample)
 
             if not pseudo:
