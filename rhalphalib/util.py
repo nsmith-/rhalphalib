@@ -12,9 +12,9 @@ def _to_numpy(hinput, read_sumw2=False):
         if read_sumw2 and not isinstance(hinput[3], np.ndarray):
             raise ValueError("Expected numpy array for eleement 3 of tuple %r, as read_sumw2=True" % hinput)
         if hinput[0].size != hinput[1].size - 1:
-            raise ValueError("Counts array and binning array are incompatible in tuple %r" % hinput)
+            raise ValueError("Counts array and binning array are incompatible in tuple %r" % (hinput,))
         if read_sumw2 and hinput[3].size != hinput[1].size - 1:
-            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % hinput)
+            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % (hinput,))
         return hinput
     elif "<class 'ROOT.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())

@@ -141,7 +141,7 @@ class TemplateSample(Sample):
                 self._paramEffectsUp[param] = effect_up
                 return
             else:
-                raise ValueError("Template morphing can only be done via a NuisanceParameter")
+                raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
