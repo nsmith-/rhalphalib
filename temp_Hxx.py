@@ -1,4 +1,5 @@
 from __future__ import print_function, division
+import warnings
 import rhalphalib as rl
 import numpy as np
 import pickle
@@ -7,7 +8,7 @@ import uproot
 from template_morph import AffineMorphTemplate
 rl.util.install_roofit_helpers()
 
-import warnings
+
 warnings.filterwarnings('error')
 
 SF2017 = {  # cristina Jun25
@@ -64,7 +65,7 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw=False):
     return (h_vals, h_edges, h_key)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -246,18 +247,20 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
                 if sName.startswith("h"):
                     sample.setParamEffect(sys_Hpt, 1.2)
 
-                # Scale and Smear
-                mtempl = AffineMorphTemplate((templ[0], templ[1]))
-                #import pprint.pprint as pprint
-                np.set_printoptions(linewidth=1000, precision=2)
-                if sName == "zcc" and ptbin == 4:
-                    print(region)
-                    print(templ[0])
-                    print(np.sum(templ[0]))
-                    print(mtempl.get(shift=-7.)[0])
-                    print(mtempl.get(shift=7.)[0])
-                sample.setParamEffect(sys_scale,
-                                      mtempl.get(shift=7.)[0], mtempl.get(shift=-7.)[0])
+                if scalesmear_syst:
+                    # Scale and Smear
+                    mtempl = AffineMorphTemplate((templ[0], templ[1]))
+                    # import pprint.pprint as pprint
+                    np.set_printoptions(linewidth=1000, precision=2)
+                    if sName == "zcc" and ptbin == 4:
+                        print(region)
+                        print(templ[0])
+                        print(np.sum(templ[0]))
+                        print(mtempl.get(shift=-7.)[0])
+                        print(mtempl.get(shift=7.)[0])
+                    sample.setParamEffect(sys_scale,
+                                          mtempl.get(shift=7.)[0],
+                                          mtempl.get(shift=-7.)[0])
 
                 ch.addSample(sample)
 
@@ -396,9 +399,15 @@ if __name__ == '__main__':
 
     parser.add_argument("--MCTF",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
-                        help="Fit QCD in MC first")
+                        help="ToFix, Fit QCD in MC first")
+
+    parser.add_argument("--scale",
+                        type=str2bool,
+                        default='False',
+                        choices={True, False},
+                        help="ToFix, Generate with scale/smear systematics")
 
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
@@ -408,5 +417,6 @@ if __name__ == '__main__':
 
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
-                     MCTF=args.MCTF
+                     MCTF=args.MCTF,
+                     scalesmear_syst=args.scale,
                      )
