@@ -252,10 +252,17 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                     # Scale and Smear
                     mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
-                    # np.set_printoptions(linewidth=1000, precision=2)
+                    np.set_printoptions(linewidth=1000, precision=2)
+                    if sName == "hqq" and ptbin == 4 and region == 'pass':
+                        print(sample.name)
+                        print(templ[0])
+                        print(mtempl.get(shift=-7.)[0])
+                        print(mtempl.get(shift=7.)[0])
+                    realshift = 90 * 0.01  # in GeV FIXME
                     sample.setParamEffect(sys_scale,
                                           mtempl.get(shift=7.)[0],
-                                          mtempl.get(shift=-7.)[0])
+                                          mtempl.get(shift=-7.)[0],
+                                          scale=realshift/7.)
 
                     # To Do
                     # Match to boson mass instead of mean
