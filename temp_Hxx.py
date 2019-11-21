@@ -258,9 +258,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                         print(templ[0])
                         print(mtempl.get(shift=-7.)[0])
                         print(mtempl.get(shift=7.)[0])
+                    realshift = 90 * 0.01  # in GeV FIXME
                     sample.setParamEffect(sys_scale,
                                           mtempl.get(shift=7.)[0],
-                                          mtempl.get(shift=-7.)[0])
+                                          mtempl.get(shift=-7.)[0],
+                                          scale=realshift/7.)
 
                 ch.addSample(sample)
 
