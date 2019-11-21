@@ -111,6 +111,7 @@ class TemplateSample(Sample):
         self._nominal = sumw
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
+        self._paramEffectScales = {}
 
     @property
     def parameters(self):
@@ -119,7 +120,7 @@ class TemplateSample(Sample):
         '''
         return set(self._paramEffectsUp.keys())
 
-    def setParamEffect(self, param, effect_up, effect_down=None):
+    def setParamEffect(self, param, effect_up, effect_down=None, scale=None):
         '''
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         param: a Parameter object
@@ -128,6 +129,9 @@ class TemplateSample(Sample):
                    or a histogram representing the *bin yield* under the effect of the parameter (i.e. not relative)
                    or a DependentParameter representing the value to scale the *normalization* of this process
         effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
+        scale : number, optional
+            ad-hoc rescaling of the effect, most useful for shape effects where the nuisance parameter effect needs to be
+            magnified to ensure good vertical interpolation
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         '''
@@ -156,6 +160,13 @@ class TemplateSample(Sample):
             zerobins = self._nominal <= 0.
             effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
+        if np.sum(effect_up * self._nominal) == 0:
+            # TODO: warning? this can happen regularly
+            # we might even want some sort of threshold
+            return
+        elif np.all(effect_up == 1.):
+            # some sort of threshold might be useful here as well
+            return
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
@@ -172,9 +183,23 @@ class TemplateSample(Sample):
                 zerobins = self._nominal <= 0.
                 effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
+                if np.sum(effect_down * self._nominal) == 0:
+                    # TODO: warning? this can happen regularly
+                    # we might even want some sort of threshold
+                    return
+                elif np.all(effect_down == 1.):
+                    # some sort of threshold might be useful here as well
+                    return
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
+
+        if isinstance(scale, numbers.Number):
+            if isinstance(effect_up, DependentParameter):
+                raise ValueError("Scale not supported for DependentParameter effects. You can encode the effect in the dependent parameter")
+            self._paramEffectScales[param] = scale
+        elif scale is not None:
+            raise ValueError("Cannot understand scale value %r. It should be a number" % scale)
 
     def getParamEffect(self, param, up=True):
         '''
@@ -204,28 +229,32 @@ class TemplateSample(Sample):
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
                     continue
-                elif isinstance(effect_up, DependentParameter):
+                if param in self._paramEffectScales:
+                    param_scaled = param * self._paramEffectScales[param]
+                else:
+                    param_scaled = param
+                if isinstance(effect_up, DependentParameter):
                     out = out * effect_up
                 elif self._paramEffectsDown[param] is None:
                     if param.combinePrior == 'shape':
-                        out = out * (1 + (effect_up - 1)*param)
+                        out = out * (1 + (effect_up - 1)*param_scaled)
                     elif param.combinePrior == 'shapeN':
-                        out = out * (effect_up**param)
+                        out = out * (effect_up**param_scaled)
                     elif param.combinePrior == 'lnN':
                         # TODO: ensure scalar effect
-                        out = out * (effect_up**param)
+                        out = out * (effect_up**param_scaled)
                     else:
                         raise NotImplementedError('per-bin effects for other nuisance parameter types')
                 else:
                     effect_down = self.getParamEffect(param, up=False)
-                    smoothStep = SmoothStep(param)
+                    smoothStep = SmoothStep(param_scaled)
                     if param.combinePrior == 'shape':
-                        combined_effect = smoothStep * (1 + (effect_up - 1)*param) + (1 - smoothStep) * (1 - (effect_down - 1)*param)
+                        combined_effect = smoothStep * (1 + (effect_up - 1)*param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1)*param_scaled)
                     elif param.combinePrior == 'shapeN':
-                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) / (effect_down**param)
+                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     elif param.combinePrior == 'lnN':
                         # TODO: ensure scalar effect
-                        combined_effect = smoothStep * (effect_up**param) + (1 - smoothStep) / (effect_down**param)
+                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     else:
                         raise NotImplementedError('per-bin effects for other nuisance parameter types')
                     out = out * combined_effect
@@ -285,7 +314,7 @@ class TemplateSample(Sample):
         if param not in self._paramEffectsUp:
             return '-'
         elif 'shape' in param.combinePrior:
-            return '1'
+            return '%.3f' % self._paramEffectScales.get(param, 1)
         elif isinstance(self.getParamEffect(param, up=True), DependentParameter):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
@@ -298,8 +327,10 @@ class TemplateSample(Sample):
                                                           param.name,
                                                           )
         else:
-            up = self.getParamEffect(param, up=True)
-            down = self.getParamEffect(param, up=False)
+            # TODO the scaling here depends on the prior of the nuisance parameter
+            scale = self._paramEffectScales.get(param, 1.)
+            up = (self.getParamEffect(param, up=True) - 1) * scale + 1
+            down = (self.getParamEffect(param, up=False) - 1) * scale + 1
             if isinstance(up, np.ndarray):
                 # Convert shape to norm (note symmeterized effect on shape != symmeterized effect on norm)
                 nominal = self.getExpectation(nominal=True)
