@@ -138,11 +138,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
                                       limits=(0, 10))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
-        print(qcdeff * tf_MCtempl(ptscaled, rhoscaled, nominal=True))
-        print(f_templates['qcd_pass'].values / f_templates['qcd_fail'].values)
 
         for ptbin in range(npt):
-            print('ptbin%dfail' % ptbin)
             failCh = qcdmodel['ptbin%dfail' % ptbin]
             passCh = qcdmodel['ptbin%dpass' % ptbin]
             failObs = failCh.getObservation()[0]
@@ -173,6 +170,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                               ROOT.RooFit.Save(),
                               ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
                               ROOT.RooFit.Offset(True),
+                              ROOT.RooFit.PrintLevel(-1),
                               )
         qcdfit_ws.add(qcdfit)
         qcdfit_ws.writeToFile('qcdfit.root')
