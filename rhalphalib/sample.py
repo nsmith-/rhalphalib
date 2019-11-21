@@ -153,10 +153,16 @@ class TemplateSample(Sample):
             effect_up, binning, _ = _to_numpy(effect_up)
             if not np.array_equal(binning, self.observable.binning):
                 raise ValueError("effect_up has incompatible binning with sample %r" % self)
-            #zerobins = self._nominal <= 0.
-            zerobins = np.isclose(self._nominal, 0.)
+            zerobins = self._nominal <= 0.
             effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
+        if np.sum(effect_up * self._nominal) == 0:
+            # TODO: warning? this can happen regularly
+            # we might even want some sort of threshold
+            return
+        elif np.all(effect_up == 1.):
+            # some sort of threshold might be useful here as well
+            return
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
@@ -170,10 +176,16 @@ class TemplateSample(Sample):
                 effect_down, binning, _ = _to_numpy(effect_down)
                 if not np.array_equal(binning, self.observable.binning):
                     raise ValueError("effect_down has incompatible binning with sample %r" % self)
-                #zerobins = self._nominal <= 0.
-                zerobins = np.isclose(self._nominal, 0.)
+                zerobins = self._nominal <= 0.
                 effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
+                if np.sum(effect_down * self._nominal) == 0:
+                    # TODO: warning? this can happen regularly
+                    # we might even want some sort of threshold
+                    return
+                elif np.all(effect_down == 1.):
+                    # some sort of threshold might be useful here as well
+                    return
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
