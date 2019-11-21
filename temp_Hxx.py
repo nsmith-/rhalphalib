@@ -100,23 +100,18 @@ def dummy_rhalphabet():
 
         qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
         simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
-        ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.INFO)
         qcdfit = simpdf.fitTo(obs,
                               ROOT.RooFit.Extended(True),
                               ROOT.RooFit.SumW2Error(True),
                               ROOT.RooFit.Strategy(2),
                               ROOT.RooFit.Save(),
                               ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
-                              ROOT.RooFit.PrintLevel(1),
+                              ROOT.RooFit.Offset(True),
                               )
         qcdfit_ws.add(qcdfit)
         qcdfit_ws.writeToFile('qcdfit.root')
         if qcdfit.status() != 0:
-            print("Fit Status:", qcdfit.status())
-            nll = simpdf.createNLL(obs, ROOT.RooFit.Extended(True),)
-            chi2 = simpdf.createChi2(obs, ROOT.RooFit.Extended(True), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2))
-            chi2_pois = simpdf.createChi2(obs, ROOT.RooFit.Extended(True), ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson))
-            import pdb; pdb.set_trace()
+            qcdfit.Print()
             raise RuntimeError('Could not fit qcd')
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
