@@ -178,6 +178,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
             qcdfit.Print()
             raise RuntimeError('Could not fit qcd')
 
+        qcdmodel.readRooFitResult(qcdfit)
+        print(tf_MCtempl(ptscaled, rhoscaled, nominal=True))
+
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
             tf_MCtempl.name + '_deco', qcdfit, param_names)
