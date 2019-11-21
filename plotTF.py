@@ -5,7 +5,6 @@ import uproot
 import ROOT as r
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import math
@@ -37,7 +36,7 @@ def TF(pT, rho, n_pT=2, n_rho=2, par_map=np.ones((3, 3))):
 # TF Plots
 def plotTF(TF, msd, pt, mask=None):
     """
-    Parameters: 
+    Parameters:
     TF: Transfer Factor array
     msd: Mass bins array (meshgrid-like)
     pt: pT bins array (meshgrid-like)
@@ -47,7 +46,9 @@ def plotTF(TF, msd, pt, mask=None):
         TF = np.ma.array(TF, mask=~pvb)
 
     zmin, zmax = np.floor(10*np.min(TF))/10, np.ceil(10*np.max(TF))/10
-    levels = np.linspace(zmin, zmax, 500)
+    zmin, zmax = zmin + 0.001, zmax - 0.001
+    clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
+    levels = np.linspace(1-clim, 1+clim, 500)
 
     if mask is not None:
         contf = ax.contourf(msd, pt, TF, levels=levels,
@@ -55,9 +56,33 @@ def plotTF(TF, msd, pt, mask=None):
     else:
         contf = ax.contourf(msd, pt, TF, levels=levels, cmap='RdBu_r')
     cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
-    cbar = fig.colorbar(contf, cax=cax)
-    cbar.set_ticks([np.arange(zmin, zmax, 0.1)])
+    if abs(1-zmin) > .3 and abs(1-zmax) > .3:
+        c_extend = 'both'
+    elif abs(1-zmin) > .3:
+        c_extend = 'min'
+    elif abs(1-zmax) > .3:
+        c_extend = 'max'
+    else:
+        c_extend = 'neither'
+    cbar = fig.colorbar(contf, cax=cax, extend=c_extend)
+    cbar.set_ticks([np.arange(1-clim, 1+clim, 0.1)])
 
+    def rho_bound(ms, rho):
+        # rho = {-6, -2.1}
+        fpt = ms * np.e**(-rho/2)
+        return fpt
+
+    x = np.arange(40, 70)
+    ax.plot(x, rho_bound(x, -6), 'black', lw=3)
+    ax.fill_between(x, rho_bound(x, -6), 1200, facecolor="none", hatch="x",
+                    edgecolor="black", linewidth=0.0)
+    x = np.arange(150, 201)
+    ax.plot(x, rho_bound(x, -2.1) + 5, 'black', lw=3)
+    ax.fill_between(x, rho_bound(x, -2.1), facecolor="none", hatch="x", 
+                    edgecolor="black", linewidth=0.0)
+
+    ax.set_xlim(40,201)
+    ax.set_ylim(450,1200)
     ax.invert_yaxis()
 
     ax.set_title('Transfer Factor ({},{})'.format(rhodeg, ptdeg), pad=15, fontsize=26)
@@ -75,9 +100,22 @@ def plotTF_ratio(in_ratio, mask):
 
     H = np.ma.masked_where(in_ratio * mask <= 0.01, in_ratio * mask)
     zmin, zmax = np.floor(10*np.min(TFres))/10, np.ceil(10*np.max(TFres))/10
-    hep.hist2dplot(H, msdbins, ptbins, vmin=zmin, vmax=zmax, cmap='RdBu_r', cbar=False)
+    zmin, zmax = zmin + 0.001, zmax - 0.001
+    clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
+    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    msdbins = np.linspace(40, 201, 24)
+    hep.hist2dplot(H, msdbins, ptbins, vmin=1-clim, vmax=1+clim,
+                   cmap='RdBu_r', cbar=False)
     cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
-    cbar = fig.colorbar(ax.get_children()[0], cax=cax)
+    if abs(1-zmin) > .3 and abs(1-zmax) > .3:
+        c_extend = 'both'
+    elif abs(1-zmin) > .3:
+        c_extend = 'min'
+    elif abs(1-zmax) > .3:
+        c_extend = 'max'
+    else:
+        c_extend = 'neither'
+    cbar = fig.colorbar(ax.get_children()[0], cax=cax, extend=c_extend)
 
     ax.set_xticks(np.arange(40, 220, 20))
     ax.tick_params(axis='y', which='minor', left=False, right=False)
@@ -103,6 +141,12 @@ def plot_qcd(qcd, fail=False):
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1, labelpad=15)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1, labelpad=15)
     ax.set_zlabel(r'$\mathrm{log_{10}(N)}$', ha='left', labelpad=15)
+    
+    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    msdbins = np.linspace(40, 201, 24)
+    ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins),
+                                msdbins[:-1] + 0.5 * np.diff(msdbins),
+                                indexing='ij')
 
     Xi = (msdpts-3.5).flatten()
     Yi = np.array([list(ptbins[:-1])]*23).T.flatten()
@@ -178,9 +222,11 @@ if __name__ == '__main__':
     parmap = np.array(hmp).reshape(rhodeg+1, ptdeg+1)
 
     # Define bins
-    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    ptbins = np.arange(450, 1205, 5)
     npt = len(ptbins) - 1
-    msdbins = np.linspace(40, 201, 24)
+    # msdbins = np.linspace(40, 201, 24)
+    msdbins = np.arange(40, 201.5, .5)
 
     # here we derive these all at once with 2D array
     ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins),
@@ -211,7 +257,7 @@ if __name__ == '__main__':
     pvb = pad2d(validbins).astype(bool)
 
     # Plot TF
-    plotTF(pTF, pmsd, ppt)
+    # plotTF(pTF, pmsd, ppt)
     plotTF(pTF, pmsd, ppt, mask=pvb)
 
     # Get Info from Shapes
@@ -232,7 +278,7 @@ if __name__ == '__main__':
     q = np.sum(pass_qcd[mask])/np.sum(fail_qcd[mask])
     in_data_rat = (pass_qcd/(fail_qcd * q))
 
-    plotTF_ratio(in_data_rat, validbins)
+    plotTF_ratio(in_data_rat, mask)
 
     # Plot QCD shape
     plot_qcd(pass_qcd, fail=False)

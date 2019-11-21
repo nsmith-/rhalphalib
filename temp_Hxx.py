@@ -4,17 +4,91 @@ import numpy as np
 import pickle
 import ROOT
 import uproot
+from template_morph import AffineMorphTemplate
 rl.util.install_roofit_helpers()
 
+import warnings
+warnings.filterwarnings('error')
 
-def dummy_rhalphabet():
-    throwPoisson = True
+SF2017 = {  # cristina Jun25
+    'shift_SF': 0.979,
+    'shift_SF_ERR': 0.012,
+    'smear_SF': 1.037,
+    'smear_SF_ERR': 0.049,  # prelim SF @26% N2ddt
+    'V_SF': 0.92,
+    'V_SF_ERR': 0.018,
+    'BB_SF': 1.0,
+    'BB_SF_ERR': 0.3,  # prelim ddb SF
+}
+
+
+def ddx_SF(f, region, sName, ptbin, syst, mask):
+    if region == "pass":
+        return 1. + SF2017['BB_SF_ERR']/SF2017['BB_SF']
+    else:
+        _pass = get_templ(f, "pass", sName, ptbin)
+        _pass_rate = np.sum(_pass[0] * mask)
+        _fail = get_templ(f, "fail", sName, ptbin)
+        _fail_rate = np.sum(_fail[0] * mask)
+        if _fail_rate > 0:
+            return 1. - SF2017['BB_SF_ERR'] * (_pass_rate/_fail_rate)
+        else:
+            return 1
+
+
+def shape_to_num(f, region, sName, ptbin, syst, mask):
+    _nom = get_templ(f, region, sName, ptbin)
+    _nom_rate = np.sum(_nom[0] * mask)
+    if _nom_rate < .1:
+        return 1.0
+    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _up_rate = np.sum(_up[0] * mask)
+    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _down_rate = np.sum(_down[0] * mask)
+    _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
+    return 1.0 + _diff / (2. * _nom_rate)
+
+
+def get_templ(f, region, sample, ptbin, syst=None, read_sumw=False):
+    if sample in ["hcc", "hqq"]:
+        sample += "125"
+    hist_name = '{}_{}'.format(sample, region)
+    if syst is not None:
+        hist_name += "_" + syst
+    h_vals = f[hist_name].values[:, ptbin]
+    h_edges = f[hist_name].edges[0]
+    h_key = 'msd'
+    if read_sumw2:
+        h_variances = f[hist_name].variances[:, ptbin]
+        return (h_vals, h_edges, h_key, h_variances)
+    return (h_vals, h_edges, h_key)
+
+
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF):
     fitTF = True
-    pseudo = False
-    MCTF = True
 
     # Default lumi (needs at least one systematics for prefit)
-    lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    # Systematics
+    sys_JES = rl.NuisanceParameter('CMS_scale_j_2017 ', 'lnN')
+    sys_JER = rl.NuisanceParameter('CMS_res_j_2017 ', 'lnN')
+    sys_Pu = rl.NuisanceParameter('CMS_PU_2017', 'lnN')
+    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2018', 'lnN')
+
+    sys_ddxeff = rl.NuisanceParameter('CMS_eff_cc', 'lnN')
+    sys_eleveto = rl.NuisanceParameter('CMS_gghcc_e_veto', 'lnN')
+    sys_muveto = rl.NuisanceParameter('CMS_gghcc_m_veto', 'lnN')
+
+    sys_veff = rl.NuisanceParameter('CMS_gghcc_veff', 'lnN')
+    sys_wznormEW = rl.NuisanceParameter('CMS_gghcc_wznormEW', 'lnN')
+    sys_znormEW = rl.NuisanceParameter('CMS_gghcc_znormEW', 'lnN')
+    sys_znormQ = rl.NuisanceParameter('CMS_gghcc_znormQ', 'lnN')
+
+    sys_scale = rl.NuisanceParameter('scale', 'shape')
+    sys_smear = rl.NuisanceParameter('smear', 'shape')
+
+    sys_Hpt = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'lnN')
+    # sys_Hpt_shape = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'shape')
 
     # Define Bins
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
@@ -33,28 +107,19 @@ def dummy_rhalphabet():
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    f_templates = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
-    def get_templ(region, sample, ptbin, read_sumw2=False):
-        hist_name = '{}_{}'.format(sample, region)
-        h_vals = f_templates[hist_name].values[:, ptbin]
-        h_edges = f_templates[hist_name].edges[0]
-        h_key = 'msd'
-        if read_sumw2:
-            h_variances = f_templates[hist_name].variances[:, ptbin]
-            return (h_vals, h_edges, h_key, h_variances)
-        return (h_vals, h_edges, h_key)
+    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
 
     # Get QCD efficiency
     if MCTF:
         qcdmodel = rl.Model("qcdmodel")
-            
+
     qcdpass, qcdfail = 0., 0.
     for ptbin in range(npt):
         failCh = rl.Channel("ptbin%d%s" % (ptbin, 'fail'))
         passCh = rl.Channel("ptbin%d%s" % (ptbin, 'pass'))
 
-        passTempl = get_templ("pass", "qcd", ptbin, read_sumw2=True)
-        failTempl = get_templ("fail", "qcd", ptbin, read_sumw2=True)
+        passTempl = get_templ(f, "pass", "qcd", ptbin, read_sumw2=True)
+        failTempl = get_templ(f, "fail", "qcd", ptbin, read_sumw2=True)
 
         failCh.setObservation(failTempl, read_sumw2=True)
         passCh.setObservation(passTempl, read_sumw2=True)
@@ -124,53 +189,88 @@ def dummy_rhalphabet():
     # build actual fit model now
     model = rl.Model("tempModel")
 
-    # Load templates
-    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
-    templates = {}
-    sys_list = ['JES']  # Sys list
-    sysud_list = sum([[sys+"Up", sys+"Down"] for sys in sys_list], [])  # Sys name list
-    for ptbin in range(npt):
-        for region in ['pass', 'fail']:
-            templates[region+str(ptbin)] = {}
-            for sample in [
-                    'zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc125', 'tqq', 'hqq125', 'qcd',
-                    'data_obs'
-            ]:
-                for sys_name in [""] + sysud_list:
-                    hist_name = '{}_{}'.format(sample, region)
-                    _outname = sample.replace('125', '')
-                    if len(sys_name) > 0:
-                        hist_name += "_"+sys_name
-                        _outname += "_"+sys_name
-                    h_vals = f[hist_name].values[:, ptbin]
-                    h_edges = f[hist_name].edges[0]
-                    h_key = 'msd'
-                    templates[region+str(ptbin)][_outname] = (h_vals, h_edges, h_key)
-
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
             include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']
+            # Define mask
+            mask = validbins[ptbin].copy()
+            if not pseudo and region == 'pass':
+                mask[10:14] = False
+
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
             for sName in include_samples:
-                templ = templates[region+str(ptbin)][sName]
+                templ = get_templ(f, region, sName, ptbin)
                 stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                sample.setParamEffect(lumi, 1.027)
+                # Systematics
+                sample.setParamEffect(sys_lumi, 1.023)
+
+                # Shape systematics
+                # Not actuall in ggH
+                # sys_names = ['JES', "JER", 'trigger', 'Pu']
+                # sys_list = [JES, JER, trigger, Pu]
+                # for sys_name, sys in zip(sys_names, sys_list):
+                #     _up = get_templ(f, region, sName, ptbin, syst=sys_name+"Up")
+                #     _dn = get_templ(f, region, sName, ptbin, syst=sys_name+"Down")
+                #     sample.setParamEffect(sys, _up[0], _dn[0])
+
+                sys_names = ['JES', "JER", 'Pu']
+                sys_list = [sys_JES, sys_JER, sys_Pu]
+                for sys_name, sys in zip(sys_names, sys_list):
+                    _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
+                    sample.setParamEffect(sys, _sys_ef)
+
+                # Sample specific
+                if sName not in ["qcd"]:
+                    sample.setParamEffect(sys_eleveto, 1.005)
+                    sample.setParamEffect(sys_muveto, 1.005)
+                    sample.setParamEffect(sys_lumi, 1.025)
+                    sample.setParamEffect(sys_trigger, 1.02)
+                if sName not in ["qcd", 'tqq']:
+                    sample.setParamEffect(sys_veff,
+                                          1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
+                if sName not in ["qcd", "tqq", "wqq", "zqq"]:
+                    sample.setParamEffect(
+                        sys_ddxeff, ddx_SF(f, region, sName, ptbin, sys_name, mask))
+                if sName.startswith("z"):
+                    sample.setParamEffect(sys_znormQ, 1.1)
+                    sample.setParamEffect(sys_znormEW, 1.05)
+                if sName.startswith("w"):
+                    sample.setParamEffect(sys_znormQ, 1.1)
+                    sample.setParamEffect(sys_znormEW, 1.05)
+                    sample.setParamEffect(sys_wznormEW, 1.02)
+                if sName.startswith("h"):
+                    sample.setParamEffect(sys_Hpt, 1.2)
+
+                # Scale and Smear
+                mtempl = AffineMorphTemplate((templ[0], templ[1]))
+                #import pprint.pprint as pprint
+                np.set_printoptions(linewidth=1000, precision=2)
+                if sName == "zcc" and ptbin == 4:
+                    print(region)
+                    print(templ[0])
+                    print(np.sum(templ[0]))
+                    print(mtempl.get(shift=-7.)[0])
+                    print(mtempl.get(shift=7.)[0])
+                sample.setParamEffect(sys_scale,
+                                      mtempl.get(shift=7.)[0], mtempl.get(shift=-7.)[0])
 
                 ch.addSample(sample)
 
             if not pseudo:
-                data_obs = templates[region+str(ptbin)]['data_obs']
-                print("Reading real data")
+                data_obs = get_templ(f, region, 'data_obs', ptbin)
+                if ptbin == 0 and region == "pass":
+                    print("Reading real data")
 
             else:
-                yields = sum(tpl[0]
-                             for samp, tpl in templates[region + str(ptbin)].items()
-                             if samp in include_samples + ['qcd'])
+                yields = []
+                for samp in include_samples + ['qcd']:
+                    yields.append(get_templ(f, region, samp, ptbin)[0])
+                yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
                     yields = np.random.poisson(yields)
 
@@ -178,9 +278,6 @@ def dummy_rhalphabet():
             ch.setObservation(data_obs)
 
             # drop bins outside rho validity
-            mask = validbins[ptbin].copy()
-            if not pseudo and region == 'pass':
-                mask[10:14] = False
             ch.mask = mask
 
     if fitTF:
@@ -278,4 +375,38 @@ def dummy_rhalphabet():
 
 
 if __name__ == '__main__':
-    dummy_rhalphabet()
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
+    parser.add_argument("--throwPoisson",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="If plotting data, redraw from poisson distribution")
+
+    parser.add_argument("--MCTF",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Fit QCD in MC first")
+
+    pseudo = parser.add_mutually_exclusive_group(required=True)
+    pseudo.add_argument('--data', action='store_false', dest='pseudo')
+    pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+
+    args = parser.parse_args()
+
+    dummy_rhalphabet(pseudo=args.pseudo,
+                     throwPoisson=args.throwPoisson,
+                     MCTF=args.MCTF
+                     )
