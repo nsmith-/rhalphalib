@@ -50,7 +50,7 @@ def shape_to_num(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def get_templ(f, region, sample, ptbin, syst=None, read_sumw=False):
+def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
     if sample in ["hcc", "hqq"]:
         sample += "125"
     hist_name = '{}_{}'.format(sample, region)
