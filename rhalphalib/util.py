@@ -113,6 +113,12 @@ def install_roofit_helpers():
             yield obj
             obj = it.Next()
 
+    if hasattr(_ROOT.RooAbsCollection, '__iter__'):
+        # https://sft.its.cern.ch/jira/browse/ROOT-10457
+        del _ROOT.RooAbsCollection.__iter__
+        del _ROOT.RooArgList.__iter__
+        del _ROOT.RooArgSet.__iter__
+
     _ROOT.RooAbsCollection.__iter__ = _RooAbsCollection__iter__
 
     # This is mainly for collections of parameters
