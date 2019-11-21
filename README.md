@@ -55,6 +55,8 @@ combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveSha
 
 # To extract shapes/norms use combine harvester
 PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
+
+combine -M Significance tempModel_combined.root
 ```
 And back in conda env:
 ```

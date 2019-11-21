@@ -252,15 +252,21 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                     # Scale and Smear
                     mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
-                    np.set_printoptions(linewidth=1000, precision=2)
-                    if sName == "hqq" and ptbin == 4 and region == 'pass':
-                        print(sample.name)
-                        print(templ[0])
-                        print(mtempl.get(shift=-7.)[0])
-                        print(mtempl.get(shift=7.)[0])
+                    # np.set_printoptions(linewidth=1000, precision=2)
                     sample.setParamEffect(sys_scale,
                                           mtempl.get(shift=7.)[0],
                                           mtempl.get(shift=-7.)[0])
+
+                    # To Do
+                    # Match to boson mass instead of mean
+                    smear_in, smear_unc = 1, 0.11
+                    _smear_up = mtempl.get(scale=smear_in + 1 * smear_unc,
+                                           shift=-mtempl.mean *
+                                           (smear_in + 1 * smear_unc - 1))
+                    _smear_down = mtempl.get(scale=smear_in + -1 * smear_unc,
+                                             shift=-mtempl.mean *
+                                             (smear_in + -1 * smear_unc - 1))
+                    sample.setParamEffect(sys_smear, _smear_up[0], _smear_down[0])
 
                 ch.addSample(sample)
 
@@ -399,13 +405,13 @@ if __name__ == '__main__':
 
     parser.add_argument("--MCTF",
                         type=str2bool,
-                        default='False',
+                        default='True',
                         choices={True, False},
                         help="ToFix, Fit QCD in MC first")
 
     parser.add_argument("--scale",
                         type=str2bool,
-                        default='False',
+                        default='True',
                         choices={True, False},
                         help="ToFix, Generate with scale/smear systematics")
 
