@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
     - master
-  push:
-    branches: 
-    - citest
 
 jobs:
   build:
@@ -20,12 +17,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Cache conda installation
-      uses: actions/cache@v1
-      id: conda-cache
-      with:
-        path: condaenv
-        key: ${{ runner.OS }}-build-${{ matrix.python-version }}-${{ hashFiles('setup.py') }}
     - name: Install conda
       if: steps.conda-cache.outputs.cache-hit != 'true'
       run: |
