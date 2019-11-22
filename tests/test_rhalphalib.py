@@ -89,7 +89,7 @@ def test_rhalphabet(tmpdir):
                           )
     qcdfit_ws.add(qcdfit)
     if "pytest" not in sys.modules:
-         qcdfit_ws.writeToFile(os.path.join(tmpdir, 'testModel_qcdfit.root'))
+         qcdfit_ws.writeToFile(os.path.join(str(tmpdir), 'testModel_qcdfit.root'))
     if qcdfit.status() != 0:
         raise RuntimeError('Could not fit qcd')
 
@@ -219,10 +219,10 @@ def test_rhalphabet(tmpdir):
     tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
     tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
-    with open(os.path.join(tmpdir, 'testModel.pkl'), "wb") as fout:
+    with open(os.path.join(str(tmpdir), 'testModel.pkl'), "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine(os.path.join(tmpdir, 'testModel'))
+    model.renderCombine(os.path.join(str(tmpdir), 'testModel'))
 
 
 def test_monojet(tmpdir):
@@ -289,10 +289,10 @@ def test_monojet(tmpdir):
 
     gammaCh.setObservation(expo_sample(2000, 450, recoil))
 
-    with open(os.path.join(tmpdir, 'monojetModel.pkl'), "wb") as fout:
+    with open(os.path.join(str(tmpdir), 'monojetModel.pkl'), "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine(os.path.join(tmpdir, 'monojetModel'))
+    model.renderCombine(os.path.join(str(tmpdir), 'monojetModel'))
 
 
 if __name__ == '__main__':
