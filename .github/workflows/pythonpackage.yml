@@ -18,7 +18,6 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install conda
-      if: steps.conda-cache.outputs.cache-hit != 'true'
       run: |
         source $CONDA/etc/profile.d/conda.sh
         conda create --prefix condaenv python=${{ matrix.python-version }} -y
