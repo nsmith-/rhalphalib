@@ -1,0 +1,43 @@
+name: Python package
+
+on:
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        python-version: [2.7, 3.7]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install conda
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda create --prefix condaenv python=${{ matrix.python-version }} -y
+        conda activate $PWD/condaenv
+        conda install numpy scipy
+        conda install -c conda-forge root
+    - name: Install package
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate $PWD/condaenv
+        pip install -e .
+    - name: Lint with flake8
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate $PWD/condaenv
+        pip install flake8
+        flake8 rhalphalib --count --show-source --statistics
+    - name: Test with pytest
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate $PWD/condaenv
+        pip install pytest
+        pytest tests
