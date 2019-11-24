@@ -23,13 +23,19 @@ SF2017 = {  # cristina Jun25
 }
 
 
-def ddx_SF(f, region, sName, ptbin, syst, mask):
+def ddx_SF(f, region, sName, ptbin, syst, mask, use_matched=False):
     if region == "pass":
         return 1. + SF2017['BB_SF_ERR']/SF2017['BB_SF']
     else:
-        _pass = get_templ(f, "pass", sName, ptbin)
+        if use_matched:
+            _pass = get_templM(f, "pass", sName, ptbin)
+        else:
+            _pass = get_templ(f, "pass", sName, ptbin)
         _pass_rate = np.sum(_pass[0] * mask)
-        _fail = get_templ(f, "fail", sName, ptbin)
+        if use_matched:
+            _fail = get_templM(f, "fail", sName, ptbin)
+        else:
+            _fail = get_templ(f, "fail", sName, ptbin)
         _fail_rate = np.sum(_fail[0] * mask)
         if _fail_rate > 0:
             return 1. - SF2017['BB_SF_ERR'] * (_pass_rate/_fail_rate)
@@ -65,7 +71,42 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
     return (h_vals, h_edges, h_key)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
+def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False):
+    # With Matched logic
+    if sample in ["hcc", "hqq"]:
+        sample += "125"
+    hist_name = '{}_{}'.format(sample, region)
+    if syst is not None:
+        hist_name += "_" + syst
+    if (sample.startswith("w") or sample.startswith("z")
+            or sample.startswith("h")) and syst is None:
+        hist_name += "_" + 'matched'
+    h_vals = f[hist_name].values[:, ptbin]
+    h_edges = f[hist_name].edges[0]
+    h_key = 'msd'
+    if read_sumw2:
+        h_variances = f[hist_name].variances[:, ptbin]
+        return (h_vals, h_edges, h_key, h_variances)
+    return (h_vals, h_edges, h_key)
+
+
+def shape_to_numM(f, region, sName, ptbin, syst, mask):
+    # With Matched logic
+    _nom = get_templM(f, region, sName, ptbin)
+    _nom_rate = np.sum(_nom[0] * mask)
+    if _nom_rate < .1:
+        return 1.0
+    _up = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _up_unmatched = get_templ(f, region, sName, ptbin, 'unmatched')
+    _up_rate = np.sum(_up[0] * mask) - np.sum(_up_unmatched[0] * mask)
+    _down = get_templ(f, region, sName, ptbin, syst=syst+"Up")
+    _down_unmatched = get_templ(f, region, sName, ptbin, 'unmatched')
+    _down_rate = np.sum(_down[0] * mask) - np.sum(_down_unmatched[0] * mask)
+    _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
+    return 1.0 + _diff / (2. * _nom_rate)
+
+
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -179,7 +220,22 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
             raise RuntimeError('Could not fit qcd')
 
         qcdmodel.readRooFitResult(qcdfit)
-        print(tf_MCtempl(ptscaled, rhoscaled, nominal=True))
+
+        # # Plot it
+        # from utils import pad2d
+        # from plotTF import plotTF as plotTransF
+        # TF_vals = tf_MCtempl(ptscaled, rhoscaled, nominal=True)
+        # pmsd = pad2d(msdpts)
+        # pmsd[:, 0] = 40
+        # pmsd[:, -1] = 201
+        # # Pad pT bins
+        # ppt = pad2d(ptpts)
+        # ppt[0, :] = 450
+        # ppt[-1, :] = 1200
+        # # Pad TF result
+        # pTF = pad2d(TF_vals)
+        # pvb = pad2d(validbins).astype(bool)
+        # plotTransF(pTF, pmsd, ppt, mask=pvb, MC=False)
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
@@ -204,7 +260,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
             for sName in include_samples:
-                templ = get_templ(f, region, sName, ptbin)
+                if use_matched:
+                    templ = get_templM(f, region, sName, ptbin)
+                else:
+                    templ = get_templ(f, region, sName, ptbin)
                 stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -223,7 +282,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                 sys_names = ['JES', "JER", 'Pu']
                 sys_list = [sys_JES, sys_JER, sys_Pu]
                 for sys_name, sys in zip(sys_names, sys_list):
-                    _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
+                    if use_matched:
+                        _sys_ef = shape_to_numM(f, region, sName, ptbin, sys_name, mask)
+                    else:
+                        _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
                     sample.setParamEffect(sys, _sys_ef)
 
                 # Sample specific
@@ -237,7 +299,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
                     sample.setParamEffect(
-                        sys_ddxeff, ddx_SF(f, region, sName, ptbin, sys_name, mask))
+                        sys_ddxeff,
+                        ddx_SF(f, region, sName, ptbin, sys_name, mask, use_matched))
                 if sName.startswith("z"):
                     sample.setParamEffect(sys_znormQ, 1.1)
                     sample.setParamEffect(sys_znormEW, 1.05)
@@ -285,7 +348,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst):
             else:
                 yields = []
                 for samp in include_samples + ['qcd']:
-                    yields.append(get_templ(f, region, samp, ptbin)[0])
+                    yields.append(get_templM(f, region, samp, ptbin)[0])
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
                     yields = np.random.poisson(yields)
@@ -422,6 +485,13 @@ if __name__ == '__main__':
                         choices={True, False},
                         help="ToFix, Generate with scale/smear systematics")
 
+    parser.add_argument("--matched",
+                        type=str2bool,
+                        default='False',
+                        choices={True, False},
+                        help=("Use matched/unmatched templates"
+                              "(w/o there is some W/Z/H contamination from QCD)"))
+
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
@@ -432,4 +502,5 @@ if __name__ == '__main__':
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
                      scalesmear_syst=args.scale,
+                     use_matched=args.matched
                      )

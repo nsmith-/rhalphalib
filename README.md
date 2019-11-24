@@ -51,7 +51,9 @@ python make_Hxx.py
 cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
-combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes
+combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes --setParameterRanges r=-1,3
+
+python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnostics.root 
 
 # To extract shapes/norms use combine harvester
 PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s

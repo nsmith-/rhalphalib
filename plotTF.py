@@ -34,7 +34,7 @@ def TF(pT, rho, n_pT=2, n_rho=2, par_map=np.ones((3, 3))):
 
 
 # TF Plots
-def plotTF(TF, msd, pt, mask=None):
+def plotTF(TF, msd, pt, mask=None, MC=False, raw=False):
     """
     Parameters:
     TF: Transfer Factor array
@@ -78,24 +78,31 @@ def plotTF(TF, msd, pt, mask=None):
                     edgecolor="black", linewidth=0.0)
     x = np.arange(150, 201)
     ax.plot(x, rho_bound(x, -2.1) + 5, 'black', lw=3)
-    ax.fill_between(x, rho_bound(x, -2.1), facecolor="none", hatch="x", 
+    ax.fill_between(x, rho_bound(x, -2.1), facecolor="none", hatch="x",
                     edgecolor="black", linewidth=0.0)
 
     ax.set_xlim(40,201)
     ax.set_ylim(450,1200)
     ax.invert_yaxis()
 
-    ax.set_title('Transfer Factor ({},{})'.format(rhodeg, ptdeg), pad=15, fontsize=26)
+    tMC = "MC only" if MC else "Data Residual"
+    if raw: tMC = "Prefit MC"
+    ax.set_title('{} Transfer Factor ({},{})'.format(tMC, rhodeg, ptdeg),
+                 pad=15,
+                 fontsize=26)
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1)
     cbar.set_label(r'TF', ha='right', y=1)
 
-    fig.savefig('{}/{}.png'.format(args.output_folder,
-                                   "TFmasked" if mask is not None else "TF"),
+    label = "MC" if MC else "Data"
+    if raw: label = "MCRaw"
+    fig.savefig('{}/{}{}.png'.format(args.output_folder,
+                                     "TFmasked" if mask is not None else "TF",
+                                     label),
                 bbox_inches="tight")
 
 
-def plotTF_ratio(in_ratio, mask):
+def plotTF_ratio(in_ratio, mask, region):
     fig, ax = plt.subplots()
 
     H = np.ma.masked_where(in_ratio * mask <= 0.01, in_ratio * mask)
@@ -121,12 +128,13 @@ def plotTF_ratio(in_ratio, mask):
     ax.tick_params(axis='y', which='minor', left=False, right=False)
     ax.invert_yaxis()
 
-    ax.set_title('Postfit QCD Ratio', pad=15, fontsize=26)
+    ax.set_title('{} QCD Ratio'.format(region), pad=15, fontsize=26)
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1)
     cbar.set_label(r'(Pass QCD) / (Fail QCD * eff)', ha='right', y=1)
 
-    fig.savefig('{}/{}.png'.format(args.output_folder, "TF_ratio"), bbox_inches="tight")
+    fig.savefig('{}/{}{}.png'.format(args.output_folder, "TF_ratio_", region),
+                bbox_inches="tight")
 
 
 def plot_qcd(qcd, fail=False):
@@ -141,7 +149,7 @@ def plot_qcd(qcd, fail=False):
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1, labelpad=15)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1, labelpad=15)
     ax.set_zlabel(r'$\mathrm{log_{10}(N)}$', ha='left', labelpad=15)
-    
+
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
     msdbins = np.linspace(40, 201, 24)
     ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins),
@@ -203,13 +211,18 @@ if __name__ == '__main__':
     hmp = []
     par_names = rf.Get('fit_s').floatParsFinal().contentsString().split(',')
     par_names = [p for p in par_names if 'tf' in p]
+    MCTF = []
     for pn in par_names:
-        hmp.append(round(rf.Get('fit_s').floatParsFinal().find(pn).getVal(), 4))
+        if "deco" not in pn:
+            hmp.append(round(rf.Get('fit_s').floatParsFinal().find(pn).getVal(), 4))
+        elif "deco" in pn:
+            MCTF.append(round(rf.Get('fit_s').floatParsFinal().find(pn).getVal(), 4))
 
     def _get(s):
         # Helper
         return s[-1][0]
 
+    par_names = [n for n in par_names if "deco" not in n]
     ptdeg = max(
         list(
             map(int, list(map(_get, list(map(methodcaller("split", 'pt_par'),
@@ -220,6 +233,8 @@ if __name__ == '__main__':
                                              par_names)))))))
 
     parmap = np.array(hmp).reshape(rhodeg+1, ptdeg+1)
+    if len(MCTF) > 0:
+        MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)
 
     # Define bins
     # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
@@ -244,6 +259,14 @@ if __name__ == '__main__':
     TFres = np.array(list(map(TFwrap, ptscaled.flatten(),
                           rhoscaled.flatten()))).reshape(ptpts.shape)
 
+    if len(MCTF) > 0:
+        def TFwrap(pt, rho):
+            return TF(pt, rho, ptdeg, rhodeg, MCTF_map)
+
+        MCTFres = np.array(list(map(TFwrap, ptscaled.flatten(),
+                                rhoscaled.flatten()))).reshape(ptpts.shape)
+
+
     # Pad mass bins
     pmsd = pad2d(msdpts)
     pmsd[:, 0] = 40
@@ -255,14 +278,35 @@ if __name__ == '__main__':
     # Pad TF result
     pTF = pad2d(TFres)
     pvb = pad2d(validbins).astype(bool)
+        
+    if len(MCTF) > 0:
+        pMCTF = pad2d(MCTFres)
+        plotTF(1+pMCTF, pmsd, ppt, mask=pvb, MC=True)
 
     # Plot TF
-    # plotTF(pTF, pmsd, ppt)
-    plotTF(pTF, pmsd, ppt, mask=pvb)
-
+    plotTF(pTF, pmsd, ppt)
+    plotTF(pTF, pmsd, ppt, mask=pvb, MC=False)
+    
     # Get Info from Shapes
     # Build 2D
     f = uproot.open(args.input_file)
+    region = 'prefit'
+    fail_qcd, pass_qcd = [], []
+    bins = []
+    for ipt in range(6):
+        fail_qcd.append(f['ptbin{}fail_{}/qcd'.format(ipt, region)].values)
+        pass_qcd.append(f['ptbin{}pass_{}/qcd'.format(ipt, region)].values)
+
+    fail_qcd = np.array(fail_qcd)
+    pass_qcd = np.array(pass_qcd)
+
+    mask = ~np.isclose(pass_qcd, np.zeros_like(pass_qcd))
+    mask *= ~np.isclose(fail_qcd, np.zeros_like(fail_qcd))
+    q = np.sum(pass_qcd[mask])/np.sum(fail_qcd[mask])
+    in_data_rat = (pass_qcd/(fail_qcd * q))
+
+    plotTF_ratio(in_data_rat, mask, region="Prefit")
+
     region = 'postfit'
     fail_qcd, pass_qcd = [], []
     bins = []
@@ -278,7 +322,7 @@ if __name__ == '__main__':
     q = np.sum(pass_qcd[mask])/np.sum(fail_qcd[mask])
     in_data_rat = (pass_qcd/(fail_qcd * q))
 
-    plotTF_ratio(in_data_rat, mask)
+    plotTF_ratio(in_data_rat, mask, region="Postfit")
 
     # Plot QCD shape
     plot_qcd(pass_qcd, fail=False)
