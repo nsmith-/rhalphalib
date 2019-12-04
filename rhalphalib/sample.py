@@ -208,7 +208,7 @@ class TemplateSample(Sample):
         if up:
             return self._paramEffectsUp[param]
         else:
-            if self._paramEffectsDown[param] is None:
+            if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
                 return 1. / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
