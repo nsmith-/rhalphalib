@@ -23,7 +23,10 @@ parser.add_argument("--fit",
                     choices={"prefit", "postfit"},
                     dest='fit',
                     help="Shapes to plot")
-
+parser.add_argument("--3reg",
+                    action='store_true',
+                    dest='three_regions',
+                    help="By default plots pass/fail region. Set to plot pqq/pcc/pbb")
 parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
@@ -35,7 +38,7 @@ pseudo.add_argument('--MC', action='store_true', dest='pseudo')
 
 args = parser.parse_args()
 
-make_dirs('plots')
+make_dirs(args.output_folder)
 
 cdict = {
     'hqq': 'blue',
@@ -79,6 +82,16 @@ label_dict = OrderedDict({
 
 
 def full_plot(cats, pseudo=True):
+
+    # Determine:
+    if "pass" in str(cats[0].name) or "fail" in str(cats[0].name):
+        regs = "pf"
+    elif "pqq" in str(cats[0].name) or "pcc" in str(cats[0].name) or "pbb" in str(
+            cats[0].name):
+        regs = "3reg"
+    else:
+        print("Unknown regions")
+        return
 
     # For masking 0 bins (don't want to show them)
     class Ugh():
@@ -269,7 +282,7 @@ def full_plot(cats, pseudo=True):
     # ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.e'))
     f = mtick.ScalarFormatter(useOffset=False, useMathText=True)
     # g = lambda x, pos: "${}$".format(f._formatSciNotation('%1.10e' % x))
-    
+
     def g(x, pos):
         return "${}$".format(f._formatSciNotation('%1.10e' % x))
     ax.yaxis.set_major_formatter(mtick.FuncFormatter(g))
@@ -288,8 +301,16 @@ def full_plot(cats, pseudo=True):
             pbins[-1]) + " GeV"
 
     lab_mu = ", MuonCR" if b'muon' in cats[0].name else ""
-    lab_reg = "Passing" if "pass" in str(cats[0].name) else "Failing"
-    print(lab_reg)
+    if regs == "pf":
+        lab_reg = "Passing" if "pass" in str(cats[0].name) else "Failing"
+    else:
+        if "pqq" in str(cats[0].name):
+            lab_reg = "Light"
+        elif "pcc" in str(cats[0].name):
+            lab_reg = "Charm"
+        elif "pbb" in str(cats[0].name):
+            lab_reg = "Bottom"
+    
     annot = pt_range + '\nDeepDoubleX{}'.format(lab_mu) + '\n{} Region'.format(lab_reg)
 
     ax.annotate(annot,
@@ -315,18 +336,23 @@ def full_plot(cats, pseudo=True):
         _iptname = "MuonCR"
     else:
         _iptname = str(str(ipt) if len(cats) == 1 else "")
-    name = str("pass" if "pass" in str(cats[0].name) else "fail"
-               ) + _iptname
+    # name = str("pass" if "pass" in str(cats[0].name) else "fail"
+    #            ) + _iptname
+    name = str(lab_reg) + _iptname
 
-    fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name), 
+    fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name),
                 bbox_inches="tight")
 
 
 shape_type = args.fit
+if args.three_regions:
+    regions = ['pqq', 'pcc', 'pbb']
+else:
+    regions = ['pass', 'fail']
 
 f = uproot.open(args.input_file)
 pbins = [450, 500, 550, 600, 675, 800, 1200]
-for region in ['pass', 'fail']:
+for region in regions:
     print("Plotting {} region".format(region))
     for i in range(0, 6):
         cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
