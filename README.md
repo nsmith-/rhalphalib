@@ -66,6 +66,13 @@ python plot.py -i tempModel/shapes.root --data --fit postfit
 python plotTF.py -i tempModel/shapes.root --fit tempModel/fitDiagnostics.root
 ```
 
+
+### OTHER IMPORTANT COMMANDS
+```
+combineTool.py -M FitDiagnostics -m 125 -d tempModel_combined.root --there --cminDefaultMinimizerStrategy 0 -t -1 --expectSignal 1
+combineTool.py -M AsymptoticLimits -m 125 -d tempModel_combined.root --there -t -1 --expectSignal 1 --rMin=-50 --rMax=50
+```
+
 ## Requirements
 Standalone model creation requires:
   - Python 2.7+ or 3.6+

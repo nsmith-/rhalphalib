@@ -107,7 +107,7 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
 
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
-                     blind=True):
+                     blind=True, runhigs=False):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -266,7 +266,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     templ = get_templM(f, region, sName, ptbin)
                 else:
                     templ = get_templ(f, region, sName, ptbin)
-                stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                if runhigs:
+                    stype = rl.Sample.SIGNAL if sName in ['hqq'] else rl.Sample.BACKGROUND
+                else:
+                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                 # Systematics
@@ -351,7 +355,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
             else:
                 yields = []
                 for samp in include_samples + ['qcd']:
-                    yields.append(get_templM(f, region, samp, ptbin)[0])
+                    _temp_yields = get_templM(f, region, samp, ptbin)[0]
+                    if samp not in ['qcd', 'tqq']:
+                        _temp_yields *= SF2017['V_SF']                
+                    yields.append(_temp_yields)
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
                     yields = np.random.poisson(yields)
@@ -500,6 +507,7 @@ if __name__ == '__main__':
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
     
     parser.add_argument('--unblind', action='store_true', dest='unblind')
+    parser.add_argument('--higgs', action='store_true', dest='runhigs', help="Set Higgs as signal instead of z")
 
     args = parser.parse_args()
 
@@ -509,4 +517,5 @@ if __name__ == '__main__':
                      scalesmear_syst=args.scale,
                      use_matched=args.matched,
                      blind=(not args.unblind),
+                     runhigs=args.runhigs,
                      )
