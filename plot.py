@@ -19,7 +19,7 @@ parser.add_argument("-i",
                     default='hxxModel/shapes.root',
                     help="Input shapes file")
 parser.add_argument("--fit",
-                    default='prefit',
+                    default=None,
                     choices={"prefit", "postfit"},
                     dest='fit',
                     help="Shapes to plot")
@@ -81,7 +81,7 @@ label_dict = OrderedDict({
 })
 
 
-def full_plot(cats, pseudo=True):
+def full_plot(cats, pseudo=True, fittype=""):
 
     # Determine:
     if "pass" in str(cats[0].name) or "fail" in str(cats[0].name):
@@ -330,7 +330,8 @@ def full_plot(cats, pseudo=True):
                 annotation_clip=False)
 
     # Leg sort
-    ax.legend(*hep.plot.sort_legend(ax, label_dict), ncol=2, columnspacing=0.8)
+    leg = ax.legend(*hep.plot.sort_legend(ax, label_dict), ncol=2, columnspacing=0.8)
+    leg.set_title(title=fittype.capitalize(),prop={'size':"smaller"})
 
     if b'muon' in cats[0].name:
         _iptname = "MuonCR"
@@ -340,36 +341,40 @@ def full_plot(cats, pseudo=True):
     #            ) + _iptname
     name = str(lab_reg) + _iptname
 
-    fig.savefig('{}/{}.png'.format(args.output_folder, args.fit + "_" + name),
+    fig.savefig('{}/{}.png'.format(args.output_folder, fittype + "_" + name),
                 bbox_inches="tight")
 
 
-shape_type = args.fit
+if args.fit is None:
+    shape_types = ['prefit', 'postfit']
+else:
+    shape_types = [args.fit]
 if args.three_regions:
     regions = ['pqq', 'pcc', 'pbb']
 else:
     regions = ['pass', 'fail']
 
 f = uproot.open(args.input_file)
-pbins = [450, 500, 550, 600, 675, 800, 1200]
-for region in regions:
-    print("Plotting {} region".format(region))
-    for i in range(0, 6):
-        cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
-        try:
-            cat = f[cat_name]
-        except Exception:
-            raise ValueError("Namespace {} is not available, only following"
-                             "namespaces were found in the file: {}".format(
-                                 args.fit, f.keys()))
+for shape_type in shape_types:
+    pbins = [450, 500, 550, 600, 675, 800, 1200]
+    for region in regions:
+        print("Plotting {} region".format(region))
+        for i in range(0, 6):
+            cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
+            try:
+                cat = f[cat_name]
+            except Exception:
+                raise ValueError("Namespace {} is not available, only following"
+                                "namespaces were found in the file: {}".format(
+                                    args.fit, f.keys()))
 
-        fig = full_plot([cat], pseudo=args.pseudo)
-    full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
-              pseudo=args.pseudo)
-    # MuonCR if included
-    try:
-        cat = f['muonCR{}_{};1'.format(region, shape_type)]
-        full_plot([cat], args.pseudo)
-        print("Plotted muCR")
-    except Exception:
-        pass
+            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type)
+        full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
+                   pseudo=args.pseudo, fittype=shape_type)
+        # MuonCR if included
+        try:
+            cat = f['muonCR{}_{};1'.format(region, shape_type)]
+            full_plot([cat], args.pseudo, fittype=shape_type)
+            print("Plotted muCR")
+        except Exception:
+            pass

@@ -106,7 +106,8 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
+                     blind=True):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -149,7 +150,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+    f = uproot.open('hxx/hist_1DZbb_pt_scalesmear.root')
 
     # Get QCD efficiency
     if MCTF:
@@ -245,17 +246,18 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
         tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
 
     # build actual fit model now
-    model = rl.Model("tempModel")
+    model = rl.Model("hbbModel")
 
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
-            include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']
+            include_samples = ['zqq', 'wqq', 'tqq', 'hqq']
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
-                mask[10:14] = False
+                if blind:
+                    mask[10:14] = False
 
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
@@ -264,20 +266,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
                     templ = get_templM(f, region, sName, ptbin)
                 else:
                     templ = get_templ(f, region, sName, ptbin)
-                stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                stype = rl.Sample.SIGNAL if sName in ['hqq'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                 # Systematics
                 sample.setParamEffect(sys_lumi, 1.023)
-
-                # Shape systematics
-                # Not actuall in ggH
-                # sys_names = ['JES', "JER", 'trigger', 'Pu']
-                # sys_list = [JES, JER, trigger, Pu]
-                # for sys_name, sys in zip(sys_names, sys_list):
-                #     _up = get_templ(f, region, sName, ptbin, syst=sys_name+"Up")
-                #     _dn = get_templ(f, region, sName, ptbin, syst=sys_name+"Down")
-                #     sample.setParamEffect(sys, _up[0], _dn[0])
 
                 sys_names = ['JES', "JER", 'Pu']
                 sys_list = [sys_JES, sys_JER, sys_Pu]
@@ -295,6 +288,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
                     sample.setParamEffect(sys_lumi, 1.025)
                     sample.setParamEffect(sys_trigger, 1.02)
                 if sName not in ["qcd", 'tqq']:
+                    sample.scale(SF2017['V_SF'])
                     sample.setParamEffect(sys_veff,
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
@@ -447,10 +441,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
     # tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
     # tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
-    with open("tempModel.pkl", "wb") as fout:
+    with open("hbbModel.pkl", "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine("tempModel")
+    model.renderCombine("hbbModel")
 
 
 if __name__ == '__main__':
@@ -495,6 +489,8 @@ if __name__ == '__main__':
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+    
+    parser.add_argument('--unblind', action='store_true', dest='unblind')
 
     args = parser.parse_args()
 
@@ -502,5 +498,6 @@ if __name__ == '__main__':
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
                      scalesmear_syst=args.scale,
-                     use_matched=args.matched
+                     use_matched=args.matched,
+                     blind=(not args.unblind),
                      )

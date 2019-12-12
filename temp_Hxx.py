@@ -106,7 +106,8 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
+                     blind=True):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -255,7 +256,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
-                mask[10:14] = False
+                if blind:
+                    mask[10:14] = False
 
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
@@ -295,6 +297,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched):
                     sample.setParamEffect(sys_lumi, 1.025)
                     sample.setParamEffect(sys_trigger, 1.02)
                 if sName not in ["qcd", 'tqq']:
+                    sample.scale(SF2017['V_SF'])
                     sample.setParamEffect(sys_veff,
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
@@ -487,7 +490,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--matched",
                         type=str2bool,
-                        default='False',
+                        default='True',
                         choices={True, False},
                         help=("Use matched/unmatched templates"
                               "(w/o there is some W/Z/H contamination from QCD)"))
@@ -495,6 +498,8 @@ if __name__ == '__main__':
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+    
+    parser.add_argument('--unblind', action='store_true', dest='unblind')
 
     args = parser.parse_args()
 
@@ -502,5 +507,6 @@ if __name__ == '__main__':
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
                      scalesmear_syst=args.scale,
-                     use_matched=args.matched
+                     use_matched=args.matched,
+                     blind=(not args.unblind),
                      )

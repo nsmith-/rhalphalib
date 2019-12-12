@@ -112,6 +112,12 @@ class TemplateSample(Sample):
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
         self._paramEffectScales = {}
+        
+    def show(self):
+        print(self._nominal)
+        
+    def scale(self, _scale):
+        self._nominal *= _scale
 
     @property
     def parameters(self):
