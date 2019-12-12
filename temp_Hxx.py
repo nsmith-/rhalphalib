@@ -107,7 +107,7 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
 
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
-                     blind=True, runhigs=False):
+                     blind=True, runhiggs=False):
     fitTF = True
 
     # Default lumi (needs at least one systematics for prefit)
@@ -266,8 +266,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     templ = get_templM(f, region, sName, ptbin)
                 else:
                     templ = get_templ(f, region, sName, ptbin)
-                if runhigs:
-                    stype = rl.Sample.SIGNAL if sName in ['hqq'] else rl.Sample.BACKGROUND
+                if runhiggs:
+                    stype = rl.Sample.SIGNAL if sName in ['hcc'] else rl.Sample.BACKGROUND
                 else:
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                 
@@ -295,6 +295,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     sample.setParamEffect(sys, _sys_ef)
 
                 # Sample specific
+                #if sName in ["hcc", "hqq"]:
+                #    sample.scale(2)
                 if sName not in ["qcd"]:
                     sample.setParamEffect(sys_eleveto, 1.005)
                     sample.setParamEffect(sys_muveto, 1.005)
@@ -507,7 +509,7 @@ if __name__ == '__main__':
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
     
     parser.add_argument('--unblind', action='store_true', dest='unblind')
-    parser.add_argument('--higgs', action='store_true', dest='runhigs', help="Set Higgs as signal instead of z")
+    parser.add_argument('--higgs', action='store_true', dest='runhiggs', help="Set Higgs as signal instead of z")
 
     args = parser.parse_args()
 
@@ -517,5 +519,5 @@ if __name__ == '__main__':
                      scalesmear_syst=args.scale,
                      use_matched=args.matched,
                      blind=(not args.unblind),
-                     runhigs=args.runhigs,
+                     runhiggs=args.runhiggs,
                      )
