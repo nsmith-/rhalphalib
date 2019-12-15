@@ -312,25 +312,38 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                         ddx_SF(f, region, sName, ptbin, sys_name, mask, use_matched))
                 if sName.startswith("z"):
                     sample.setParamEffect(sys_znormQ, 1.1)
-                    sample.setParamEffect(sys_znormEW, 1.05)
+                    if ptbin >= 2:
+                        sample.setParamEffect(sys_znormEW, 1.07)
+                    else:
+                        sample.setParamEffect(sys_znormEW, 1.05)
                 if sName.startswith("w"):
                     sample.setParamEffect(sys_znormQ, 1.1)
-                    sample.setParamEffect(sys_znormEW, 1.05)
-                    sample.setParamEffect(sys_wznormEW, 1.02)
+                    if ptbin >= 2:
+                        sample.setParamEffect(sys_znormEW, 1.07)
+                    else:
+                        sample.setParamEffect(sys_znormEW, 1.05)
+                    if ptbin >= 3:                        
+                        sample.setParamEffect(sys_wznormEW, 1.06)
+                    else:
+                        sample.setParamEffect(sys_wznormEW, 1.02)
                 if sName.startswith("h"):
                     sample.setParamEffect(sys_Hpt, 1.2)
 
-                if scalesmear_syst:
+                if scalesmear_syst and sName not in ["qcd", 'tqq']:
                     # Scale and Smear
                     mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
-                    np.set_printoptions(linewidth=1000, precision=2)
-                    if sName == "hqq" and ptbin == 4 and region == 'pass':
-                        print(sample.name)
-                        print(templ[0])
-                        print(mtempl.get(shift=-7.)[0])
-                        print(mtempl.get(shift=7.)[0])
-                    realshift = 90 * 0.01  # in GeV FIXME
+                    # np.set_printoptions(linewidth=1000, precision=2)
+                    if sName.startswith("h"):
+                        _mass = 125.
+                    elif sName.startswith("w"):
+                        _mass = 80.4
+                    elif sName.startswith("z"):
+                        _mass = 91.
+                    else:
+                        pass
+                    realshift = _mass * SF2017['shift_SF'] * SF2017['shift_SF_ERR']
+                    # realshift = 90 * 0.01
                     sample.setParamEffect(sys_scale,
                                           mtempl.get(shift=7.)[0],
                                           mtempl.get(shift=-7.)[0],
@@ -338,7 +351,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
 
                     # To Do
                     # Match to boson mass instead of mean
-                    smear_in, smear_unc = 1, 0.11
+                    # smear_in, smear_unc = 1, 0.11
+                    smear_in, smear_unc = SF2017['smear_SF'], SF2017['smear_SF_ERR']
                     _smear_up = mtempl.get(scale=smear_in + 1 * smear_unc,
                                            shift=-mtempl.mean *
                                            (smear_in + 1 * smear_unc - 1))
@@ -512,6 +526,8 @@ if __name__ == '__main__':
     parser.add_argument('--higgs', action='store_true', dest='runhiggs', help="Set Higgs as signal instead of z")
 
     args = parser.parse_args()
+    print("Running with options:")
+    print("    ", args)
 
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
