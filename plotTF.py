@@ -100,7 +100,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     if raw: 
         label = "MCRaw"
     if out is None:
-        fig.savefig('{}/{}{}.png'.format(out_folder,
+        fig.savefig('{}/{}{}.png'.format(args.output_folder,
                                          "TFmasked" if mask is not None else "TF",
                                          label),
                     bbox_inches="tight")
@@ -241,7 +241,20 @@ if __name__ == '__main__':
 
     parmap = np.array(hmp).reshape(rhodeg+1, ptdeg+1)
     if len(MCTF) > 0:
-        MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)
+        MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)\
+            
+    # Smooth plots
+    from plotTF2 import plotTF as plotTFsmooth
+    from plotTF2 import TF_smooth_plot, TF_params
+    print(hmp, MCTF)
+    _values = hmp
+    #_names = [n for n in par_names if "deco" not in n]
+    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False,
+                 out='{}/TF_data'.format(args.output_folder))
+    _values = MCTF
+    #_names = [n for n in par_names if "deco" in n]
+    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=True,
+                 out='{}/TF_MC'.format(args.output_folder))
 
     # Define bins
     # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])

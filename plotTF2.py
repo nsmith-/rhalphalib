@@ -98,7 +98,8 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     
     if np.min(TF) < 1-clim and np.max(TF) > 1+clim: _extend = 'both'
     elif np.max(TF) > 1+clim: _extend = 'max'
-    elif np.min(TF) < 1-clim: _extend = 'min'    
+    elif np.min(TF) < 1-clim: _extend = 'min'  
+    else: _extend = 'neither'
 
     if mask is not None:
         contf = ax.contourf(msd, pt, TF, levels=levels,
