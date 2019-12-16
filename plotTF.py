@@ -12,6 +12,8 @@ import math
 import mplhep as hep
 from utils import make_dirs, get_fixed_mins_maxs, pad2d
 
+plt.switch_backend('agg')
+
 
 # Benstein polynomial calculation
 def bern_elem(x, v, n):
@@ -34,7 +36,7 @@ def TF(pT, rho, n_pT=2, n_rho=2, par_map=np.ones((3, 3))):
 
 
 # TF Plots
-def plotTF(TF, msd, pt, mask=None, MC=False, raw=False):
+def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=None):
     """
     Parameters:
     TF: Transfer Factor array
@@ -42,8 +44,8 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False):
     pt: pT bins array (meshgrid-like)
     """
     fig, ax = plt.subplots()
-    if mask is not None:
-        TF = np.ma.array(TF, mask=~pvb)
+    #if mask is not None:
+    #    TF = np.ma.array(TF, mask=~mask)
 
     zmin, zmax = np.floor(10*np.min(TF))/10, np.ceil(10*np.max(TF))/10
     zmin, zmax = zmin + 0.001, zmax - 0.001
@@ -95,11 +97,16 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False):
     cbar.set_label(r'TF', ha='right', y=1)
 
     label = "MC" if MC else "Data"
-    if raw: label = "MCRaw"
-    fig.savefig('{}/{}{}.png'.format(args.output_folder,
-                                     "TFmasked" if mask is not None else "TF",
-                                     label),
-                bbox_inches="tight")
+    if raw: 
+        label = "MCRaw"
+    if out is None:
+        fig.savefig('{}/{}{}.png'.format(out_folder,
+                                         "TFmasked" if mask is not None else "TF",
+                                         label),
+                    bbox_inches="tight")
+    else:
+        fig.savefig('TF{}.png'.format(out, bbox_inches="tight"))
+        
 
 
 def plotTF_ratio(in_ratio, mask, region):
@@ -278,7 +285,7 @@ if __name__ == '__main__':
     # Pad TF result
     pTF = pad2d(TFres)
     pvb = pad2d(validbins).astype(bool)
-        
+
     if len(MCTF) > 0:
         pMCTF = pad2d(MCTFres)
         plotTF(1+pMCTF, pmsd, ppt, mask=pvb, MC=True)
@@ -286,7 +293,7 @@ if __name__ == '__main__':
     # Plot TF
     plotTF(pTF, pmsd, ppt)
     plotTF(pTF, pmsd, ppt, mask=pvb, MC=False)
-    
+
     # Get Info from Shapes
     # Build 2D
     f = uproot.open(args.input_file)

@@ -1,15 +1,20 @@
 from __future__ import print_function, division
-import warnings
+# import warnings
 import rhalphalib as rl
-import numpy as np
 import pickle
+import numpy as np
 import ROOT
 import uproot
 from template_morph import AffineMorphTemplate
+#import matplotlib.pyplot as plt
+#import mplhep as hep
+#plt.style.use(hep.style.ROOT)
+#plt.switch_backend('agg')
+
 rl.util.install_roofit_helpers()
 
 
-warnings.filterwarnings('error')
+# warnings.filterwarnings('error')
 
 SF2017 = {  # cristina Jun25
     'shift_SF': 0.979,
@@ -18,14 +23,14 @@ SF2017 = {  # cristina Jun25
     'smear_SF_ERR': 0.049,  # prelim SF @26% N2ddt
     'V_SF': 0.92,
     'V_SF_ERR': 0.018,
-    'BB_SF': 1.0,
-    'BB_SF_ERR': 0.3,  # prelim ddb SF
+    'CC_SF': 0.9,  # 1.0,
+    'CC_SF_ERR': .8  # 0.3,  # prelim ddb SF
 }
 
 
 def ddx_SF(f, region, sName, ptbin, syst, mask, use_matched=False):
     if region == "pass":
-        return 1. + SF2017['BB_SF_ERR']/SF2017['BB_SF']
+        return 1. + SF2017['CC_SF_ERR']/SF2017['CC_SF']
     else:
         if use_matched:
             _pass = get_templM(f, "pass", sName, ptbin)
@@ -38,7 +43,7 @@ def ddx_SF(f, region, sName, ptbin, syst, mask, use_matched=False):
             _fail = get_templ(f, "fail", sName, ptbin)
         _fail_rate = np.sum(_fail[0] * mask)
         if _fail_rate > 0:
-            return 1. - SF2017['BB_SF_ERR'] * (_pass_rate/_fail_rate)
+            return 1. - SF2017['CC_SF_ERR'] * (_pass_rate/_fail_rate)
         else:
             return 1
 
@@ -57,8 +62,12 @@ def shape_to_num(f, region, sName, ptbin, syst, mask):
 
 
 def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
-    if sample in ["hcc", "hqq"]:
+    # if sample in ["hcc", "hqq"]:
+    #     sample += "125"
+    if sample in ["hcc"]:
         sample += "125"
+    if sample in ["hbb"]:
+        sample = "hqq125"
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
@@ -73,8 +82,12 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
 
 def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False):
     # With Matched logic
-    if sample in ["hcc", "hqq"]:
+    # if sample in ["hcc", "hqq"]:
+    #     sample += "125"
+    if sample in ["hcc"]:
         sample += "125"
+    if sample in ["hbb"]:
+        sample = "hqq125"
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
@@ -116,7 +129,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
     sys_JES = rl.NuisanceParameter('CMS_scale_j_2017 ', 'lnN')
     sys_JER = rl.NuisanceParameter('CMS_res_j_2017 ', 'lnN')
     sys_Pu = rl.NuisanceParameter('CMS_PU_2017', 'lnN')
-    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2018', 'lnN')
+    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2017', 'lnN')
 
     sys_ddxeff = rl.NuisanceParameter('CMS_eff_cc', 'lnN')
     sys_eleveto = rl.NuisanceParameter('CMS_gghcc_e_veto', 'lnN')
@@ -127,27 +140,18 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
     sys_znormEW = rl.NuisanceParameter('CMS_gghcc_znormEW', 'lnN')
     sys_znormQ = rl.NuisanceParameter('CMS_gghcc_znormQ', 'lnN')
 
-    sys_scale = rl.NuisanceParameter('scale', 'shape')
-    sys_smear = rl.NuisanceParameter('smear', 'shape')
+    sys_scale = rl.NuisanceParameter('CMS_gghcc_scale', 'shape')
+    sys_smear = rl.NuisanceParameter('CMS_gghcc_smear', 'shape')
 
-    sys_Hpt = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'lnN')
+    sys_Hpt = rl.NuisanceParameter('CMS_gghcc_ggHpt', 'lnN')
     # sys_Hpt_shape = rl.NuisanceParameter('CMS_gghbb_ggHpt', 'shape')
 
-    # Define Bins
-    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
-    npt = len(ptbins) - 1
-    msdbins = np.linspace(40, 201, 24)
+    # Import binnings
+    # Hidden away to be available to other functions
+    from config_Hxx import ptbins, msdbins  # ptpts, msdpts, rhopts
+    from config_Hxx import ptscaled, rhoscaled, validbins
     msd = rl.Observable('msd', msdbins)
-
-    # Define pt/msd/rho grids
-    ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins),
-                                msdbins[:-1] + 0.5 * np.diff(msdbins),
-                                indexing='ij')
-    rhopts = 2*np.log(msdpts/ptpts)
-    ptscaled = (ptpts - 450.) / (1200. - 450.)
-    rhoscaled = (rhopts - (-6)) / ((-2.1) - (-6))
-    validbins = (rhoscaled >= 0) & (rhoscaled <= 1)
-    rhoscaled[~validbins] = 1  # we will mask these out later
+    npt = len(ptbins) - 1
 
     # Template reading
     f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
@@ -223,20 +227,14 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
         qcdmodel.readRooFitResult(qcdfit)
 
         # # Plot it
-        # from utils import pad2d
-        # from plotTF import plotTF as plotTransF
-        # TF_vals = tf_MCtempl(ptscaled, rhoscaled, nominal=True)
-        # pmsd = pad2d(msdpts)
-        # pmsd[:, 0] = 40
-        # pmsd[:, -1] = 201
-        # # Pad pT bins
-        # ppt = pad2d(ptpts)
-        # ppt[0, :] = 450
-        # ppt[-1, :] = 1200
-        # # Pad TF result
-        # pTF = pad2d(TF_vals)
-        # pvb = pad2d(validbins).astype(bool)
-        # plotTransF(pTF, pmsd, ppt, mask=pvb, MC=False)
+        from plotTF2 import TF_smooth_plot, TF_params
+        from plotTF2 import plotTF as plotMCTF
+        from utils import make_dirs
+        _values = [par.value for par in tf_MCtempl.parameters.flatten()]
+        _names = [par.name for par in tf_MCtempl.parameters.flatten()]
+        make_dirs('tempModel')
+        plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True,
+                 out='tempModel/MCTF')
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
@@ -252,7 +250,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
-            include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']
+            include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hbb']
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
@@ -295,7 +293,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     sample.setParamEffect(sys, _sys_ef)
 
                 # Sample specific
-                #if sName in ["hcc", "hqq"]:
+                # if sName in ["hcc", "hqq"]:
                 #    sample.scale(2)
                 if sName not in ["qcd"]:
                     sample.setParamEffect(sys_eleveto, 1.005)
@@ -307,6 +305,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     sample.setParamEffect(sys_veff,
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
+                    sample.scale(SF2017['CC_SF'])
                     sample.setParamEffect(
                         sys_ddxeff,
                         ddx_SF(f, region, sName, ptbin, sys_name, mask, use_matched))
@@ -318,6 +317,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                         sample.setParamEffect(sys_znormEW, 1.05)
                 if sName.startswith("w"):
                     sample.setParamEffect(sys_znormQ, 1.1)
+                    # sample.setParamEffect(sys_wnormQ, 1.1)
                     if ptbin >= 2:
                         sample.setParamEffect(sys_znormEW, 1.07)
                     else:
@@ -503,13 +503,13 @@ if __name__ == '__main__':
                         type=str2bool,
                         default='True',
                         choices={True, False},
-                        help="ToFix, Fit QCD in MC first")
+                        help="Fit QCD in MC first")
 
     parser.add_argument("--scale",
                         type=str2bool,
                         default='True',
                         choices={True, False},
-                        help="ToFix, Generate with scale/smear systematics")
+                        help="Include scale/smear systematics")
 
     parser.add_argument("--matched",
                         type=str2bool,

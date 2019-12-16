@@ -71,6 +71,8 @@ python plotTF.py -i tempModel/shapes.root --fit tempModel/fitDiagnostics.root
 ```
 combineTool.py -M FitDiagnostics -m 125 -d tempModel_combined.root --there --cminDefaultMinimizerStrategy 0 -t -1 --expectSignal 1
 combineTool.py -M AsymptoticLimits -m 125 -d tempModel_combined.root --there -t -1 --expectSignal 1 --rMin=-50 --rMax=50
+
+combine -M FitDiagnostics -t -1 --expectSignal 0 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1
 ```
 
 ## Requirements
