@@ -370,7 +370,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
 
             else:
                 yields = []
-                if fitTF:
+                if 'qcd' not in include_samples:
                     include_samples + ['qcd']
                 for samp in include_samples:
                     _temp_yields = get_templM(f, region, samp, ptbin)[0]
