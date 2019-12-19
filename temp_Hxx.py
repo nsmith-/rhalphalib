@@ -371,11 +371,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
             else:
                 yields = []
                 if 'qcd' not in include_samples:
-                    include_samples + ['qcd']
+                    include_samples = include_samples + ['qcd']
                 for samp in include_samples:
                     _temp_yields = get_templM(f, region, samp, ptbin)[0]
                     if samp not in ['qcd', 'tqq']:
-                        _temp_yields *= SF2017['V_SF']                
+                        _temp_yields *= SF2017['V_SF']            
                     yields.append(_temp_yields)
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
@@ -387,7 +387,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
             # drop bins outside rho validity
             ch.mask = mask
 
-    if fitTF:
+    if fitTF:   
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
                                            limits=(0, 10))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)

@@ -242,7 +242,7 @@ if __name__ == '__main__':
     parmap = np.array(hmp).reshape(rhodeg+1, ptdeg+1)
     if len(MCTF) > 0:
         MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)\
-            
+
     # Smooth plots
     from plotTF2 import plotTF as plotTFsmooth
     from plotTF2 import TF_smooth_plot, TF_params
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     #_names = [n for n in par_names if "deco" not in n]
     plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False,
                  out='{}/TF_data'.format(args.output_folder))
-    _values = MCTF
+    _values = np.array(MCTF) + 1
     #_names = [n for n in par_names if "deco" in n]
     plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=True,
                  out='{}/TF_MC'.format(args.output_folder))
