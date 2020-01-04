@@ -45,8 +45,8 @@ def get_templ2M(f, region, sample, ptbin, syst=None, read_sumw2=False):
     return (h_vals, h_edges, h_key)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
-    fitTF = True
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVectors):
+    #fitTF = False
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -96,21 +96,22 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
     model = rl.Model("temp3Model")
 
     regions = ['pbb', 'pcc', 'pqq']
+    vector_samples = ["zcc", "wqq"]
+    include_samples = [] 
+    if not paramVectors:
+        include_samples = include_samples + vector_samples
+    if not fitTF:  # Add QCD sample when not running TF fit
+        include_samples.append('qcd')
     for ptbin in range(npt):
         for region in regions:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
-            # include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hqq']
-            include_samples = ['zcc', 'wqq']
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region in ['pbb', 'pcc']:
                 mask[10:14] = False
-
-            if not fitTF:  # Add QCD sample when not running TF fit
-                include_samples.append('qcd')
+            
             for sName in include_samples:
-                continue
                 if use_matched:
                     templ = get_templ2M(f, region, sName, ptbin)
                 else:
@@ -123,6 +124,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
 
                 ch.addSample(sample)
 
+            # Add/Make Data
             if not pseudo:
                 data_obs = get_templ2(f, region, 'data_obs', ptbin)
                 if ptbin == 0 and region in ['pbb', 'pcc']:
@@ -130,9 +132,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
 
             else:
                 yields = []
-                if "qcd" not in include_samples:
-                    include_samples = include_samples + ['qcd']
-                for samp in include_samples:
+                MC_samples = include_samples
+                if "qcd" not in MC_samples:
+                    MC_samples = MC_samples + ['qcd']
+                for samp in MC_samples + vector_samples:
                     if use_matched:
                         yields.append(get_templ2M(f, region, samp, ptbin)[0])
                     else:
@@ -146,6 +149,48 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
 
             # drop bins outside rho validity
             ch.mask = mask
+
+    if paramVectors:
+        vectorparams = {}
+        for reg in regions:
+            for samp in vector_samples:
+                vectorparams['veff_%s_%s' % (samp, reg)] = rl.IndependentParameter('veff_%s_%s' % (samp, reg), 1, 0, 10)
+
+        for ptbin in range(npt):
+            for sName in vector_samples:
+                tot_templ = 0
+                for reg in regions:
+                    if use_matched:
+                        tot_templ += np.sum(get_templ2M(f, reg, sName, ptbin)[0])
+                    else:
+                        tot_templ += np.sum(get_templ2(f, reg, sName, ptbin)[0])
+
+                for region in regions:
+                    chlist = [ch.name for ch in model.channels]
+                    chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
+                    ch = model[chid]
+
+                    if use_matched:
+                        templ = get_templ2M(f, region, sName, ptbin)
+                    else:
+                        templ = get_templ2(f, region, sName, ptbin)
+
+                    norm_templ = templ[0].sum() / tot_templ
+                    scale_templ = templ[0] * tot_templ / templ[0].sum()
+                    #templ = (scale_templ, templ[1], templ[2])
+                    templ = (templ[0]*0.5, templ[1], templ[2])
+
+                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                    sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+
+                    # Cannot set veff along with r
+                    if sName not in ['zcc']:
+                        sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)],
+                                              1 * vectorparams['veff_%s_%s' % (sName, region)])
+
+                    sample.setParamEffect(sys_lumi, 1.023)
+                    #print("Add", sample)
+                    ch.addSample(sample)
 
     if fitTF:
         tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (2, 2), ['pt', 'rho'],
@@ -180,62 +225,18 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF,  use_matched):
                 1 + sigmascale / np.maximum(1., np.sqrt(initial_qcd)))**qcdparams
             pqq_qcd = rl.ParametericSample('ptbin%dpqq_qcd' % ptbin,
                                            rl.Sample.BACKGROUND, msd, scaledparams)
+            pqqCh.addSample(pqq_qcd)
 
             pcc_qcd = rl.TransferFactorSample('ptbin%dpcc_qcd' % ptbin,
                                               rl.Sample.BACKGROUND,
                                               tf1_params[ptbin, :],
                                               pqq_qcd)
+            pccCh.addSample(pcc_qcd)
             pbb_qcd = rl.TransferFactorSample('ptbin%dpbb_qcd' % ptbin,
                                               rl.Sample.BACKGROUND,
                                               tf2_params[ptbin, :],
-                                              pqq_qcd)
-            pqqCh.addSample(pqq_qcd)
-            pccCh.addSample(pcc_qcd)
+                                              pqq_qcd)            
             pbbCh.addSample(pbb_qcd)
-
-    # vectorparams = []
-    vectorparams = {}
-    for reg in regions:
-        for samp in ["zcc", "wqq"]:
-            # vectorparams.append(rl.IndependentParameter('veff_%s_%s' % (samp, region), 1))
-            vectorparams['veff_%s_%s' % (samp, reg)] = rl.IndependentParameter('veff_%s_%s' % (samp, reg), 1)
-
-    print(vectorparams)
-    if True:
-        for ptbin in range(npt):
-            for sName in ["zcc", "wqq"]:
-                tot_templ = 0
-                for reg in regions:
-                    if use_matched:
-                        tot_templ = np.sum(get_templ2M(f, reg, sName, ptbin)[0])
-                    else:
-                        tot_templ = np.sum(get_templ2(f, reg, sName, ptbin)[0])
-
-                for region in regions:
-                    chid = [ch.name for ch in model.channels].index("ptbin%d%s" % (ptbin, region))
-                    ch = model.channels[chid]
-                    
-                    if use_matched:
-                        templ = get_templ2M(f, region, sName, ptbin)
-                    else:
-                        templ = get_templ2(f, region, sName, ptbin)
-                    norm_templ = templ[0].sum() / tot_templ
-                    scale_templ = templ[0] * tot_templ / templ[0].sum()
-                    templ = (scale_templ, templ[1], templ[2])
-                    
-                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
-                    sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
-                    
-                    sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)],
-                                          norm_templ * vectorparams['veff_%s_%s' % (sName, region)])
-                    
-                    ch.addSample(sample)
-                
-            break
-                #stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
-                #sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
-
-        
 
     with open("temp3Model.pkl", "wb") as fout:
         pickle.dump(model, fout)
@@ -259,7 +260,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--throwPoisson",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
                         help="If plotting data, redraw from poisson distribution")
 
@@ -268,9 +269,22 @@ if __name__ == '__main__':
                         default='False',
                         choices={True, False},
                         help="Fit QCD in MC first")
-    parser.add_argument("--matched",
+    
+    parser.add_argument("--fitTF",
                         type=str2bool,
                         default='False',
+                        choices={True, False},
+                        help="Generate pass QCD from fail QCD to fit it")
+    
+    parser.add_argument("--paramVectors",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Parametric vector samples")
+    
+    parser.add_argument("--matched",
+                        type=str2bool,
+                        default='True',
                         choices={True, False},
                         help=("Use matched/unmatched templates"
                               "(w/o there is some W/Z/H contamination from QCD)"))
@@ -284,5 +298,7 @@ if __name__ == '__main__':
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
+                     fitTF=args.fitTF, 
                      use_matched=args.matched,
+                     paramVectors=args.paramVectors,
                      )
