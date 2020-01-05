@@ -334,7 +334,9 @@ class Channel(object):
 
             for param in otherParams:
                 fout.write("{0} extArg {1}.root:{1}\n".format(param.name, workspaceName))
-                # identify any normalization modifiers
+
+            # identify any normalization modifiers
+            for param in otherParams:
                 for sample in signalSamples + bkgSamples:
                     effect = sample.combineParamEffect(param)
                     if effect != '-':
