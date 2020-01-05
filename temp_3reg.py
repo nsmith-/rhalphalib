@@ -96,7 +96,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
     model = rl.Model("temp3Model")
 
     regions = ['pbb', 'pcc', 'pqq']
-    vector_samples = ["zcc", "wqq"]
+    vector_samples = ["zbb", "zcc", "zqq", "wcq", "wqq"]
     include_samples = [] 
     if not paramVectors:
         include_samples = include_samples + vector_samples
@@ -152,10 +152,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
 
     if paramVectors:
         vectorparams = {}
-        for reg in regions:
+        for reg in ['pbb', 'pcc']:
             for samp in vector_samples:
                 vectorparams['veff_%s_%s' % (samp, reg)] = rl.IndependentParameter('veff_%s_%s' % (samp, reg), 1, 0, 10)
 
+        from collections import defaultdict
+        ptbinconsistency = defaultdict(list)
         for ptbin in range(npt):
             for sName in vector_samples:
                 tot_templ = 0
@@ -165,7 +167,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     else:
                         tot_templ += np.sum(get_templ2(f, reg, sName, ptbin)[0])
 
-                for region in regions:
+                pqq_effect = []
+                for region in ['pbb', 'pcc']:
                     chlist = [ch.name for ch in model.channels]
                     chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
                     ch = model[chid]
@@ -176,21 +179,48 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                         templ = get_templ2(f, region, sName, ptbin)
 
                     norm_templ = templ[0].sum() / tot_templ
+                    ptbinconsistency[(sName, region)].append(norm_templ)
                     scale_templ = templ[0] * tot_templ / templ[0].sum()
-                    #templ = (scale_templ, templ[1], templ[2])
-                    templ = (templ[0]*0.5, templ[1], templ[2])
+                    templ = (scale_templ, templ[1], templ[2])
+                    # templ = (templ[0], templ[1], templ[2])
 
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                    # Cannot set veff along with r
-                    if sName not in ['zcc']:
-                        sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)],
-                                              1 * vectorparams['veff_%s_%s' % (sName, region)])
+                    effect = norm_templ * vectorparams['veff_%s_%s' % (sName, region)]
+                    sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)], effect)
+                    pqq_effect.append(effect)
 
                     sample.setParamEffect(sys_lumi, 1.023)
                     #print("Add", sample)
                     ch.addSample(sample)
+
+                for region in ['pqq']:
+                    chlist = [ch.name for ch in model.channels]
+                    chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
+                    ch = model[chid]
+
+                    if use_matched:
+                        templ = get_templ2M(f, region, sName, ptbin)
+                    else:
+                        templ = get_templ2(f, region, sName, ptbin)
+
+                    norm_templ = templ[0].sum() / tot_templ
+                    ptbinconsistency[(sName, region)].append(norm_templ)
+                    scale_templ = templ[0] * tot_templ / templ[0].sum()
+                    templ = (scale_templ, templ[1], templ[2])
+                    # templ = (templ[0], templ[1], templ[2])
+
+                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                    sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+
+                    effect = 1 - pqq_effect[0] - pqq_effect[1]
+                    sample.setParamEffect(vectorparams['veff_%s_pcc' % sName], effect)  # pcc or pbb could go here
+
+                    sample.setParamEffect(sys_lumi, 1.023)
+                    #print("Add", sample)
+                    ch.addSample(sample)
+        print(ptbinconsistency)
 
     if fitTF:
         tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (2, 2), ['pt', 'rho'],
