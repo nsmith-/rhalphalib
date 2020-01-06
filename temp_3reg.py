@@ -163,8 +163,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
             pbb_nom = tot_region['pbb'] / tot_templ
             pcc_nom = tot_region['pcc'] / tot_templ
             pqq_nom = tot_region['pqq'] / tot_templ
-            pbbscaled = rl.IndependentParameter('veff_%s_pbb_scaled' % sName, pbb_nom, 0, 1)
             pcc = rl.IndependentParameter('veff_%s_pcc' % sName, pcc_nom, 0, 1)
+            pbbscaled = rl.IndependentParameter('veff_%s_pbb_scaled' % sName, pbb_nom / (1 - pcc_nom), 0, 1)
             pbb = pbbscaled * (1 - pcc)
             pqq = 1 - pbb - pcc
             vscalefactors['pbb'] = (pbbscaled, pbb * (1 / pbb_nom))
