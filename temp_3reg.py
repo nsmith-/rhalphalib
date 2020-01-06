@@ -1,4 +1,5 @@
 from __future__ import print_function, division
+from collections import defaultdict
 import rhalphalib as rl
 import numpy as np
 import pickle
@@ -47,6 +48,10 @@ def get_templ2M(f, region, sample, ptbin, syst=None, read_sumw2=False):
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVectors):
     #fitTF = False
+    if use_matched:
+        get_templ = get_templ2M
+    else:
+        get_templ = get_templ2
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -112,10 +117,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                 mask[10:14] = False
             
             for sName in include_samples:
-                if use_matched:
-                    templ = get_templ2M(f, region, sName, ptbin)
-                else:
-                    templ = get_templ2(f, region, sName, ptbin)
+                templ = get_templ(f, region, sName, ptbin)
                 stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -136,10 +138,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                 if "qcd" not in MC_samples:
                     MC_samples = MC_samples + ['qcd']
                 for samp in MC_samples + vector_samples:
-                    if use_matched:
-                        yields.append(get_templ2M(f, region, samp, ptbin)[0])
-                    else:
-                        yields.append(get_templ2(f, region, samp, ptbin)[0])
+                    yields.append(get_templ(f, region, samp, ptbin)[0])
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
                     yields = np.random.poisson(yields)
@@ -151,45 +150,38 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
             ch.mask = mask
 
     if paramVectors:
-        vectorparams = {}
-        for reg in ['pbb', 'pcc']:
-            for samp in vector_samples:
-                vectorparams['veff_%s_%s' % (samp, reg)] = rl.IndependentParameter('veff_%s_%s' % (samp, reg), 1, 0, 10)
-
-        from collections import defaultdict
-        ptbinconsistency = defaultdict(list)
-        for ptbin in range(npt):
-            for sName in vector_samples:
-                tot_templ = 0
+        for sName in vector_samples:
+            tot_templ = 0
+            tot_region = defaultdict(float)
+            for ptbin in range(npt):
                 for reg in regions:
-                    if use_matched:
-                        tot_templ += np.sum(get_templ2M(f, reg, sName, ptbin)[0])
-                    else:
-                        tot_templ += np.sum(get_templ2(f, reg, sName, ptbin)[0])
+                    norm = np.sum(get_templ(f, reg, sName, ptbin)[0])
+                    tot_templ += norm
+                    tot_region[reg] += norm
+            
+            vectorparams = {}
+            for reg in ['pbb', 'pcc']:
+                nom = tot_region[reg] / tot_templ
+                vectorparams['veff_%s_%s' % (sName, reg)] = rl.IndependentParameter('veff_%s_%s' % (sName, reg), nom, 0, 1)
+                print(nom, 'veff_%s_%s' % (sName, reg))
 
-                pqq_effect = []
+            for ptbin in range(npt):
                 for region in ['pbb', 'pcc']:
                     chlist = [ch.name for ch in model.channels]
                     chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
                     ch = model[chid]
 
-                    if use_matched:
-                        templ = get_templ2M(f, region, sName, ptbin)
-                    else:
-                        templ = get_templ2(f, region, sName, ptbin)
+                    templ = get_templ(f, region, sName, ptbin)
 
-                    norm_templ = templ[0].sum() / tot_templ
-                    ptbinconsistency[(sName, region)].append(norm_templ)
+                    norm_templ = templ[0].sum() / tot_region[region]
                     scale_templ = templ[0] * tot_templ / templ[0].sum()
                     templ = (scale_templ, templ[1], templ[2])
-                    # templ = (templ[0], templ[1], templ[2])
 
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
                     effect = norm_templ * vectorparams['veff_%s_%s' % (sName, region)]
                     sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)], effect)
-                    pqq_effect.append(effect)
 
                     sample.setParamEffect(sys_lumi, 1.023)
                     #print("Add", sample)
@@ -200,27 +192,21 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
                     ch = model[chid]
 
-                    if use_matched:
-                        templ = get_templ2M(f, region, sName, ptbin)
-                    else:
-                        templ = get_templ2(f, region, sName, ptbin)
+                    templ = get_templ(f, region, sName, ptbin)
 
-                    norm_templ = templ[0].sum() / tot_templ
-                    ptbinconsistency[(sName, region)].append(norm_templ)
+                    norm_templ = templ[0].sum() / tot_region[region]
                     scale_templ = templ[0] * tot_templ / templ[0].sum()
                     templ = (scale_templ, templ[1], templ[2])
-                    # templ = (templ[0], templ[1], templ[2])
 
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                    effect = 1 - pqq_effect[0] - pqq_effect[1]
+                    effect = norm_templ * (1 - vectorparams['veff_%s_pcc' % sName] - vectorparams['veff_%s_pbb' % sName])
                     sample.setParamEffect(vectorparams['veff_%s_pcc' % sName], effect)  # pcc or pbb could go here
 
                     sample.setParamEffect(sys_lumi, 1.023)
                     #print("Add", sample)
                     ch.addSample(sample)
-        print(ptbinconsistency)
 
     if fitTF:
         tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (2, 2), ['pt', 'rho'],
