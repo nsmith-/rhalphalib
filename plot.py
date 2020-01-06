@@ -360,6 +360,7 @@ for shape_type in shape_types:
     for region in regions:
         print("Plotting {} region".format(region))
         for i in range(0, 6):
+            continue
             cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
             try:
                 cat = f[cat_name]

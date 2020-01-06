@@ -304,6 +304,8 @@ if __name__ == '__main__':
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
 
     args = parser.parse_args()
+    print("Running with options:")
+    print("    ", args)
 
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
