@@ -203,10 +203,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     ch.addSample(sample)
 
     if fitTF:
-        tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (2, 2), ['pt', 'rho'],
-                                            limits=(0, 10))
-        tf2_dataResidual = rl.BernsteinPoly("tf_dataResidual_bb", (2, 2), ['pt', 'rho'],
-                                            limits=(0, 10))
+        tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (1, 3), ['pt', 'rho'],
+                                            limits=(-10, 10))
+        tf2_dataResidual = rl.BernsteinPoly("tf_dataResidual_bb", (1, 3), ['pt', 'rho'],
+                                            limits=(-10, 10))
         tf1_dataResidual_params = tf1_dataResidual(ptscaled, rhoscaled)
         tf2_dataResidual_params = tf2_dataResidual(ptscaled, rhoscaled)
 
