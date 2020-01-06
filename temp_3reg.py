@@ -173,14 +173,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
 
                     templ = get_templ(f, region, sName, ptbin)
 
-                    norm_templ = templ[0].sum() / tot_region[region]
-                    scale_templ = templ[0] * tot_templ / templ[0].sum()
-                    templ = (scale_templ, templ[1], templ[2])
-
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                    effect = norm_templ * vectorparams['veff_%s_%s' % (sName, region)]
+                    inverse_nom = tot_templ / tot_region[region]
+                    effect = inverse_nom * vectorparams['veff_%s_%s' % (sName, region)]
                     sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)], effect)
 
                     sample.setParamEffect(sys_lumi, 1.023)
@@ -194,14 +191,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
 
                     templ = get_templ(f, region, sName, ptbin)
 
-                    norm_templ = templ[0].sum() / tot_region[region]
-                    scale_templ = templ[0] * tot_templ / templ[0].sum()
-                    templ = (scale_templ, templ[1], templ[2])
-
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                    effect = norm_templ * (1 - vectorparams['veff_%s_pcc' % sName] - vectorparams['veff_%s_pbb' % sName])
+                    inverse_nom = tot_templ / tot_region[region]
+                    effect = inverse_nom * (1 - vectorparams['veff_%s_pcc' % sName] - vectorparams['veff_%s_pbb' % sName])
                     sample.setParamEffect(vectorparams['veff_%s_pcc' % sName], effect)  # pcc or pbb could go here
 
                     sample.setParamEffect(sys_lumi, 1.023)
