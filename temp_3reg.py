@@ -159,48 +159,31 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                     tot_templ += norm
                     tot_region[reg] += norm
             
-            vectorparams = {}
-            for reg in ['pbb', 'pcc']:
-                nom = tot_region[reg] / tot_templ
-                vectorparams['veff_%s_%s' % (sName, reg)] = rl.IndependentParameter('veff_%s_%s' % (sName, reg), nom, 0, 1)
-                print(nom, 'veff_%s_%s' % (sName, reg))
+            vscalefactors = {}
+            pbb_nom = tot_region['pbb'] / tot_templ
+            pcc_nom = tot_region['pcc'] / tot_templ
+            pqq_nom = tot_region['pqq'] / tot_templ
+            pbbscaled = rl.IndependentParameter('veff_%s_pbb_scaled' % sName, pbb_nom, 0, 1)
+            pcc = rl.IndependentParameter('veff_%s_pcc' % sName, pcc_nom, 0, 1)
+            pbb = pbbscaled * (1 - pcc)
+            pqq = 1 - pbb - pcc
+            vscalefactors['pbb'] = (pbbscaled, pbb * (1 / pbb_nom))
+            vscalefactors['pcc'] = (pcc, pcc * (1 / pcc_nom))
+            vscalefactors['pqq'] = (pcc, pqq * (1 / pqq_nom))
 
             for ptbin in range(npt):
-                for region in ['pbb', 'pcc']:
-                    chlist = [ch.name for ch in model.channels]
-                    chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
-                    ch = model[chid]
+                for region in ['pbb', 'pcc', 'pqq']:
+                    ch = model["ptbin%d%s" % (ptbin, region)]
 
                     templ = get_templ(f, region, sName, ptbin)
 
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
                     sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-                    inverse_nom = tot_templ / tot_region[region]
-                    effect = inverse_nom * vectorparams['veff_%s_%s' % (sName, region)]
-                    sample.setParamEffect(vectorparams['veff_%s_%s' % (sName, region)], effect)
-
+                    sample.setParamEffect(*vscalefactors[region])
                     sample.setParamEffect(sys_lumi, 1.023)
-                    #print("Add", sample)
                     ch.addSample(sample)
 
-                for region in ['pqq']:
-                    chlist = [ch.name for ch in model.channels]
-                    chid = chlist[chlist.index("ptbin%d%s" % (ptbin, region))]
-                    ch = model[chid]
-
-                    templ = get_templ(f, region, sName, ptbin)
-
-                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
-                    sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
-
-                    inverse_nom = tot_templ / tot_region[region]
-                    effect = inverse_nom * (1 - vectorparams['veff_%s_pcc' % sName] - vectorparams['veff_%s_pbb' % sName])
-                    sample.setParamEffect(vectorparams['veff_%s_pcc' % sName], effect)  # pcc or pbb could go here
-
-                    sample.setParamEffect(sys_lumi, 1.023)
-                    #print("Add", sample)
-                    ch.addSample(sample)
 
     if fitTF:
         tf1_dataResidual = rl.BernsteinPoly("tf_dataResidual_cc", (1, 3), ['pt', 'rho'],
