@@ -112,13 +112,22 @@ class TemplateSample(Sample):
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
         self._paramEffectScales = {}
+        self._extra_dependencies = set()
+
+    def show(self):
+        print(self._nominal)
+
+    def scale(self, _scale):
+        self._nominal *= _scale
 
     @property
     def parameters(self):
         '''
         Set of independent parameters that affect this sample
         '''
-        return set(self._paramEffectsUp.keys())
+        pset = set(self._paramEffectsUp.keys())
+        pset.update(self._extra_dependencies)
+        return pset
 
     def setParamEffect(self, param, effect_up, effect_down=None, scale=None):
         '''
@@ -137,8 +146,12 @@ class TemplateSample(Sample):
         '''
         if not isinstance(param, NuisanceParameter):
             if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
-                if effect_up.getDependents(deep=True) != {param}:
-                    raise NotImplementedError("Support for normalization modifier dependent on multiple parameters... just use ParametericSample")
+                extras = effect_up.getDependents() - {param}
+                if not all(isinstance(p, IndependentParameter) for p in extras):
+                    raise ValueError("Normalization effects can only depend on one or more IndependentParameters")
+                self._extra_dependencies.update(extras)
+                for extra in extras:
+                    self._paramEffectsUp[extra] = None
                 if effect_down is not None:
                     raise ValueError("Asymmetric normalization modifiers not supported. You can encode the effect in the dependent parameter")
                 effect_up.name = param.name + '_effect_' + self.name
@@ -311,7 +324,7 @@ class TemplateSample(Sample):
         A formatted string for placement into the combine datacard that represents
         the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         '''
-        if param not in self._paramEffectsUp:
+        if self._paramEffectsUp.get(param, None) is None:
             return '-'
         elif 'shape' in param.combinePrior:
             return '%.3f' % self._paramEffectScales.get(param, 1)
@@ -319,12 +332,13 @@ class TemplateSample(Sample):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
             channel, sample = self.name[:self.name.find('_')], self.name[self.name.find('_') + 1:]
-            formula = dep.formula(rendering=True).format(**{param.name: '@0'})
+            dependents = dep.getDependents()
+            formula = dep.formula(rendering=True).format(**{var.name: '@%d' % i for i, var in enumerate(dependents)})
             return '{0} rateParam {1} {2} {3} {4}'.format(dep.name,
                                                           channel,
                                                           sample,
                                                           formula,
-                                                          param.name,
+                                                          ",".join(p.name for p in dependents),
                                                           )
         else:
             # TODO the scaling here depends on the prior of the nuisance parameter
