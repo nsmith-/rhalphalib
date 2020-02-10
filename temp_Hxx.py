@@ -305,7 +305,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     sample.setParamEffect(sys_veff,
                                           1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
                 if sName not in ["qcd", "tqq", "wqq", "zqq"]:
-                    #sample.scale(SF2017['CC_SF'])
+                    sample.scale(SF2017['CC_SF'])
                     sample.setParamEffect(
                         sys_ddxeff,
                         ddx_SF(f, region, sName, ptbin, sys_name, mask, use_matched))
