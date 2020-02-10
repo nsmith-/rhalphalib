@@ -27,6 +27,10 @@ parser.add_argument("--3reg",
                     action='store_true',
                     dest='three_regions',
                     help="By default plots pass/fail region. Set to plot pqq/pcc/pbb")
+parser.add_argument("--mask",
+                    action='store_true',
+                    dest='mask',
+                    help="Mask Higgs bins")
 parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
@@ -136,6 +140,12 @@ def full_plot(cats, pseudo=True, fittype=""):
             np.array(xerr)[0][ugh.plot_bins],
             np.array(xerr)[1][ugh.plot_bins]
         ]
+        
+        if args.mask:
+            _y = y
+            _y[10:14] = np.nan
+        else:
+            _y = y
 
         ax.errorbar(x,
                     y,
@@ -158,7 +168,12 @@ def full_plot(cats, pseudo=True, fittype=""):
         return _x, _h, _var, [_xerr[0], _xerr[1]]
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
-        ax.step(bins, h, where='post', label=label, c=cdict[label], **kwargs)
+        if args.mask:
+            _h = h
+            _h[10:14] = np.nan
+        else:
+            _h = h
+        ax.step(bins, _h, where='post', label=label, c=cdict[label], **kwargs)
 
     # Sample proofing
     by_cat_samples = []
