@@ -28,9 +28,10 @@ SF2017 = {  # cristina Jun25
 }
 
 
-def ddx_SF(f, region, sName, ptbin, syst, mask, use_matched=False):
+def ddx_SF(f, region, sName, ptbin, mask, use_matched=False,
+           SF=SF2017['CC_SF'], SF_unc=SF2017['CC_SF_ERR']):
     if region == "pass":
-        return 1. + SF2017['CC_SF_ERR']/SF2017['CC_SF']
+        return 1. + SF_unc/SF
     else:
         if use_matched:
             _pass = get_templM(f, "pass", sName, ptbin)
@@ -43,7 +44,7 @@ def ddx_SF(f, region, sName, ptbin, syst, mask, use_matched=False):
             _fail = get_templ(f, "fail", sName, ptbin)
         _fail_rate = np.sum(_fail[0] * mask)
         if _fail_rate > 0:
-            return 1. - SF2017['CC_SF_ERR'] * (_pass_rate/_fail_rate)
+            return 1. - SF_unc * (_pass_rate/_fail_rate)
         else:
             return 1
 
@@ -119,9 +120,9 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
-                     blind=True, runhiggs=False):
-    fitTF = True
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
+                     scale_syst=True, smear_syst=True, systs=True,
+                     blind=True, runhiggs=False, fitTF=True):
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -132,6 +133,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
     sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2017', 'lnN')
 
     sys_ddxeff = rl.NuisanceParameter('CMS_eff_cc', 'lnN')
+    sys_ddxeffbb = rl.NuisanceParameter('CMS_eff_bb', 'lnN')
+    sys_ddxeffw = rl.NuisanceParameter('CMS_eff_w', 'lnN')
     sys_eleveto = rl.NuisanceParameter('CMS_gghcc_e_veto', 'lnN')
     sys_muveto = rl.NuisanceParameter('CMS_gghcc_m_veto', 'lnN')
 
@@ -250,7 +253,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
         for region in ['pass', 'fail']:
             ch = rl.Channel("ptbin%d%s" % (ptbin, region))
             model.addChannel(ch)
-            include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hbb']
+            if justZ:
+                include_samples = ['zcc']
+            else:
+                include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hbb']
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
@@ -268,9 +274,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     stype = rl.Sample.SIGNAL if sName in ['hcc'] else rl.Sample.BACKGROUND
                 else:
                     stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
-                
-                sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
+                sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+                #print(sName, region, ptbin,  np.sum(templ[0]))
                 # Systematics
                 sample.setParamEffect(sys_lumi, 1.023)
 
@@ -283,6 +289,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                 #     _dn = get_templ(f, region, sName, ptbin, syst=sys_name+"Down")
                 #     sample.setParamEffect(sys, _up[0], _dn[0])
 
+                #####################################################
                 sys_names = ['JES', "JER", 'Pu']
                 sys_list = [sys_JES, sys_JER, sys_Pu]
                 for sys_name, sys in zip(sys_names, sys_list):
@@ -293,43 +300,55 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     sample.setParamEffect(sys, _sys_ef)
 
                 # Sample specific
-                # if sName in ["hcc", "hqq"]:
-                #    sample.scale(2)
-                if sName not in ["qcd"]:
-                    sample.setParamEffect(sys_eleveto, 1.005)
-                    sample.setParamEffect(sys_muveto, 1.005)
-                    sample.setParamEffect(sys_lumi, 1.025)
-                    sample.setParamEffect(sys_trigger, 1.02)
-                if sName not in ["qcd", 'tqq']:
-                    sample.scale(SF2017['V_SF'])
-                    sample.setParamEffect(sys_veff,
-                                          1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
-                if sName not in ["qcd", "tqq", "wqq", "zqq"]:
-                    sample.scale(SF2017['CC_SF'])
-                    sample.setParamEffect(
-                        sys_ddxeff,
-                        ddx_SF(f, region, sName, ptbin, sys_name, mask, use_matched))
-                if sName.startswith("z"):
-                    sample.setParamEffect(sys_znormQ, 1.1)
-                    if ptbin >= 2:
-                        sample.setParamEffect(sys_znormEW, 1.07)
-                    else:
-                        sample.setParamEffect(sys_znormEW, 1.05)
-                if sName.startswith("w"):
-                    sample.setParamEffect(sys_znormQ, 1.1)
-                    # sample.setParamEffect(sys_wnormQ, 1.1)
-                    if ptbin >= 2:
-                        sample.setParamEffect(sys_znormEW, 1.07)
-                    else:
-                        sample.setParamEffect(sys_znormEW, 1.05)
-                    if ptbin >= 3:                        
-                        sample.setParamEffect(sys_wznormEW, 1.06)
-                    else:
-                        sample.setParamEffect(sys_wznormEW, 1.02)
-                if sName.startswith("h"):
-                    sample.setParamEffect(sys_Hpt, 1.2)
+                if systs:
+                    if sName not in ["qcd"]:
+                        sample.setParamEffect(sys_eleveto, 1.005)
+                        sample.setParamEffect(sys_muveto, 1.005)
+                        sample.setParamEffect(sys_lumi, 1.025)
+                        sample.setParamEffect(sys_trigger, 1.02)
+                    if sName not in ["qcd", 'tqq']:
+                        sample.scale(SF2017['V_SF'])
+                        sample.setParamEffect(sys_veff,
+                                            1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
+                    #if sName not in ["qcd", "tqq", "wqq", "zqq"]:
+                    if sName in ["zcc", "hcc"]:
+                        sample.scale(SF2017['CC_SF'])
+                        sample.setParamEffect(
+                            sys_ddxeff,
+                            ddx_SF(f, region, sName, ptbin, mask, use_matched, SF_unc=0.3))
+                    if sName in ["zbb", "hbb"]:
+                        # 1 +- 0.3
+                        sample.setParamEffect(
+                            sys_ddxeffbb,
+                            ddx_SF(f, region, sName, ptbin, mask, use_matched,
+                                SF=1, SF_unc=0.3))
+                    if sName in ["wcq", "wqq"]:
+                        # 1 +- 0.3
+                        sample.setParamEffect(
+                            sys_ddxeffw,
+                            ddx_SF(f, region, sName, ptbin, mask, use_matched,
+                                SF=1, SF_unc=0.3))
+                    if sName.startswith("z"):
+                        sample.setParamEffect(sys_znormQ, 1.1)
+                        if ptbin >= 2:
+                            sample.setParamEffect(sys_znormEW, 1.07)
+                        else:
+                            sample.setParamEffect(sys_znormEW, 1.05)
+                    if sName.startswith("w"):
+                        sample.setParamEffect(sys_znormQ, 1.1)
+                        # sample.setParamEffect(sys_wnormQ, 1.1)
+                        if ptbin >= 2:
+                            sample.setParamEffect(sys_znormEW, 1.07)
+                        else:
+                            sample.setParamEffect(sys_znormEW, 1.05)
+                        if ptbin >= 3:                        
+                            sample.setParamEffect(sys_wznormEW, 1.06)
+                        else:
+                            sample.setParamEffect(sys_wznormEW, 1.02)
+                    if sName.startswith("h"):
+                        sample.setParamEffect(sys_Hpt, 1.2)
 
-                if scalesmear_syst and sName not in ["qcd", 'tqq']:
+                if scale_syst and sName not in ["qcd", 'tqq']:
                     # Scale and Smear
                     mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
@@ -349,16 +368,20 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                                           mtempl.get(shift=-7.)[0],
                                           scale=realshift/7.)
 
+                if smear_syst and sName not in ["qcd", 'tqq']:
                     # To Do
                     # Match to boson mass instead of mean
                     # smear_in, smear_unc = 1, 0.11
                     smear_in, smear_unc = SF2017['smear_SF'], SF2017['smear_SF_ERR']
+                    #smear_in, smear_unc = 1, 0.3
                     _smear_up = mtempl.get(scale=smear_in + 1 * smear_unc,
                                            shift=-mtempl.mean *
                                            (smear_in + 1 * smear_unc - 1))
+                    #print(_smear_up)
                     _smear_down = mtempl.get(scale=smear_in + -1 * smear_unc,
                                              shift=-mtempl.mean *
                                              (smear_in + -1 * smear_unc - 1))
+                    #print(_smear_down)
                     sample.setParamEffect(sys_smear, _smear_up[0], _smear_down[0])
 
                 ch.addSample(sample)
@@ -374,8 +397,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
                     include_samples = include_samples + ['qcd']
                 for samp in include_samples:
                     _temp_yields = get_templM(f, region, samp, ptbin)[0]
-                    if samp not in ['qcd', 'tqq']:
-                        _temp_yields *= SF2017['V_SF']            
+                    if samp not in ['qcd', 'tqq'] and systs:
+                        _temp_yields *= SF2017['V_SF']           
+                    #print("D", samp, region, ptbin, np.sum(_temp_yields))
                     yields.append(_temp_yields)
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
@@ -387,7 +411,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, scalesmear_syst, use_matched,
             # drop bins outside rho validity
             ch.mask = mask
 
-    if fitTF:   
+    if fitTF:
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
                                            limits=(0, 10))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
@@ -500,6 +524,12 @@ if __name__ == '__main__':
                         default='True',
                         choices={True, False},
                         help="If plotting data, redraw from poisson distribution")
+    
+    parser.add_argument("--fitTF",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Fit TF for QCD")
 
     parser.add_argument("--MCTF",
                         type=str2bool,
@@ -511,7 +541,25 @@ if __name__ == '__main__':
                         type=str2bool,
                         default='True',
                         choices={True, False},
-                        help="Include scale/smear systematics")
+                        help="Include scale systematic")
+
+    parser.add_argument("--smear",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Include smear systematics")
+
+    parser.add_argument("--systs",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Include all systematics (separate from scale/smear)")
+
+    parser.add_argument("--justZ",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Only run Z sample with QCD")
 
     parser.add_argument("--matched",
                         type=str2bool,
@@ -523,7 +571,7 @@ if __name__ == '__main__':
     pseudo = parser.add_mutually_exclusive_group(required=True)
     pseudo.add_argument('--data', action='store_false', dest='pseudo')
     pseudo.add_argument('--MC', action='store_true', dest='pseudo')
-    
+
     parser.add_argument('--unblind', action='store_true', dest='unblind')
     parser.add_argument('--higgs', action='store_true', dest='runhiggs', help="Set Higgs as signal instead of z")
 
@@ -534,8 +582,12 @@ if __name__ == '__main__':
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
-                     scalesmear_syst=args.scale,
+                     scale_syst=args.scale,
+                     smear_syst=args.smear,
+                     systs=args.systs,
                      use_matched=args.matched,
+                     justZ=args.justZ,
                      blind=(not args.unblind),
                      runhiggs=args.runhiggs,
+                     fitTF=args.fitTF,
                      )

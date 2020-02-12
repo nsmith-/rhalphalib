@@ -90,3 +90,14 @@ satisfies the requirements, however the CMSSW 8 recipe has a too old version of 
 There is a python 3 compatible standalone fork of combine [available](https://github.com/guitargeek/combine).
 It is also possible to render the model folder using the quickstart recipe, and then move the folder or switch
 environments to a CMSSW+combine environment and proceed from there.
+
+
+#################################
+##############################
+### Shit that worked
+```
+# For Zcc, all systs
+combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-1 --rMax=3  --cminDefaultMinimizerStrategy 0 --robustFit=1  -t -1 --toysFrequentist
+
+
+```
