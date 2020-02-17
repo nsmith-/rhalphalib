@@ -557,7 +557,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--justZ",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
                         help="Only run Z sample with QCD")
 

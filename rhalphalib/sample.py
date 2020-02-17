@@ -231,9 +231,10 @@ class TemplateSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
+        _mask_val = float(1e-20)
         nominalval = self._nominal.copy()
         if self.mask is not None:
-            nominalval[~self.mask] = 0.
+            nominalval[~self.mask] = _mask_val
         if nominal:
             return nominalval
         else:
@@ -447,9 +448,10 @@ class ParametericSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
+        _mask_val = float(1e-20)
         out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
-            out[~self.mask] = [IndependentParameter("masked", 0, constant=True) for _ in range((~self.mask).sum())]
+            out[~self.mask] = [IndependentParameter("masked", _mask_val, constant=True) for _ in range((~self.mask).sum())]
         if nominal:
             return np.array([p.value for p in out])
         else:

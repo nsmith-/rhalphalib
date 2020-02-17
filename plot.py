@@ -13,7 +13,17 @@ import mplhep as hep
 plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
 plt.switch_backend('agg')
 
-parser = argparse.ArgumentParser()
+def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
+parser = argparse.ArgumentParser()    
 parser.add_argument("-i",
                     "--input-file",
                     default='hxxModel/shapes.root',
@@ -35,6 +45,12 @@ parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
                     help="Folder to store plots - will be created if it doesn't exist.")
+parser.add_argument("--scaleH",
+                    type=str2bool,
+                    default='True',
+                    choices={True, False},
+                    help="Scale Higgs signal in plots by 100")
+
 
 pseudo = parser.add_mutually_exclusive_group(required=True)
 pseudo.add_argument('--data', action='store_false', dest='pseudo')
@@ -222,7 +238,10 @@ def full_plot(cats, pseudo=True, fittype=""):
 
     # Stack plots
     tot_h, bins = None, None
-    for mc in ['hqq', 'hcc', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']:
+    stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    if not args.scaleH:
+        stack_samples = ['hcc'] + stack_samples
+    for mc in stack_samples:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -233,6 +252,17 @@ def full_plot(cats, pseudo=True, fittype=""):
         else:
             plot_step(bins, h + tot_h, label=mc, ax=ax)
             tot_h += h
+
+    # Separate scaled signal
+    if args.scaleH:
+        for mc in ['hcc']:
+            if mc not in avail_samples:
+                continue
+            res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+            bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
+            plot_step(bins, h * 500, ax=ax, label=mc,
+                      linestyle='--')
+
 
     #######
     # Ratio plot
@@ -269,7 +299,10 @@ def full_plot(cats, pseudo=True, fittype=""):
 
     # Stack plots
     tot_h, bins = None, None
-    for mc in ['hqq', 'hcc', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']:
+    stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    if not args.scaleH:
+        stack_samples = ['hcc'] + stack_samples
+    for mc in stack_samples:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -281,9 +314,20 @@ def full_plot(cats, pseudo=True, fittype=""):
             plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
             tot_h += h
 
+    # Separate scaled signal
+    if args.scaleH:
+        for mc in ['hcc']:
+            if mc not in avail_samples:
+                continue
+            res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
+            bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
+            plot_step(bins, 500 * h / _scale_for_mc, ax=rax, label=mc,
+                      linestyle='--')
+
+
     ############
     # Style
-    ax = hep.cms.cmslabel(ax, data=(not pseudo))
+    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo))
     ax.legend(ncol=2)
 
     ax.set_ylabel('Events / 7GeV', ha='right', y=1)
@@ -345,6 +389,11 @@ def full_plot(cats, pseudo=True, fittype=""):
                 annotation_clip=False)
 
     # Leg sort
+    if args.scaleH:      
+        label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 5e2" 
+        # label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 100" 
+        # label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 100" 
+
     leg = ax.legend(*hep.plot.sort_legend(ax, label_dict), ncol=2, columnspacing=0.8)
     leg.set_title(title=fittype.capitalize(),prop={'size':"smaller"})
 

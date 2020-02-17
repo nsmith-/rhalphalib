@@ -51,7 +51,7 @@ python make_Hxx.py
 cmsenv
 bash build.sh
 combine -M FitDiagnostics hxxModel_combined.root
-combine -M FitDiagnostics tempModel_combined.root --saveNormalizations --saveShapes --setParameterRanges r=-1,3
+combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist # --freezeParameters=CMS_gghcc_scale,CMS_gghcc_smear
 
 python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnostics.root 
 
