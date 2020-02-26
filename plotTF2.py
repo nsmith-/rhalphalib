@@ -93,10 +93,12 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
 
     zmin, zmax = np.floor(10*np.min(TF))/10, np.ceil(10*np.max(TF))/10
     zmin, zmax = zmin + 0.001, zmax - 0.001
-    clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
+    clim = np.round(np.min([abs(zmin - 1), abs(zmax - 1)]), 1)
+    if clim < .3: clim = .3
+    if clim > .5: clm = .5
     levels = np.linspace(1-clim, 1+clim, 500)
-    
-    if np.min(TF) < 1-clim and np.max(TF) > 1+clim: _extend = 'both'
+
+    if np.min(TF) < 1-clim and np.max(TF) > 1+clim: _extend = 'both '
     elif np.max(TF) > 1+clim: _extend = 'max'
     elif np.min(TF) < 1-clim: _extend = 'min'  
     else: _extend = 'neither'
@@ -155,4 +157,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     if raw: 
         label = "MCRaw"
     import mplhep as hep
-    fig.savefig('{}.png'.format(out))#, bbox_inches="tight")
+    if out is not None:
+        fig.savefig('{}.png'.format(out))#, bbox_inches="tight")
+    else:
+        return fig
