@@ -60,8 +60,6 @@ PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --p
 
 combine -M Significance tempModel_combined.root
 ```
-And back in conda env:
-```
 python plot.py -i tempModel/shapes.root --data --fit postfit
 python plotTF.py -i tempModel/shapes.root --fit tempModel/fitDiagnostics.root
 ```
@@ -73,6 +71,18 @@ combineTool.py -M FitDiagnostics -m 125 -d tempModel_combined.root --there --cmi
 combineTool.py -M AsymptoticLimits -m 125 -d tempModel_combined.root --there -t -1 --expectSignal 1 --rMin=-50 --rMax=50
 
 combine -M FitDiagnostics -t -1 --expectSignal 0 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1
+```
+
+### Running Impacts
+```
+# Baseline
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 -t -1 --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP
+# Condor
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doFits --robustFit 1 --allPars --setParameterRanges r=-1,5  -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd MINIMIZER_analytic --job-mode condor --sub-opts='+JobFlavour = "workday"' --task-name ggHccFit --exclude 'rgx{}'
+# Collect
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --allPars -o impacts.json
+plotImpacts.py -i impacts.json -o impacts_out --transparent --blind
 ```
 
 ## Requirements

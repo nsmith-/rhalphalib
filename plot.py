@@ -45,6 +45,10 @@ parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
                     help="Folder to store plots - will be created if it doesn't exist.")
+parser.add_argument("--year",
+                    default=2017,
+                    help="year label")
+
 parser.add_argument("--scaleH",
                     type=str2bool,
                     default='True',
@@ -327,7 +331,7 @@ def full_plot(cats, pseudo=True, fittype=""):
 
     ############
     # Style
-    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo))
+    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year)
     ax.legend(ncol=2)
 
     ax.set_ylabel('Events / 7GeV', ha='right', y=1)

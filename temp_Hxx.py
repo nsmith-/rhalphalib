@@ -122,7 +122,7 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                      scale_syst=True, smear_syst=True, systs=True,
-                     blind=True, runhiggs=False, fitTF=True):
+                     blind=True, runhiggs=False, fitTF=True, year=2017):
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -157,7 +157,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     npt = len(ptbins) - 1
 
     # Template reading
-    f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+    if year == 2018:
+        print("Year: 2018")
+        f = uproot.open('hxx18/hist_1DZcc_pt_scalesmear.root')
+    else:
+        print("Year: 2017")
+        f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
 
     # Get QCD efficiency
     if MCTF:
@@ -185,7 +190,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # Separate out QCD to QCD fit
     if MCTF:
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
-                                      limits=(0, 10))
+                                      limits=(-50, 50))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
 
         for ptbin in range(npt):
@@ -247,7 +252,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
 
     # build actual fit model now
-    model = rl.Model("tempModel")
+    if year == 2018:
+        model_name = "temp18Model"
+    else:
+        model_name = "tempModel"
+    
+    model = rl.Model(model_name)
 
     for ptbin in range(npt):
         for region in ['pass', 'fail']:
@@ -290,17 +300,17 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                 #     sample.setParamEffect(sys, _up[0], _dn[0])
 
                 #####################################################
-                sys_names = ['JES', "JER", 'Pu']
-                sys_list = [sys_JES, sys_JER, sys_Pu]
-                for sys_name, sys in zip(sys_names, sys_list):
-                    if use_matched:
-                        _sys_ef = shape_to_numM(f, region, sName, ptbin, sys_name, mask)
-                    else:
-                        _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
-                    sample.setParamEffect(sys, _sys_ef)
-
-                # Sample specific
                 if systs:
+                    sys_names = ['JES', "JER", 'Pu']
+                    sys_list = [sys_JES, sys_JER, sys_Pu]
+                    for sys_name, sys in zip(sys_names, sys_list):
+                        if use_matched:
+                            _sys_ef = shape_to_numM(f, region, sName, ptbin, sys_name, mask)
+                        else:
+                            _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
+                        sample.setParamEffect(sys, _sys_ef)
+
+                    # Sample specific            
                     if sName not in ["qcd"]:
                         sample.setParamEffect(sys_eleveto, 1.005)
                         sample.setParamEffect(sys_muveto, 1.005)
@@ -413,7 +423,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     if fitTF:
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
-                                           limits=(0, 10))
+                                           limits=(-50, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
             tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
@@ -499,10 +509,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
     # tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
-    with open("tempModel.pkl", "wb") as fout:
+    with open("{}.pkl".format(model_name), "wb") as fout:
         pickle.dump(model, fout)
 
-    model.renderCombine("tempModel")
+    model.renderCombine(model_name)
 
 
 if __name__ == '__main__':
@@ -561,6 +571,11 @@ if __name__ == '__main__':
                         choices={True, False},
                         help="Only run Z sample with QCD")
 
+    parser.add_argument("--year",
+                        type=int,
+                        default=2017,
+                        help="Year")
+
     parser.add_argument("--matched",
                         type=str2bool,
                         default='True',
@@ -590,4 +605,5 @@ if __name__ == '__main__':
                      blind=(not args.unblind),
                      runhiggs=args.runhiggs,
                      fitTF=args.fitTF,
+                     year=args.year
                      )
