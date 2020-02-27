@@ -190,7 +190,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # Separate out QCD to QCD fit
     if MCTF:
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
-                                      limits=(-50, 50))
+                                      limits=(-20, 20))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
 
         for ptbin in range(npt):
@@ -241,12 +241,14 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         _values = [par.value for par in tf_MCtempl.parameters.flatten()]
         _names = [par.name for par in tf_MCtempl.parameters.flatten()]
         make_dirs('tempModel')
+        np.save('tempModel/MCTF', _values)
         plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True,
                  out='tempModel/MCTF')
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
             tf_MCtempl.name + '_deco', qcdfit, param_names)
+        np.save('tempModel/decoVector', decoVector._transform)
         tf_MCtempl.parameters = decoVector.correlated_params.reshape(
             tf_MCtempl.parameters.shape)
         tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
@@ -270,7 +272,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
-                if blind:
+                if blind and 'hbb' in include_samples:
+                    include_samples.remove('hbb')
                     mask[10:14] = False
 
             if not fitTF:  # Add QCD sample when not running TF fit
@@ -423,7 +426,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     if fitTF:
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
-                                           limits=(-50, 50))
+                                           limits=(-20, 20))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
             tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params

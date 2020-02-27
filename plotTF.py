@@ -1,4 +1,5 @@
 import argparse
+import os
 from operator import methodcaller
 
 import uproot
@@ -193,12 +194,17 @@ if __name__ == '__main__':
     np.seterr(divide='ignore', invalid='ignore')
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("-d",
+                        "--dir",
+                        default='',
+                        help="Model/Fit dir")
+
     parser.add_argument("-i",
                         "--input-file",
-                        default='tempModel/shapes.root',
+                        default='shapes.root',
                         help="Input shapes file")
     parser.add_argument("-f", "--fit",
-                        default='tempModel/fitDiagnostics.root',
+                        default='fitDiagnostics.root',
                         dest='fit',
                         help="fitDiagnostics file")
 
@@ -208,11 +214,12 @@ if __name__ == '__main__':
                         help="Folder to store plots - will be created ? doesn't exist.")
 
     args = parser.parse_args()
-
+    if args.output_folder.split("/")[0] != args.dir:
+        args.output_folder = os.path.join(args.dir, args.output_folder)
     make_dirs(args.output_folder)
 
     # Get fitDiagnostics File
-    rf = r.TFile.Open(args.fit)
+    rf = r.TFile.Open(os.path.join(args.dir, args.fit))
 
     # Get TF parameters
     hmp = []
@@ -246,14 +253,14 @@ if __name__ == '__main__':
     # Smooth plots
     from plotTF2 import plotTF as plotTFsmooth
     from plotTF2 import TF_smooth_plot, TF_params
-    print(hmp, MCTF)
     _values = hmp
-    #_names = [n for n in par_names if "deco" not in n]
     plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False,
                  out='{}/TF_data'.format(args.output_folder))
-    _values = np.array(MCTF) + 1
-    #_names = [n for n in par_names if "deco" in n]
-    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=True,
+
+    _vect = np.load('decoVector.npy')
+    _MCTF_nominal = np.load('MCTF.npy')
+    _values = _values = _vect.dot(np.array(MCTF)) + _MCTF_nominal
+    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=False,
                  out='{}/TF_MC'.format(args.output_folder))
 
     # Define bins
@@ -299,17 +306,17 @@ if __name__ == '__main__':
     pTF = pad2d(TFres)
     pvb = pad2d(validbins).astype(bool)
 
-    if len(MCTF) > 0:
-        pMCTF = pad2d(MCTFres)
-        plotTF(1+pMCTF, pmsd, ppt, mask=pvb, MC=True)
+    # if len(MCTF) > 0:
+    #     pMCTF = pad2d(MCTFres)
+    #     plotTF(1+pMCTF, pmsd, ppt, mask=pvb, MC=True)
 
-    # Plot TF
-    plotTF(pTF, pmsd, ppt)
-    plotTF(pTF, pmsd, ppt, mask=pvb, MC=False)
+    # # Plot TF
+    # plotTF(pTF, pmsd, ppt)
+    # plotTF(pTF, pmsd, ppt, mask=pvb, MC=False)
 
     # Get Info from Shapes
     # Build 2D
-    f = uproot.open(args.input_file)
+    f = uproot.open(os.path.join(args.dir, args.input_file))
     region = 'prefit'
     fail_qcd, pass_qcd = [], []
     bins = []

@@ -14,6 +14,7 @@ Take a look at the folders `testModel` and `monojetModel`.
 ### Hcc
 Following the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version) from combine. and clone to CMSSW environment.
 ```
+export SCRAM_ARCH=slc7_amd64_gcc700
 cd CMSSW_10_2_13/src
 cmsenv
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
