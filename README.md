@@ -26,43 +26,38 @@ scramv1 b clean; scramv1 b
 
 git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester
 scram b -j8
+```
+Then get the workspace maker
 
 ```
-Then ideally in a separte window (no `cmsenv`) if you don't have conda setup, install conda (will manage all your packages, needs few GB of space)
-```
-wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh
-```
-Setup a new environment to keep pacakges separate. Root needs to be 6.16
-```
-conda create -n myenv python
-conda activate myenv
-conda config --add channels conda-forge
-conda install root==6.16
-```
-
-```
+cmsenv
 git clone git@github.com:andrzejnovak/rhalphalib.git
 cd rhalphalib
 git fetch
 git checkout -b origin/hxx
-python make_Hxx.py
+# Need to update some packages against the ones in CMSSW (might need a few more)
+pip install uproot --user --upgrade
+pip install matplotlib --user --upgrade
+pip install mplhep --user
+# Run
+python temp_Hxx.py # Must chose --data or --MC, other options get printed
 
-# Go to hxxModel/ and source cmsenv to get combine
+# Go to tempModel/
 cmsenv
 bash build.sh
-combine -M FitDiagnostics hxxModel_combined.root
-combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist # --freezeParameters=CMS_gghcc_scale,CMS_gghcc_smear
 
+combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist
+combine -M Significance tempModel_combined.root
 python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnostics.root 
 
-# To extract shapes/norms use combine harvester
-PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
 
-combine -M Significance tempModel_combined.root
 ```
-python plot.py -i tempModel/shapes.root --data --fit postfit
-python plotTF.py -i tempModel/shapes.root --fit tempModel/fitDiagnostics.root
+## To extract shapes/norms use combine harvester and make plots
+```
+PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
+# If withing the model dir
+python ../plot.py --data 
+python ../plotTF.py --data
 ```
 
 
