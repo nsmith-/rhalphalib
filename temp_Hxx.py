@@ -322,8 +322,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                     if sName not in ["qcd", 'tqq']:
                         sample.scale(SF2017['V_SF'])
                         sample.setParamEffect(sys_veff,
-                                            1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
-                    #if sName not in ["qcd", "tqq", "wqq", "zqq"]:
+                                            #1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
+                                            1.3)
                     if sName in ["zcc", "hcc"]:
                         sample.scale(SF2017['CC_SF'])
                         sample.setParamEffect(
@@ -349,7 +349,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                             sample.setParamEffect(sys_znormEW, 1.05)
                     if sName.startswith("w"):
                         sample.setParamEffect(sys_znormQ, 1.1)
-                        # sample.setParamEffect(sys_wnormQ, 1.1)
                         if ptbin >= 2:
                             sample.setParamEffect(sys_znormEW, 1.07)
                         else:

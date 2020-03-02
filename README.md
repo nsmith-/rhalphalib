@@ -15,6 +15,7 @@ Take a look at the folders `testModel` and `monojetModel`.
 Following the [recipe](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version) from combine. and clone to CMSSW environment.
 ```
 export SCRAM_ARCH=slc7_amd64_gcc700
+cmsrel CMSSW_10_2_13
 cd CMSSW_10_2_13/src
 cmsenv
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
@@ -34,7 +35,7 @@ cmsenv
 git clone git@github.com:andrzejnovak/rhalphalib.git
 cd rhalphalib
 git fetch
-git checkout -b origin/hxx
+git checkout origin/hxxdev
 # Need to update some packages against the ones in CMSSW (might need a few more)
 pip install uproot --user --upgrade
 pip install matplotlib --user --upgrade
@@ -47,7 +48,7 @@ cmsenv
 bash build.sh
 
 combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist
-combine -M Significance tempModel_combined.root
+combine -M Significance tempModel_combined.root --expectSignal 1  -t -1 --toysFrequentist
 python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnostics.root 
 
 
