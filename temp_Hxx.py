@@ -190,7 +190,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # Separate out QCD to QCD fit
     if MCTF:
         tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
-                                      limits=(-20, 20))
+                                      limits=(-50, 50))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
 
         for ptbin in range(npt):
@@ -426,7 +426,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     if fitTF:
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
-                                           limits=(-20, 20))
+                                           limits=(-50, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
             tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params

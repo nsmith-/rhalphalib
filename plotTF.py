@@ -198,7 +198,6 @@ if __name__ == '__main__':
                         "--dir",
                         default='',
                         help="Model/Fit dir")
-
     parser.add_argument("-i",
                         "--input-file",
                         default='shapes.root',

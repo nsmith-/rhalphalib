@@ -1,4 +1,5 @@
 import argparse
+import os
 from collections import OrderedDict
 
 import uproot
@@ -23,10 +24,14 @@ def str2bool(v):
         else:
             raise argparse.ArgumentTypeError('Boolean value expected.')
 
-parser = argparse.ArgumentParser()    
+parser = argparse.ArgumentParser()  
+parser.add_argument("-d",
+                    "--dir",
+                    default='',
+                    help="Model/Fit dir")  
 parser.add_argument("-i",
                     "--input-file",
-                    default='hxxModel/shapes.root',
+                    default='shapes.root',
                     help="Input shapes file")
 parser.add_argument("--fit",
                     default=None,
@@ -61,7 +66,8 @@ pseudo.add_argument('--data', action='store_false', dest='pseudo')
 pseudo.add_argument('--MC', action='store_true', dest='pseudo')
 
 args = parser.parse_args()
-
+if args.output_folder.split("/")[0] != args.dir:
+    args.output_folder = os.path.join(args.dir, args.output_folder)
 make_dirs(args.output_folder)
 
 cdict = {
@@ -105,7 +111,7 @@ label_dict = OrderedDict({
 })
 
 
-def full_plot(cats, pseudo=True, fittype=""):
+def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Determine:
     if "pass" in str(cats[0].name) or "fail" in str(cats[0].name):
@@ -161,7 +167,7 @@ def full_plot(cats, pseudo=True, fittype=""):
             np.array(xerr)[1][ugh.plot_bins]
         ]
         
-        if args.mask:
+        if mask:
             _y = y
             _y[10:14] = np.nan
         else:
@@ -188,7 +194,7 @@ def full_plot(cats, pseudo=True, fittype=""):
         return _x, _h, _var, [_xerr[0], _xerr[1]]
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
-        if args.mask:
+        if mask:
             _h = h
             _h[10:14] = np.nan
         else:
@@ -422,11 +428,12 @@ if args.three_regions:
 else:
     regions = ['pass', 'fail']
 
-f = uproot.open(args.input_file)
+f = uproot.open(os.path.join(args.dir, args.input_file))
 for shape_type in shape_types:
     pbins = [450, 500, 550, 600, 675, 800, 1200]
     for region in regions:
         print("Plotting {} region".format(region))
+        mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
             continue
             cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
@@ -437,9 +444,9 @@ for shape_type in shape_types:
                                 "namespaces were found in the file: {}".format(
                                     args.fit, f.keys()))
 
-            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type)
+            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask)
         full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
-                   pseudo=args.pseudo, fittype=shape_type)
+                   pseudo=args.pseudo, fittype=shape_type, mask=mask)
         # MuonCR if included
         try:
             cat = f['muonCR{}_{};1'.format(region, shape_type)]

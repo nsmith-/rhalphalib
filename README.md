@@ -77,10 +77,9 @@ combine -M FitDiagnostics -t -1 --expectSignal 0 -d tempModel_combined.root --rM
 ### Running Impacts
 ```
 # Baseline
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 -t -1 --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doInitialFit --robustFit 1 --setParameterRanges r=-1,5 --cminDefaultMinimizerStrategy 0 --X-rtd FITTER_DYN_STEP --expectSignal 1 -t -1 --toysFrequentist 
 # Condor
-combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doFits --robustFit 1 --allPars --setParameterRanges r=-1,5  -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd MINIMIZER_analytic --job-mode condor --sub-opts='+JobFlavour = "workday"' --task-name ggHccFit --exclude 'rgx{}'
+combineTool.py -M Impacts -d tempModel_combined.root -m 125 --doFits --robustFit 1 --allPars --setParameterRanges r=-1,5  -t -1 --toysFrequentist --expectSignal 1 --cminDefaultMinimizerStrategy 0 --X-rtd MINIMIZER_analytic --job-mode condor --sub-opts='+JobFlavour = "workday"' --task-name ggHccFit --exclude 'rgx{qcdparams*}'
 # Collect
 combineTool.py -M Impacts -d tempModel_combined.root -m 125 --allPars -o impacts.json
 plotImpacts.py -i impacts.json -o impacts_out --transparent --blind
