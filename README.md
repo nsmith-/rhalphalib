@@ -25,6 +25,7 @@ git fetch origin
 git checkout v8.0.1
 scramv1 b clean; scramv1 b
 
+cd $CMSSW_BASE/src/
 git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester
 scram b -j8
 ```
@@ -32,6 +33,7 @@ Then get the workspace maker
 
 ```
 cmsenv
+cd $CMSSW_BASE/src/
 git clone git@github.com:andrzejnovak/rhalphalib.git
 cd rhalphalib
 git fetch
@@ -47,15 +49,15 @@ python temp_Hxx.py # Must chose --data or --MC, other options get printed
 cmsenv
 bash build.sh
 
-combine -M FitDiagnostics --expectSignal 1 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist
-combine -M Significance tempModel_combined.root --expectSignal 1  -t -1 --toysFrequentist
+combine -M FitDiagnostics --expectSignal 1 -d model_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist
+combine -M Significance model_combined.root --expectSignal 1  -t -1 --toysFrequentist
 python ../HiggsAnalysis/CombinedLimit/test/diffNuisances.py tempModel/fitDiagnostics.root 
 
 
 ```
 ## To extract shapes/norms use combine harvester and make plots
 ```
-PostFitShapesFromWorkspace -w tempModel_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
+PostFitShapesFromWorkspace -w model_combined.root -o shapes.root --print --postfit --sampling -f fitDiagnostics.root:fit_s
 # If withing the model dir
 python ../plot.py --data 
 python ../plotTF.py --data
@@ -64,8 +66,8 @@ python ../plotTF.py --data
 
 ### OTHER IMPORTANT COMMANDS
 ```
-combineTool.py -M FitDiagnostics -m 125 -d tempModel_combined.root --there --cminDefaultMinimizerStrategy 0 -t -1 --expectSignal 1
-combineTool.py -M AsymptoticLimits -m 125 -d tempModel_combined.root --there -t -1 --expectSignal 1 --rMin=-50 --rMax=50
+combineTool.py -M FitDiagnostics -m 125 -d model_combined.root --there --cminDefaultMinimizerStrategy 0 -t -1 --expectSignal 1
+combineTool.py -M AsymptoticLimits -m 125 -d model_combined.root --there -t -1 --expectSignal 1 --rMin=-50 --rMax=50
 
 combine -M FitDiagnostics -t -1 --expectSignal 0 -d tempModel_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1
 ```

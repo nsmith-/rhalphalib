@@ -337,7 +337,17 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     ############
     # Style
-    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year)
+    lumi = {
+    "2016" : 35.5,
+    "2017" : 41.5,
+    "2018" : 59.2,
+    }
+    lumi_mu = {
+        "2016" : 35.2,
+        "2017" : 41.1,
+        "2018" : 59.0,
+    }
+    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year, lumi=lumi[args.year])
     ax.legend(ncol=2)
 
     ax.set_ylabel('Events / 7GeV', ha='right', y=1)

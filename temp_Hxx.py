@@ -159,10 +159,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # Template reading
     if year == 2018:
         print("Year: 2018")
-        f = uproot.open('hxx18/hist_1DZcc_pt_scalesmear.root')
+        #f = uproot.open('hxx18/hist_1DZcc_pt_scalesmear.root')
+        f = uproot.open('2018/hist_1DZcc_pt_scalesmear.root')
     else:
         print("Year: 2017")
-        f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+        #f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
+        f = uproot.open('2017/hist_1DZcc_pt_scalesmear.root')
 
     # Get QCD efficiency
     if MCTF:
