@@ -212,6 +212,11 @@ if __name__ == '__main__':
                         dest='output_folder',
                         help="Folder to store plots - will be created ? doesn't exist.")
 
+    parser.add_argument("--year",
+                        default="2017",
+                        type=str,
+                        help="year label")
+
     args = parser.parse_args()
     if args.output_folder.split("/")[0] != args.dir:
         args.output_folder = os.path.join(args.dir, args.output_folder)
@@ -249,18 +254,27 @@ if __name__ == '__main__':
     if len(MCTF) > 0:
         MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)\
 
-    # Smooth plots
+    ##### Smooth plots
     from plotTF2 import plotTF as plotTFsmooth
     from plotTF2 import TF_smooth_plot, TF_params
     _values = hmp
+    # TF Data
     plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False,
-                 out='{}/TF_data'.format(args.output_folder))
+                 out='{}/TF_data'.format(args.output_folder), year=args.year)
 
+    # TF MC Postfit
     _vect = np.load('decoVector.npy')
     _MCTF_nominal = np.load('MCTF.npy')
     _values = _values = _vect.dot(np.array(MCTF)) + _MCTF_nominal
     plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=False,
-                 out='{}/TF_MC'.format(args.output_folder))
+                 out='{}/TF_MC'.format(args.output_folder), year=args.year)
+
+    # Effective TF (combination)
+    _tf1, _, _, _ = TF_smooth_plot(*TF_params(hmp, nrho=2, npt=2))
+    _tf2, bit1, bit2, bit3 = TF_smooth_plot(*TF_params(_values, nrho=2, npt=2))
+    plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=False,
+                 out='{}/TF_eff'.format(args.output_folder), year=args.year,
+                 label='Effective TF({},{})'.format(2, 2))
 
     # Define bins
     # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])

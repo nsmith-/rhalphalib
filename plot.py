@@ -73,6 +73,7 @@ make_dirs(args.output_folder)
 
 cdict = {
     'hqq': 'blue',
+    'hbb': 'blue',
     'hcc': 'darkred',
     'wqq': 'lightgreen',
     'wcq': 'green',
@@ -85,6 +86,7 @@ cdict = {
 
 sdict = {
     'hqq': '-',
+    'hbb': '-',
     'hcc': '-',
     'wqq': '-',
     'wcq': '-',
@@ -253,9 +255,9 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Stack plots
     tot_h, bins = None, None
-    stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    stack_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq']
     if not args.scaleH:
-        stack_samples = ['hcc'] + stack_samples
+        stack_samples = ['hcc', 'hbb'] + stack_samples
     for mc in stack_samples:
         if mc not in avail_samples:
             continue
@@ -270,7 +272,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Separate scaled signal
     if args.scaleH:
-        for mc in ['hcc']:
+        for mc in ['hcc', 'hbb']:
             if mc not in avail_samples:
                 continue
             res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -291,7 +293,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
-    for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hqq']:
+    for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -315,7 +317,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Stack plots
     tot_h, bins = None, None
-    #stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    #stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
     stack_samples = ['zcc']
     if not args.scaleH:
         stack_samples = ['hcc'] + stack_samples
@@ -426,9 +428,9 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Leg sort
     if args.scaleH:
-        label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 5e2"
-        # label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 100"
-        # label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 100"
+        label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 500"
+        label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 500"
+        label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 500"
 
     sorted_handles_labels = hep.plot.sort_legend(ax, label_dict)
     # Insert dummy to uneven legend to align right

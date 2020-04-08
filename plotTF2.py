@@ -76,7 +76,7 @@ def TF_smooth_plot(_tfmap, _rhodeg, _ptdeg):
 
 # TF Plots
 def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=None,
-           year="2017"):
+           year="2017", label=None):
     """
     Parameters:
     TF: Transfer Factor array
@@ -144,16 +144,18 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     ax.set_ylim(450, 1200)
     ax.invert_yaxis()
 
-    tMC = "Tag Response" if MC else "Data Residual"
+    tMC = "Tagger Response" if MC else "Data Residual"
     if raw:
-        tMC = "Tag Response (prefit)"
-    ax.set_title('{} Transfer Factor ({},{})'.format(tMC, rhodeg, ptdeg),
-                 pad=6,
-                 fontsize=23,
+        tMC = "Tagger Response (prefit)"
+    if label is None:
+        label = '{} TF({},{})'.format(tMC, rhodeg, ptdeg)
+    ax.set_title(label,
+                 pad=9,
+                 fontsize=22,
                  loc='left')
     ax.set_title("({})".format(str(year)),
-                 pad=6,
-                 fontsize=23,
+                 pad=9,
+                 fontsize=22,
                  loc='right')
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1)
