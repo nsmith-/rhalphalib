@@ -16,20 +16,43 @@ rl.util.install_roofit_helpers()
 
 # warnings.filterwarnings('error')
 
-SF2017 = {  # cristina Jun25
-    'shift_SF': 0.979,
-    'shift_SF_ERR': 0.012,
-    'smear_SF': 1.037,
-    'smear_SF_ERR': 0.049,  # prelim SF @26% N2ddt
-    'V_SF': 0.92,
-    'V_SF_ERR': 0.018,
-    'CC_SF': 0.9,  # 1.0,
-    'CC_SF_ERR': .8  # 0.3,  # prelim ddb SF
+SF = {
+    # https://github.com/kakwok/ZPrimePlusJet/blob/fidxs/fitting/PbbJet/buildRhalphabetHbb.py
+    "2017": {
+        'shift_SF': 0.978,
+        'shift_SF_ERR': 0.012,
+        'smear_SF': 0.9045,
+        'smear_SF_ERR': 0.048,
+        'V_SF': 0.924,
+        'V_SF_ERR': 0.018,
+        'CC_SF': 0.9,  # 1.0,
+        'CC_SF_ERR': .8  # 0.3,  # prelim ddb SF
+    },
+    "2018": {
+        'shift_SF': 0.970,
+        'shift_SF_ERR': 0.012,
+        'smear_SF': 0.9076,
+        'smear_SF_ERR': 0.0146,
+        'V_SF': 0.953,
+        'V_SF_ERR': 0.016,
+        'CC_SF': 0.9,  # 1.0,
+        'CC_SF_ERR': .8  # 0.3,  # prelim ddb SF
+    },
+    "2016": {
+        'V_SF': 0.993,
+        'V_SF_ERR': 0.043,
+        'shift_SF': 1.001,
+        'shift_SF_ERR': 0.012,
+        'smear_SF': 1.084,
+        'smear_SF_ERR': 0.0905,
+        'CC_SF': 0.9,  # 1.0,
+        'CC_SF_ERR': .8  # 0.3,  # prelim ddb SF
+    }
 }
 
 
 def ddx_SF(f, region, sName, ptbin, mask, use_matched=False,
-           SF=SF2017['CC_SF'], SF_unc=SF2017['CC_SF_ERR']):
+           SF=SF["2017"]['CC_SF'], SF_unc=SF["2017"]['CC_SF_ERR']):
     if region == "pass":
         return 1. + SF_unc/SF
     else:
@@ -62,7 +85,7 @@ def shape_to_num(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
+def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False):
     # if sample in ["hcc", "hqq"]:
     #     sample += "125"
     if sample in ["hcc"]:
@@ -72,8 +95,14 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
-    h_vals = f[hist_name].values[:, ptbin]
-    h_edges = f[hist_name].edges[0]
+    if syst is None and muon:
+        hist_name += "_"
+    if muon:
+        h_vals = f[hist_name].values
+        h_edges = f[hist_name].edges
+    else:
+        h_vals = f[hist_name].values[:, ptbin]
+        h_edges = f[hist_name].edges[0]
     h_key = 'msd'
     if read_sumw2:
         h_variances = f[hist_name].variances[:, ptbin]
@@ -81,10 +110,7 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False):
     return (h_vals, h_edges, h_key)
 
 
-def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False):
-    # With Matched logic
-    # if sample in ["hcc", "hqq"]:
-    #     sample += "125"
+def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False):
     if sample in ["hcc"]:
         sample += "125"
     if sample in ["hbb"]:
@@ -92,11 +118,17 @@ def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False):
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
+    if syst is None and muon:
+        hist_name += "_"
     if (sample.startswith("w") or sample.startswith("z")
             or sample.startswith("h")) and syst is None:
         hist_name += "_" + 'matched'
-    h_vals = f[hist_name].values[:, ptbin]
-    h_edges = f[hist_name].edges[0]
+    if muon:
+        h_vals = f[hist_name].values
+        h_edges = f[hist_name].edges
+    else:
+        h_vals = f[hist_name].values[:, ptbin]
+        h_edges = f[hist_name].edges[0]
     h_key = 'msd'
     if read_sumw2:
         h_variances = f[hist_name].variances[:, ptbin]
@@ -122,15 +154,19 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
 
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                      scale_syst=True, smear_syst=True, systs=True,
-                     blind=True, runhiggs=False, fitTF=True, year=2017):
+                     blind=True, runhiggs=False, fitTF=True, muonCR=True,
+                     year=2017):
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
+    # TT params
+    tqqeffSF = rl.IndependentParameter('tqqeffSF', 1., 0, 10)
+    tqqnormSF = rl.IndependentParameter('tqqnormSF', 1., 0, 10)
     # Systematics
-    sys_JES = rl.NuisanceParameter('CMS_scale_j_2017 ', 'lnN')
-    sys_JER = rl.NuisanceParameter('CMS_res_j_2017 ', 'lnN')
-    sys_Pu = rl.NuisanceParameter('CMS_PU_2017', 'lnN')
-    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_2017', 'lnN')
+    sys_JES = rl.NuisanceParameter('CMS_scale_j_{}'.format(year), 'lnN')
+    sys_JER = rl.NuisanceParameter('CMS_res_j_{}'.format(year), 'lnN')
+    sys_Pu = rl.NuisanceParameter('CMS_PU_{}_'.format(year), 'lnN')
+    sys_trigger = rl.NuisanceParameter('CMS_gghcc_trigger_{}'.format(year), 'lnN')
 
     sys_ddxeff = rl.NuisanceParameter('CMS_eff_cc', 'lnN')
     sys_ddxeffbb = rl.NuisanceParameter('CMS_eff_bb', 'lnN')
@@ -156,15 +192,26 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     msd = rl.Observable('msd', msdbins)
     npt = len(ptbins) - 1
 
-    # Template reading
-    if year == 2018:
+    # Year setup
+    if year == "2018":
         print("Year: 2018")
+        model_name = "temp18Model"
         #f = uproot.open('hxx18/hist_1DZcc_pt_scalesmear.root')
         f = uproot.open('2018/hist_1DZcc_pt_scalesmear.root')
-    else:
+        f_mu = uproot.open('2018/hist_1DZcc_muonCR.root')
+    elif year == "2017":
         print("Year: 2017")
+        model_name = "temp17Model"
         #f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
         f = uproot.open('2017/hist_1DZcc_pt_scalesmear.root')
+        f_mu = uproot.open('2017/hist_1DZcc_muonCR.root')
+    elif year == "2016":
+        print("Year: 2016")
+        model_name = "temp16Model"
+        f = uproot.open('2016v2/hist_1DZcc_pt_scalesmear.root')
+        f_mu = uproot.open('2016v2/hist_1DZcc_muonCR.root')
+    else:
+        raise ValueError("Invalid Year")
 
     # Get QCD efficiency
     if MCTF:
@@ -242,25 +289,20 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         from utils import make_dirs
         _values = [par.value for par in tf_MCtempl.parameters.flatten()]
         _names = [par.name for par in tf_MCtempl.parameters.flatten()]
-        make_dirs('tempModel')
-        np.save('tempModel/MCTF', _values)
-        plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True,
-                 out='tempModel/MCTF')
+        make_dirs('{}/plots'.format(model_name))
+        np.save('{}/MCTF'.format(model_name), _values)
+        plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True, raw=True,
+                 out='{}/plots/MCTF'.format(model_name))
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
             tf_MCtempl.name + '_deco', qcdfit, param_names)
-        np.save('tempModel/decoVector', decoVector._transform)
+        np.save('{}/decoVector'.format(model_name), decoVector._transform)
         tf_MCtempl.parameters = decoVector.correlated_params.reshape(
             tf_MCtempl.parameters.shape)
         tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
 
     # build actual fit model now
-    if year == 2018:
-        model_name = "temp18Model"
-    else:
-        model_name = "tempModel"
-    
     model = rl.Model(model_name)
 
     for ptbin in range(npt):
@@ -315,19 +357,19 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                             _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
                         sample.setParamEffect(sys, _sys_ef)
 
-                    # Sample specific            
+                    # Sample specific
                     if sName not in ["qcd"]:
                         sample.setParamEffect(sys_eleveto, 1.005)
                         sample.setParamEffect(sys_muveto, 1.005)
                         sample.setParamEffect(sys_lumi, 1.025)
                         sample.setParamEffect(sys_trigger, 1.02)
                     if sName not in ["qcd", 'tqq']:
-                        sample.scale(SF2017['V_SF'])
+                        sample.scale(SF[year]['V_SF'])
                         sample.setParamEffect(sys_veff,
-                                            #1.0 + SF2017['V_SF_ERR'] / SF2017['V_SF'])
-                                            1.3)
+                                            1.0 + SF[year]['V_SF_ERR'] / SF[year]['V_SF'])
+                        #1.3)
                     if sName in ["zcc", "hcc"]:
-                        sample.scale(SF2017['CC_SF'])
+                        sample.scale(SF[year]['CC_SF'])
                         sample.setParamEffect(
                             sys_ddxeff,
                             ddx_SF(f, region, sName, ptbin, mask, use_matched, SF_unc=0.3))
@@ -355,7 +397,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                             sample.setParamEffect(sys_znormEW, 1.07)
                         else:
                             sample.setParamEffect(sys_znormEW, 1.05)
-                        if ptbin >= 3:                        
+                        if ptbin >= 3:
                             sample.setParamEffect(sys_wznormEW, 1.06)
                         else:
                             sample.setParamEffect(sys_wznormEW, 1.02)
@@ -375,7 +417,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                         _mass = 91.
                     else:
                         pass
-                    realshift = _mass * SF2017['shift_SF'] * SF2017['shift_SF_ERR']
+                    realshift = _mass * SF[year]['shift_SF'] * SF[year]['shift_SF_ERR']
                     # realshift = 90 * 0.01
                     sample.setParamEffect(sys_scale,
                                           mtempl.get(shift=7.)[0],
@@ -386,7 +428,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                     # To Do
                     # Match to boson mass instead of mean
                     # smear_in, smear_unc = 1, 0.11
-                    smear_in, smear_unc = SF2017['smear_SF'], SF2017['smear_SF_ERR']
+                    smear_in, smear_unc = SF[year]['smear_SF'], SF[year]['smear_SF_ERR']
                     #smear_in, smear_unc = 1, 0.3
                     _smear_up = mtempl.get(scale=smear_in + 1 * smear_unc,
                                            shift=-mtempl.mean *
@@ -410,9 +452,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                 if 'qcd' not in include_samples:
                     include_samples = include_samples + ['qcd']
                 for samp in include_samples:
-                    _temp_yields = get_templM(f, region, samp, ptbin)[0]
+                    if use_matched:
+                        _temp_yields = get_templM(f, region, samp, ptbin)[0]
+                    else:
+                        _temp_yields = get_templ(f, region, samp, ptbin)[0]
                     if samp not in ['qcd', 'tqq'] and systs:
-                        _temp_yields *= SF2017['V_SF']           
+                        _temp_yields *= SF[year]['V_SF']
                     #print("D", samp, region, ptbin, np.sum(_temp_yields))
                     yields.append(_temp_yields)
                 yields = np.sum(np.array(yields), axis=0)
@@ -459,59 +504,69 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                                                tf_params[ptbin, :], fail_qcd)
             passCh.addSample(pass_qcd)
 
-        # tqqpass = passCh['tqq']
-        # tqqfail = failCh['tqq']
-        # tqqPF = tqqpass.getExpectation(nominal=True).sum() \
-        #     / tqqfail.getExpectation(nominal=True).sum()
-        # tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
-        # tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
-        # tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
-        # tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
+        if muonCR:
+            tqqpass = passCh['tqq']
+            tqqfail = failCh['tqq']
+            tqqPF = tqqpass.getExpectation(nominal=True).sum() \
+                / tqqfail.getExpectation(nominal=True).sum()
+            tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
+            tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
+            tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
+            tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
     # Fill in muon CR
-    # templates = {}
-    # for ptbin in range(npt):
-    #     for region in ['pass', 'fail']:
-    #         templates[region+str(ptbin)] = {}
+    if muonCR:
+        for region in ['pass', 'fail']:
+            ch = rl.Channel("muonCR%s" % (region, ))
+            model.addChannel(ch)
+            include_samples = ["qcd", "tqq"]
 
-    # for region in ['pass', 'fail']:
-    #     ch = rl.Channel("muonCR%s" % (region, ))
-    #     model.addChannel(ch)
+            for sName in include_samples:
+                if use_matched:
+                    templ = get_templM(f_mu, region, sName, ptbin, muon=True)
+                else:
+                    templ = get_templ(f_mu, region, sName, ptbin, muon=True)
 
-    #     templates = {}
-    #     f = uproot.open(
-    #         'hxx/hist_1DZcc_pt_scalesmear.root')
-    #     for sample in ['tqq', 'qcd']:
-    #         hist_name = '{}_{}'.format(sample, region)
-    #         h_vals = f[hist_name].values[:, ptbin]
-    #         h_edges = f[hist_name].edges[0]
-    #         h_key = 'msd'
-    #         templates[sample.replace('125', '')] = (h_vals, h_edges, h_key)
+                stype = rl.Sample.BACKGROUND
+                sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
-    #     for sName, templ in templates.items():
-    #         stype = rl.Sample.BACKGROUND
-    #         sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
+                # mock systematics
+                #jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
+                #sample.setParamEffect(jec, jecup_ratio)
+                sample.setParamEffect(sys_lumi, 1.023)
 
-    #         # mock systematics
-    #         jecup_ratio = np.random.normal(loc=1, scale=0.05, size=msd.nbins)
-    #         sample.setParamEffect(jec, jecup_ratio)
+                ch.addSample(sample)
 
-    #         ch.addSample(sample)
+            if not pseudo:
+                data_obs = get_templ(f_mu, region, 'data_obs', ptbin, muon=True)
+                if ptbin == 0 and region == "pass":
+                    print("Reading real data")
 
-    #     yields = sum(tpl[0] for tpl in templates.values())
-    #     if throwPoisson:
-    #         yields = np.random.poisson(yields)
-    #     data_obs = (yields, msd.binning, msd.name)
-    #     ch.setObservation(data_obs)
+            else:
+                yields = []
+                for samp in include_samples:
+                    if use_matched:
+                        _temp_yields = get_templM(f_mu, region, samp, ptbin, muon=True)[0]
+                    else:
+                        _temp_yields = get_templ(f_mu, region, samp, ptbin, muon=True)[0]
+                    # if samp not in ['qcd', 'tqq'] and systs:
+                    #     _temp_yields *= SF[year]['V_SF']
+                    yields.append(_temp_yields)
+                yields = np.sum(np.array(yields), axis=0)
+                if throwPoisson:
+                    yields = np.random.poisson(yields)
+                data_obs = (yields, msd.binning, msd.name)
 
-    # tqqpass = model['muonCRpass_tqq']
-    # tqqfail = model['muonCRfail_tqq']
-    # tqqPF = tqqpass.getExpectation(nominal=True).sum() / tqqfail.getExpectation(
-    #     nominal=True).sum()
-    # tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
-    # tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
-    # tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
-    # tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
+            ch.setObservation(data_obs)
+
+        tqqpass = model['muonCRpass_tqq']
+        tqqfail = model['muonCRfail_tqq']
+        tqqPF = tqqpass.getExpectation(nominal=True).sum() / tqqfail.getExpectation(
+            nominal=True).sum()
+        tqqpass.setParamEffect(tqqeffSF, 1*tqqeffSF)
+        tqqfail.setParamEffect(tqqeffSF, (1 - tqqeffSF) * tqqPF + 1)
+        tqqpass.setParamEffect(tqqnormSF, 1*tqqnormSF)
+        tqqfail.setParamEffect(tqqnormSF, 1*tqqnormSF)
 
     with open("{}.pkl".format(model_name), "wb") as fout:
         pickle.dump(model, fout)
@@ -532,13 +587,13 @@ if __name__ == '__main__':
             return False
         else:
             raise argparse.ArgumentTypeError('Boolean value expected.')
-
+    
     parser.add_argument("--throwPoisson",
                         type=str2bool,
                         default='True',
                         choices={True, False},
                         help="If plotting data, redraw from poisson distribution")
-    
+
     parser.add_argument("--fitTF",
                         type=str2bool,
                         default='True',
@@ -550,6 +605,12 @@ if __name__ == '__main__':
                         default='True',
                         choices={True, False},
                         help="Fit QCD in MC first")
+
+    parser.add_argument("--muCR",
+                        type=str2bool,
+                        default='True',
+                        choices={True, False},
+                        help="Include muonCR to constrain ttbar")
 
     parser.add_argument("--scale",
                         type=str2bool,
@@ -609,5 +670,6 @@ if __name__ == '__main__':
                      blind=(not args.unblind),
                      runhiggs=args.runhiggs,
                      fitTF=args.fitTF,
-                     year=args.year
+                     year=str(args.year),
+                     muonCR=args.muCR,
                      )

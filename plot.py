@@ -15,20 +15,20 @@ plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
 plt.switch_backend('agg')
 
 def str2bool(v):
-        if isinstance(v, bool):
-            return v
-        if v.lower() in ('yes', 'true', 't', 'y', '1'):
-            return True
-        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-            return False
-        else:
-            raise argparse.ArgumentTypeError('Boolean value expected.')
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
-parser = argparse.ArgumentParser()  
+parser = argparse.ArgumentParser()
 parser.add_argument("-d",
                     "--dir",
                     default='',
-                    help="Model/Fit dir")  
+                    help="Model/Fit dir")
 parser.add_argument("-i",
                     "--input-file",
                     default='shapes.root',
@@ -63,7 +63,8 @@ parser.add_argument("--scaleH",
 
 pseudo = parser.add_mutually_exclusive_group(required=True)
 pseudo.add_argument('--data', action='store_false', dest='pseudo')
-pseudo.add_argument('--MC', action='store_true', dest='pseudo')
+pseudo.add_argument('--MC',   action='store_true', dest='pseudo')
+pseudo.add_argument('--toys', action='store_true', dest='toys')
 
 args = parser.parse_args()
 if args.output_folder.split("/")[0] != args.dir:
@@ -94,21 +95,22 @@ sdict = {
     'zqq': '-',
 }
 
-
-label_dict = OrderedDict({
-    'Data': 'Data',
-    'MC': 'MC',
-    'zbb': "$\mathrm{Z(b\\bar{b})}$",
-    'zcc': "$\mathrm{Z(c\\bar{c})}$",
-    'zqq': "$\mathrm{Z(q\\bar{q})}$",
-    'wcq': "$\mathrm{W(c\\bar{q})}$",
-    'wqq': "$\mathrm{W(q\\bar{q})}$",
-    'hbb': "$\mathrm{H(b\\bar{b})}$",
-    'hqq': "$\mathrm{H(b\\bar{b})}$",
-    'hcc': "$\mathrm{H(c\\bar{c})}$",
-    'qcd': "QCD",
-    'tqq': "$\mathrm{t\\bar{t}}$",
-})
+# Sequence of tuples because python2 is stupid
+label_dict = OrderedDict([
+    ('Data', 'Data'),
+    ('MC', 'MC'),
+    ('Toys', 'Toys'),
+    ('zbb', "$\mathrm{Z(b\\bar{b})}$"),
+    ('zcc', "$\mathrm{Z(c\\bar{c})}$"),
+    ('zqq', "$\mathrm{Z(q\\bar{q})}$"),
+    ('wcq', "$\mathrm{W(c\\bar{q})}$"),
+    ('wqq', "$\mathrm{W(q\\bar{q})}$"),
+    ('hbb', "$\mathrm{H(b\\bar{b})}$"),
+    ('hqq', "$\mathrm{H(b\\bar{b})}$"),
+    ('hcc', "$\mathrm{H(c\\bar{c})}$"),
+    ('qcd', "QCD"),
+    ('tqq', "$\mathrm{t\\bar{t}}$"),
+])
 
 
 def full_plot(cats, pseudo=True, fittype="", mask=False):
@@ -166,19 +168,21 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
             np.array(xerr)[0][ugh.plot_bins],
             np.array(xerr)[1][ugh.plot_bins]
         ]
-        
+
         if mask:
             _y = y
             _y[10:14] = np.nan
         else:
             _y = y
 
+        _d_label = "MC" if pseudo else "Data"
+        if args.toys: _d_label = "Toys"
         ax.errorbar(x,
                     y,
                     yerr,
                     xerr,
                     fmt='+',
-                    label="MC" if pseudo else "Data",
+                    label=_d_label,
                     **data_err_opts)
 
     def th1_to_step(th1):
@@ -226,6 +230,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     plt.subplots_adjust(hspace=0)
 
     #  Main
+    # print(cats[0])
     res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
     _x, _h = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
@@ -283,9 +288,10 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
     _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+    _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
-    for mc in ['qcd', 'tqq']:
+    for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hqq']:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -298,7 +304,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     def prop_err(A, B, C, a, b, c):
         # Error propagation for (Data - Bkg)/Sigma_{Data} plot
         e = C**2 * (a**2 + b**2) + c**2 * (A - B)**2
-        e /= C**4
+        e /= (C**4 + 0.0000000001)  # pad zeros
         e = np.sqrt(e)
         return e
 
@@ -309,7 +315,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
 
     # Stack plots
     tot_h, bins = None, None
-    stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    #stack_samples = ['hqq', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    stack_samples = ['zcc']
     if not args.scaleH:
         stack_samples = ['hcc'] + stack_samples
     for mc in stack_samples:
@@ -338,22 +345,31 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     ############
     # Style
     lumi = {
-    "2016" : 35.5,
-    "2017" : 41.5,
-    "2018" : 59.2,
+        "jet": {
+            "2016": 35.5,
+            "2017": 41.5,
+            "2018": 59.2,
+        },
+        "mu": {
+            "2016": 35.2,
+            "2017": 41.1,
+            "2018": 59.0,
+        }
     }
-    lumi_mu = {
-        "2016" : 35.2,
-        "2017" : 41.1,
-        "2018" : 59.0,
-    }
-    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year, lumi=lumi[args.year])
+    if b'muon' in cats[0].name:
+        lumi_t = "mu"
+    else:
+        lumi_t = "jet"
+    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year, 
+                          lumi=lumi[lumi_t][str(args.year)],
+                          fontsize=22)
     ax.legend(ncol=2)
 
     ax.set_ylabel('Events / 7GeV', ha='right', y=1)
     rax.set_xlabel('jet $\mathrm{m_{SD}}$ [GeV]', ha='right', x=1)
     rax.set_ylabel(
-        r'$\mathrm{\frac{Data-(MultiJet+t\bar{t})}{\sigma_{Data}}}$')
+        #r'$\mathrm{\frac{Data-(MultiJet+t\bar{t})}{\sigma_{Data}}}$')
+        r'$\mathrm{\frac{Data-Bkg}{\sigma_{Data}}}$')
 
     ax.set_xlim(40, 200)
     ax.set_ylim(0, ax.get_ylim()[1] * 1.4)
@@ -389,7 +405,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
             lab_reg = "Charm"
         elif "pbb" in str(cats[0].name):
             lab_reg = "Bottom"
-    
+
     annot = pt_range + '\nDeepDoubleX{}'.format(lab_mu) + '\n{} Region'.format(lab_reg)
 
     ax.annotate(annot,
@@ -409,13 +425,20 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
                 annotation_clip=False)
 
     # Leg sort
-    if args.scaleH:      
-        label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 5e2" 
-        # label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 100" 
-        # label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 100" 
+    if args.scaleH:
+        label_dict['hcc'] = "$\mathrm{H(c\\bar{c})}$ x 5e2"
+        # label_dict['hqq'] = "$\mathrm{H(b\\bar{b})}$ x 100"
+        # label_dict['hbb'] = "$\mathrm{H(b\\bar{b})}$ x 100"
 
-    leg = ax.legend(*hep.plot.sort_legend(ax, label_dict), ncol=2, columnspacing=0.8)
-    leg.set_title(title=fittype.capitalize(),prop={'size':"smaller"})
+    sorted_handles_labels = hep.plot.sort_legend(ax, label_dict)
+    # Insert dummy to uneven legend to align right
+    if len(sorted_handles_labels[0]) % 2 != 0:
+        _insert_ix = len(sorted_handles_labels[0])/2
+        sorted_handles_labels[0].insert(
+            _insert_ix, plt.Line2D([], [], linestyle='none', marker=None))
+        sorted_handles_labels[1].insert(_insert_ix, '')
+    leg = ax.legend(*sorted_handles_labels, ncol=2, columnspacing=0.8)
+    leg.set_title(title=fittype.capitalize(), prop={'size': "smaller"})
 
     if b'muon' in cats[0].name:
         _iptname = "MuonCR"
@@ -442,7 +465,8 @@ f = uproot.open(os.path.join(args.dir, args.input_file))
 for shape_type in shape_types:
     pbins = [450, 500, 550, 600, 675, 800, 1200]
     for region in regions:
-        print("Plotting {} region".format(region))
+        #continue
+        print("Plotting {} region".format(region), shape_type)
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
             continue
@@ -461,6 +485,58 @@ for shape_type in shape_types:
         try:
             cat = f['muonCR{}_{};1'.format(region, shape_type)]
             full_plot([cat], args.pseudo, fittype=shape_type)
-            print("Plotted muCR")
+            print("Plotted muCR", region, shape_type)
         except Exception:
+            print("Muon region not found")
             pass
+
+
+# class ndict(dict):
+#     def __init__(self,*arg,**kw):
+#         super(ndict, self).__init__(*arg, **kw)
+
+#         self._name = ""
+
+#     @property
+#     def name(self):
+#         return self._name
+
+#     @name.setter
+#     def name(self, new_name):
+#         self._name = new_name
+
+# from uproot_methods.classes.TH1 import Methods
+# def name(self, name):
+#     self._fName = name
+# def variance(self, name):
+#     self._fName = name
+# Methods.name = Methods.name.setter(name)
+# import uproot_methods.classes.TH1 as TH1
+
+# mockd = ndict()
+# # Make shapes-like
+# f = uproot.open(os.path.join(args.dir, args.input_file))
+# inpfile = uproot.open("../2016v2/templatesCC.root")
+# for key in f.keys():
+#     passfail = key.decode(encoding="utf-8").split("_")[0][-4:]
+#     bincat = key.decode(encoding="utf-8").split("_")[0][5]
+#     cat_name = ("ptbin"+bincat+passfail+"_inputs;1").encode('utf-8')
+#     mockd[cat_name] = ndict()
+#     mockd[cat_name].name = cat_name
+#     for hname in f[key].keys():
+#         if hname.decode(encoding="utf-8").lower().startswith("total"): continue
+#         sname = hname.decode(encoding="utf-8").replace(";1", "")
+#         sname = sname.replace('hbb', 'hqq125')
+#         sname = sname.replace('hcc', 'hcc125')
+#         inname = sname + "_" + passfail + "_bin" + bincat + ";1"
+#         inname = inname.encode('utf-8')
+#         mockd[cat_name][sname] = TH1.from_numpy(inpfile[inname].numpy())
+#         mockd[cat_name][sname].name = sname
+
+# #print(mockd['ptbin0pass_prefit;1'])
+
+# for shape_type in ["inputs"]:
+#     for region in regions:
+#         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
+#         full_plot([mockd['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
+#                    pseudo=args.pseudo, fittype=shape_type, mask=mask)

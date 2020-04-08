@@ -119,7 +119,7 @@ def plotTF_ratio(in_ratio, mask, region):
     clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
     msdbins = np.linspace(40, 201, 24)
-    hep.hist2dplot(H, msdbins, ptbins, vmin=1-clim, vmax=1+clim,
+    hep.hist2dplot(H.T, msdbins, ptbins, vmin=1-clim, vmax=1+clim,
                    cmap='RdBu_r', cbar=False)
     cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
     if abs(1-zmin) > .3 and abs(1-zmax) > .3:

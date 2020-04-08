@@ -75,7 +75,8 @@ def TF_smooth_plot(_tfmap, _rhodeg, _ptdeg):
 
 
 # TF Plots
-def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=None):
+def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=None,
+           year="2017"):
     """
     Parameters:
     TF: Transfer Factor array
@@ -143,12 +144,17 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     ax.set_ylim(450, 1200)
     ax.invert_yaxis()
 
-    tMC = "MC only" if MC else "Data Residual"
+    tMC = "Tag Response" if MC else "Data Residual"
     if raw:
-        tMC = "Prefit MC"
+        tMC = "Tag Response (prefit)"
     ax.set_title('{} Transfer Factor ({},{})'.format(tMC, rhodeg, ptdeg),
-                 pad=15,
-                 fontsize=26)
+                 pad=6,
+                 fontsize=23,
+                 loc='left')
+    ax.set_title("({})".format(str(year)),
+                 pad=6,
+                 fontsize=23,
+                 loc='right')
     ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1)
     ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1)
     cbar.set_label(r'TF', ha='right', y=1)
@@ -157,6 +163,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     if raw: 
         label = "MCRaw"
     import mplhep as hep
+    hep.cms.cmslabel(loc=2, data=not raw, rlabel="", ax=ax)
     if out is not None:
         fig.savefig('{}.png'.format(out))#, bbox_inches="tight")
     else:
