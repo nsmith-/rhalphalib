@@ -42,8 +42,8 @@ def _to_numpy(hinput, read_sumw2=False):
 
 def _to_TH1(sumw, binning, name):
     import ROOT
+    ROOT.TH1.AddDirectory(False)
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
-    h.SetDirectory(0)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
             h.SetBinContent(i + 1, w)
