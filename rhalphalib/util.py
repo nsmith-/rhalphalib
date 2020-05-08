@@ -42,7 +42,6 @@ def _to_numpy(hinput, read_sumw2=False):
 
 def _to_TH1(sumw, binning, name):
     import ROOT
-    ROOT.TH1.AddDirectory(False)
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
@@ -79,6 +78,8 @@ def install_roofit_helpers():
     # TODO: configurable verbosity
     _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
 
+    _ROOT.TH1.AddDirectory(False)
+    
     def _embed_ref(obj, dependents):
         # python reference counting gc will drop rvalue dependents
         # and we don't want to hand ownership to ROOT/RooFit because it's gc is garbage
