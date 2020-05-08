@@ -79,7 +79,7 @@ def install_roofit_helpers():
     _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
 
     _ROOT.TH1.AddDirectory(False)
-    
+
     def _embed_ref(obj, dependents):
         # python reference counting gc will drop rvalue dependents
         # and we don't want to hand ownership to ROOT/RooFit because it's gc is garbage
