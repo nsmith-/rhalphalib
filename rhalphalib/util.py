@@ -43,7 +43,6 @@ def _to_numpy(hinput, read_sumw2=False):
 def _to_TH1(sumw, binning, name):
     import ROOT
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
-    h.SetDirectory(0)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
             h.SetBinContent(i + 1, w)
@@ -78,6 +77,8 @@ def install_roofit_helpers():
     _ROOT.gEnv.SetValue("RooFit.Banner=0")
     # TODO: configurable verbosity
     _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
+
+    _ROOT.TH1.AddDirectory(False)
 
     def _embed_ref(obj, dependents):
         # python reference counting gc will drop rvalue dependents
