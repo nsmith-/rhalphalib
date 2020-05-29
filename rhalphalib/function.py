@@ -41,7 +41,7 @@ class BernsteinPoly(object):
 
         # Construct Bernstein matrix for each dimension
         self._bmatrices = []
-        for idim, (n, initialv) in enumerate(zip(self._order, self._init_params)):
+        for idim, n in enumerate(self._order):
             v = np.arange(n + 1)
             bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1., np.subtract.outer(v, v)))
             bmat[np.greater.outer(v, v)] = 0  # v > l
