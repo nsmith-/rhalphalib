@@ -43,7 +43,7 @@ parser.add_argument("--3reg",
                     dest='three_regions',
                     help="By default plots pass/fail region. Set to plot pqq/pcc/pbb")
 parser.add_argument("--mask",
-                    action='store_true',
+                    action='store_false',
                     dest='mask',
                     help="Mask Higgs bins")
 parser.add_argument("-o", "--output-folder",
@@ -101,7 +101,7 @@ sdict = {
 label_dict = OrderedDict([
     ('Data', 'Data'),
     ('MC', 'MC'),
-    ('Toys', 'Toys'),
+    ('Toys', 'PostFit\nToys'),
     ('zbb', "$\mathrm{Z(b\\bar{b})}$"),
     ('zcc', "$\mathrm{Z(c\\bar{c})}$"),
     ('zqq', "$\mathrm{Z(q\\bar{q})}$"),
@@ -115,7 +115,9 @@ label_dict = OrderedDict([
 ])
 
 
-def full_plot(cats, pseudo=True, fittype="", mask=False):
+def full_plot(cats, pseudo=True, fittype="", mask=False,
+              toys=False, 
+              sqrtnerr=False):
 
     # Determine:
     if "pass" in str(cats[0].name) or "fail" in str(cats[0].name):
@@ -171,14 +173,14 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
             np.array(xerr)[1][ugh.plot_bins]
         ]
 
-        if mask:
+        if mask and not pseudo:
             _y = y
             _y[10:14] = np.nan
         else:
             _y = y
 
         _d_label = "MC" if pseudo else "Data"
-        if args.toys: _d_label = "Toys"
+        if toys: _d_label = "Toys"
         ax.errorbar(x,
                     y,
                     yerr,
@@ -200,9 +202,9 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
         return _x, _h, _var, [_xerr[0], _xerr[1]]
 
     def plot_step(bins, h, ax=None, label=None, nozeros=True, **kwargs):
-        if mask:
+        if mask and not pseudo:
             _h = h
-            _h[10:14] = np.nan
+            #_h[10:14] = np.nan
         else:
             _h = h
         ax.step(bins, _h, where='post', label=label, c=cdict[label], **kwargs)
@@ -236,7 +238,10 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
     _x, _h = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
-    _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+    if sqrtnerr:
+        _yerr = np.sqrt(_h)
+    else:
+        _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
     plot_data(_x, _h, yerr=[_yerr, _yerr], xerr=_xerr, ax=ax, ugh=ugh)
 
     # Stack qcd/ttbar
@@ -289,8 +294,11 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
     res = np.array(list(map(th1_to_err, [cat['data_obs'] for cat in cats])))
     _x, _y = res[:, 0][0], np.sum(res[:, 1], axis=0)
     _xerr = res[:, -1][0]
-    _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
-    _yerr += 0.0000000001  # pad zeros
+    if sqrtnerr:
+        _yerr = np.sqrt(_h)
+    else:
+        _yerr = np.sqrt(np.sum(res[:, 2], axis=0))
+    # _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
     for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
@@ -362,7 +370,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False):
         lumi_t = "mu"
     else:
         lumi_t = "jet"
-    ax = hep.cms.cmslabel(ax=ax, data=(not pseudo), year=args.year, 
+    ax = hep.cms.cmslabel(ax=ax, data=((not pseudo) | toys), year=args.year, 
                           lumi=lumi[lumi_t][str(args.year)],
                           fontsize=22)
     ax.legend(ncol=2)
@@ -467,11 +475,10 @@ f = uproot.open(os.path.join(args.dir, args.input_file))
 for shape_type in shape_types:
     pbins = [450, 500, 550, 600, 675, 800, 1200]
     for region in regions:
-        #continue
         print("Plotting {} region".format(region), shape_type)
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
-            continue
+            #continue
             cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
             try:
                 cat = f[cat_name]
@@ -480,65 +487,48 @@ for shape_type in shape_types:
                                 "namespaces were found in the file: {}".format(
                                     args.fit, f.keys()))
 
-            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask)
+            fig = full_plot([cat], pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
         full_plot([f['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
-                   pseudo=args.pseudo, fittype=shape_type, mask=mask)
+                   pseudo=args.pseudo, fittype=shape_type, mask=mask, toys=args.toys)
         # MuonCR if included
         try:
             cat = f['muonCR{}_{};1'.format(region, shape_type)]
-            full_plot([cat], args.pseudo, fittype=shape_type)
+            full_plot([cat], args.pseudo, fittype=shape_type, toys=args.toys)
             print("Plotted muCR", region, shape_type)
         except Exception:
             print("Muon region not found")
             pass
 
+##### Input shape plotter
+# Take sqrt N err for data
+# Mock QCD while unavailable as template in rhalpha 
+import os
+from input_shapes import input_dict_maker
+mockd = input_dict_maker(os.getcwd()+".pkl")
 
-# class ndict(dict):
-#     def __init__(self,*arg,**kw):
-#         super(ndict, self).__init__(*arg, **kw)
+input_pseudo = True
+if args.toys or not args.pseudo:
+    input_pseudo = False
+for shape_type in ["inputs"]:
+    pbins = [450, 500, 550, 600, 675, 800, 1200]
+    for region in regions:
+        print("Plotting inputs", region)
+        _mask = not input_pseudo
+        mask = (_mask & (region == "pass")) | (_mask & (region == "pcc"))  | (_mask & (region == "pbb"))
+        full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)] for i in range(0, 6)],
+                   pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
-#         self._name = ""
+        # Per bin plots
+        for i in range(0, 6):
+            full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)]],
+                   pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
-#     @property
-#     def name(self):
-#         return self._name
-
-#     @name.setter
-#     def name(self, new_name):
-#         self._name = new_name
-
-# from uproot_methods.classes.TH1 import Methods
-# def name(self, name):
-#     self._fName = name
-# def variance(self, name):
-#     self._fName = name
-# Methods.name = Methods.name.setter(name)
-# import uproot_methods.classes.TH1 as TH1
-
-# mockd = ndict()
-# # Make shapes-like
-# f = uproot.open(os.path.join(args.dir, args.input_file))
-# inpfile = uproot.open("../2016v2/templatesCC.root")
-# for key in f.keys():
-#     passfail = key.decode(encoding="utf-8").split("_")[0][-4:]
-#     bincat = key.decode(encoding="utf-8").split("_")[0][5]
-#     cat_name = ("ptbin"+bincat+passfail+"_inputs;1").encode('utf-8')
-#     mockd[cat_name] = ndict()
-#     mockd[cat_name].name = cat_name
-#     for hname in f[key].keys():
-#         if hname.decode(encoding="utf-8").lower().startswith("total"): continue
-#         sname = hname.decode(encoding="utf-8").replace(";1", "")
-#         sname = sname.replace('hbb', 'hqq125')
-#         sname = sname.replace('hcc', 'hcc125')
-#         inname = sname + "_" + passfail + "_bin" + bincat + ";1"
-#         inname = inname.encode('utf-8')
-#         mockd[cat_name][sname] = TH1.from_numpy(inpfile[inname].numpy())
-#         mockd[cat_name][sname].name = sname
-
-# #print(mockd['ptbin0pass_prefit;1'])
-
-# for shape_type in ["inputs"]:
-#     for region in regions:
-#         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
-#         full_plot([mockd['ptbin{}{}_{};1'.format(i, region, shape_type)] for i in range(0, 6)],
-#                    pseudo=args.pseudo, fittype=shape_type, mask=mask)
+        # MuonCR if included
+        try:
+            cat = mockd['muonCR{}_{}'.format(region, shape_type)]
+            full_plot([cat], fittype=shape_type,
+                      pseudo=input_pseudo, mask=False, sqrtnerr=True, toys=False)
+            print("Plotted input, muCR", region, shape_type)
+        except Exception:
+            print("Muon region not found")
+            pass

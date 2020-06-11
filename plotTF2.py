@@ -144,8 +144,8 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     ax.set_ylim(450, 1200)
     ax.invert_yaxis()
 
-    tMC = "Tagger Response" if MC else "Data Residual"
-    if raw:
+    tMC = "Tagger Response" if MC else "Residual"
+    if raw and MC:
         tMC = "Tagger Response (prefit)"
     if label is None:
         label = '{} TF({},{})'.format(tMC, rhodeg, ptdeg)

@@ -206,16 +206,18 @@ if __name__ == '__main__':
                         default='fitDiagnostics.root',
                         dest='fit',
                         help="fitDiagnostics file")
-
     parser.add_argument("-o", "--output-folder",
                         default='plots',
                         dest='output_folder',
                         help="Folder to store plots - will be created ? doesn't exist.")
-
     parser.add_argument("--year",
                         default="2017",
                         type=str,
                         help="year label")
+    parser.add_argument("--MC",
+                        action='store_true',
+                        dest='isMC',
+                        help="Use 'simulation' label")
 
     args = parser.parse_args()
     if args.output_folder.split("/")[0] != args.dir:
@@ -259,22 +261,22 @@ if __name__ == '__main__':
     from plotTF2 import TF_smooth_plot, TF_params
     _values = hmp
     # TF Data
-    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False,
+    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False, raw=args.isMC,
                  out='{}/TF_data'.format(args.output_folder), year=args.year)
 
     # TF MC Postfit
     _vect = np.load('decoVector.npy')
     _MCTF_nominal = np.load('MCTF.npy')
     _values = _values = _vect.dot(np.array(MCTF)) + _MCTF_nominal
-    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=False,
+    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=args.isMC,
                  out='{}/TF_MC'.format(args.output_folder), year=args.year)
 
     # Effective TF (combination)
     _tf1, _, _, _ = TF_smooth_plot(*TF_params(hmp, nrho=2, npt=2))
     _tf2, bit1, bit2, bit3 = TF_smooth_plot(*TF_params(_values, nrho=2, npt=2))
-    plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=False,
+    plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=args.isMC,
                  out='{}/TF_eff'.format(args.output_folder), year=args.year,
-                 label='Effective TF({},{})'.format(2, 2))
+                 label='Effective Transfer Factor')
 
     # Define bins
     # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])

@@ -61,6 +61,9 @@ PostFitShapesFromWorkspace -w model_combined.root -o shapes.root --print --postf
 # If withing the model dir
 python ../plot.py --data 
 python ../plotTF.py --data
+
+###
+python ../plot.py --MC --year 2017 -o plots_MC_t1
 ```
 
 

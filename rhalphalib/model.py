@@ -194,7 +194,8 @@ class Channel(object):
         Return the current observation set for this Channel as plain numpy array
         If it is non-poisson, it will be returned as a tuple (sumw, sumw2)
         '''
-        _mask_val = float(1e-17)
+        # _mask_val = float(1e-17)
+        _mask_val = float(0)
         if self._observation is None:
             raise RuntimeError("Channel %r has no observation set" % self)
         if isinstance(self._observation, tuple):

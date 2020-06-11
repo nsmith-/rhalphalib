@@ -1,5 +1,5 @@
 from __future__ import print_function, division
-# import warnings
+import warnings
 import rhalphalib as rl
 import pickle
 import numpy as np
@@ -197,14 +197,14 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         print("Year: 2018")
         model_name = "temp18Model"
         #f = uproot.open('hxx18/hist_1DZcc_pt_scalesmear.root')
-        f = uproot.open('2018/hist_1DZcc_pt_scalesmear.root')
-        f_mu = uproot.open('2018/hist_1DZcc_muonCR.root')
+        f = uproot.open('2018v2/hist_1DZcc_pt_scalesmear.root')
+        f_mu = uproot.open('2018v2/hist_1DZcc_muonCR.root')
     elif year == "2017":
         print("Year: 2017")
         model_name = "temp17Model"
         #f = uproot.open('hxx/hist_1DZcc_pt_scalesmear.root')
-        f = uproot.open('2017/hist_1DZcc_pt_scalesmear.root')
-        f_mu = uproot.open('2017/hist_1DZcc_muonCR.root')
+        f = uproot.open('2017v2/hist_1DZcc_pt_scalesmear.root')
+        f_mu = uproot.open('2017v2/hist_1DZcc_muonCR.root')
     elif year == "2016":
         print("Year: 2016")
         model_name = "temp16Model"
@@ -492,7 +492,11 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             for sample in failCh:
                 initial_qcd -= sample.getExpectation(nominal=True)
             if np.any(initial_qcd < 0.):
-                raise ValueError("initial_qcd negative for some bins..", initial_qcd)
+                # raise ValueError("initial_qcd negative for some bins..", initial_qcd)
+                warnings.warn("initial_qcd negative for some bins..", UserWarning)
+                print(initial_qcd)
+                warnings.warn("Negative bins will be forced positive", UserWarning)
+                initial_qcd[0 > initial_qcd] = abs(initial_qcd[0 > initial_qcd])
             sigmascale = 10  # to scale the deviation from initial
             scaledparams = initial_qcd * (
                 1 + sigmascale / np.maximum(1., np.sqrt(initial_qcd)))**qcdparams
@@ -504,7 +508,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                                                tf_params[ptbin, :], fail_qcd)
             passCh.addSample(pass_qcd)
 
-        if muonCR:
+    if muonCR:
+        for ptbin in range(npt):
+            failCh = model['ptbin%dfail' % ptbin]
+            passCh = model['ptbin%dpass' % ptbin]
             tqqpass = passCh['tqq']
             tqqfail = failCh['tqq']
             tqqPF = tqqpass.getExpectation(nominal=True).sum() \
