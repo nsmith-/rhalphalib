@@ -72,7 +72,13 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    f = uproot.open('hxx/templates3.root')
+    #f = uproot.open('hxx/templates3.root')
+    f = uproot.open('jax.root')
+
+    # Get QCD efficiency
+    if MCTF:
+        qcdmodelc = rl.Model("qcdmodelc")
+        qcdmodelb = rl.Model("qcdmodelb")
 
     qcdpqq, qcdpcc, qcdpbb = 0., 0., 0.
     for ptbin in range(npt):
@@ -92,8 +98,61 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
         qcdpcc += pccCh.getObservation().sum()
         qcdpbb += pbbCh.getObservation().sum()
 
+        if MCTF:
+            qcdmodelc.addChannel(pqqCh)
+            qcdmodelc.addChannel(pccCh)
+            qcdmodelb.addChannel(pqqCh)
+            qcdmodelb.addChannel(pbbCh)
+
     qcdeff_c = qcdpcc / qcdpqq
     qcdeff_b = qcdpbb / qcdpqq
+
+    # Separate out QCD to QCD fit
+    if MCTF:
+        tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
+                                      limits=(-50, 50))
+        tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
+
+        for ptbin in range(npt):
+            failCh = qcdmodel['ptbin%dfail' % ptbin]
+            passCh = qcdmodel['ptbin%dpass' % ptbin]
+            failObs = failCh.getObservation()[0]
+            qcdparams = np.array([
+                rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0)
+                for i in range(msd.nbins)
+            ])
+            sigmascale = 10.
+            scaledparams = failObs * (
+                1 + sigmascale / np.maximum(1., np.sqrt(failObs)))**qcdparams
+            fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin,
+                                            rl.Sample.BACKGROUND, msd, scaledparams)
+            failCh.addSample(fail_qcd)
+            pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin,
+                                               rl.Sample.BACKGROUND,
+                                               tf_MCtempl_params[ptbin, :], fail_qcd)
+            passCh.addSample(pass_qcd)
+
+            failCh.mask = validbins[ptbin]
+            passCh.mask = validbins[ptbin]
+
+        qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
+        simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
+        qcdfit = simpdf.fitTo(obs,
+                              ROOT.RooFit.Extended(True),
+                              ROOT.RooFit.SumW2Error(True),
+                              ROOT.RooFit.Strategy(2),
+                              ROOT.RooFit.Save(),
+                              ROOT.RooFit.Minimizer('Minuit2', 'migrad'),
+                              ROOT.RooFit.Offset(True),
+                              ROOT.RooFit.PrintLevel(-1),
+                              )
+        qcdfit_ws.add(qcdfit)
+        qcdfit_ws.writeToFile('qcdfit.root')
+        if qcdfit.status() != 0:
+            qcdfit.Print()
+            raise RuntimeError('Could not fit qcd')
+
+        qcdmodel.readRooFitResult(qcdfit)
 
     # build actual fit model now
     model = rl.Model("temp3Model")

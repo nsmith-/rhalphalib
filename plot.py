@@ -10,6 +10,9 @@ import numpy as np
 
 from utils import make_dirs
 
+from _plot_fractions import plot_fractions
+from _plot_cov import plot_cov
+
 import mplhep as hep
 plt.style.use([hep.cms.style.ROOT, {'font.size': 24}])
 plt.switch_backend('agg')
@@ -301,7 +304,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
-    for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
+    #for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
+    for mc in ['qcd', 'tqq']:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -325,8 +329,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Stack plots
     tot_h, bins = None, None
-    #stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
-    stack_samples = ['zcc']
+    stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    #stack_samples = ['zcc']
     if not args.scaleH:
         stack_samples = ['hcc'] + stack_samples
     for mc in stack_samples:
@@ -478,7 +482,7 @@ for shape_type in shape_types:
         print("Plotting {} region".format(region), shape_type)
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
-            #continue
+            continue
             cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
             try:
                 cat = f[cat_name]
@@ -504,31 +508,47 @@ for shape_type in shape_types:
 # Mock QCD while unavailable as template in rhalpha 
 import os
 from input_shapes import input_dict_maker
-mockd = input_dict_maker(os.getcwd()+".pkl")
+try:
+    mockd = input_dict_maker(os.getcwd()+".pkl")
 
-input_pseudo = True
-if args.toys or not args.pseudo:
-    input_pseudo = False
-for shape_type in ["inputs"]:
-    pbins = [450, 500, 550, 600, 675, 800, 1200]
-    for region in regions:
-        print("Plotting inputs", region)
-        _mask = not input_pseudo
-        mask = (_mask & (region == "pass")) | (_mask & (region == "pcc"))  | (_mask & (region == "pbb"))
-        full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)] for i in range(0, 6)],
-                   pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
+    input_pseudo = True
+    if args.toys or not args.pseudo:
+        input_pseudo = False
+    for shape_type in ["inputs"]:
+        pbins = [450, 500, 550, 600, 675, 800, 1200]
+        for region in regions:
+            print("Plotting inputs", region)
+            _mask = not input_pseudo
+            mask = (_mask & (region == "pass")) | (_mask & (region == "pcc"))  | (_mask & (region == "pbb"))
+            full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)] for i in range(0, 6)],
+                    pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
-        # Per bin plots
-        for i in range(0, 6):
-            full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)]],
-                   pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
+            # Per bin plots
+            for i in range(0, 6):
+                continue
+                full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)]],
+                    pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
-        # MuonCR if included
-        try:
-            cat = mockd['muonCR{}_{}'.format(region, shape_type)]
-            full_plot([cat], fittype=shape_type,
-                      pseudo=input_pseudo, mask=False, sqrtnerr=True, toys=False)
-            print("Plotted input, muCR", region, shape_type)
-        except Exception:
-            print("Muon region not found")
-            pass
+            # MuonCR if included
+            try:
+                cat = mockd['muonCR{}_{}'.format(region, shape_type)]
+                full_plot([cat], fittype=shape_type,
+                        pseudo=input_pseudo, mask=False, sqrtnerr=True, toys=False)
+                print("Plotted input, muCR", region, shape_type)
+            except Exception:
+                print("Muon region not found")
+                pass
+except:
+    print("Input pkl file not found")
+
+if args.three_regions:
+    plot_fractions(os.path.join(args.dir, 'fitDiagnostics.root'),
+                   os.path.join(args.dir, 'model_combined.root'),
+                   out='{}/{}.png'.format(args.output_folder, 'fractions'),
+                   data=((not args.pseudo) | args.toys), year=args.year,
+    )
+
+plot_cov(os.path.join(args.dir, 'fitDiagnostics.root'),
+         out='{}/{}.png'.format(args.output_folder, 'covariances'),
+         data=((not args.pseudo) | args.toys), year=args.year,
+         )
