@@ -2,7 +2,20 @@
 
 ![Ralph](https://upload.wikimedia.org/wikipedia/en/thumb/1/14/Ralph_Wiggum.png/220px-Ralph_Wiggum.png)
 
-## Quickstart
+## CMSSW+Combine Quickstart
+```bash
+export SCRAM_ARCH=slc7_amd64_gcc700
+cmsrel CMSSW_10_2_13
+cd CMSSW_10_2_13/src
+cmsenv
+git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+scram b
+pip install --user https://github.com/nsmith-/rhalphalib/archive/master.zip
+```
+Take a look at [test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
+for examples of how to use the package.
+
+## Standalone Quickstart
 ```bash
 # check your platform: CC7 shown below, for SL6 it would be "x86_64-slc6-gcc8-opt"
 source /cvmfs/sft.cern.ch/lcg/views/LCG_96python3/x86_64-centos7-gcc8-opt/setup.sh  # or .csh, etc.
