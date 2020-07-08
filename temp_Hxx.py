@@ -155,7 +155,9 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
 def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                      scale_syst=True, smear_syst=True, systs=True,
                      blind=True, runhiggs=False, fitTF=True, muonCR=True,
-                     year=2017):
+                     runboth=False, year=2017,
+                     opts=None
+                     ):
 
     # Default lumi (needs at least one systematics for prefit)
     sys_lumi = rl.NuisanceParameter('CMS_lumi', 'lnN')
@@ -328,9 +330,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                 else:
                     templ = get_templ(f, region, sName, ptbin)
                 if runhiggs:
-                    stype = rl.Sample.SIGNAL if sName in ['hcc'] else rl.Sample.BACKGROUND
+                    _signals = ["hcc"]
+                elif runboth:
+                    _signals = ["hcc", "zcc"]
                 else:
-                    stype = rl.Sample.SIGNAL if sName in ['zcc'] else rl.Sample.BACKGROUND
+                    _signals = ["zcc"]
+                stype = rl.Sample.SIGNAL if sName in _signals else rl.Sample.BACKGROUND
 
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
                 #print(sName, region, ptbin,  np.sum(templ[0]))
@@ -379,12 +384,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                             sys_ddxeffbb,
                             ddx_SF(f, region, sName, ptbin, mask, use_matched,
                                 SF=1, SF_unc=0.3))
-                    if sName in ["wcq", "wqq"]:
-                        # 1 +- 0.3
-                        sample.setParamEffect(
-                            sys_ddxeffw,
-                            ddx_SF(f, region, sName, ptbin, mask, use_matched,
-                                SF=1, SF_unc=0.3))
+                    # if sName in ["wcq", "wqq"]:
+                    #     # 1 +- 0.3
+                    #     sample.setParamEffect(
+                    #         sys_ddxeffw,
+                    #         ddx_SF(f, region, sName, ptbin, mask, use_matched,
+                    #             SF=1, SF_unc=0.3))
                     if sName.startswith("z"):
                         sample.setParamEffect(sys_znormQ, 1.1)
                         if ptbin >= 2:
@@ -471,7 +476,9 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             ch.mask = mask
 
     if fitTF:
-        tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ['pt', 'rho'],
+        degs = tuple([int(s) for s in opts.degs.split(',')])
+        print("XXX", degs)
+        tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", degs, ['pt', 'rho'],
                                            limits=(-50, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
         if MCTF:
@@ -661,6 +668,13 @@ if __name__ == '__main__':
 
     parser.add_argument('--unblind', action='store_true', dest='unblind')
     parser.add_argument('--higgs', action='store_true', dest='runhiggs', help="Set Higgs as signal instead of z")
+    parser.add_argument('--both', action='store_true', dest='runboth', help="Both Z and H signals")
+
+    parser.add_argument("--degs",
+                        type=str,
+                        default='2,2',
+                        help="Polynomial degrees in the shape 'pt,rho' e.g. '2,2'")
+    
 
     args = parser.parse_args()
     print("Running with options:")
@@ -676,7 +690,9 @@ if __name__ == '__main__':
                      justZ=args.justZ,
                      blind=(not args.unblind),
                      runhiggs=args.runhiggs,
+                     runboth=args.runboth,
                      fitTF=args.fitTF,
                      year=str(args.year),
                      muonCR=args.muCR,
+                     opts=args
                      )
