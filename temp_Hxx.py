@@ -294,8 +294,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         _names = [par.name for par in tf_MCtempl.parameters.flatten()]
         make_dirs('{}/plots'.format(model_name))
         np.save('{}/MCTF'.format(model_name), _values)
+        print('ptdeg', degsMC[0], 'rhodeg', degsMC[1])
         plotMCTF(*TF_smooth_plot(*TF_params(_values, _names)), MC=True, raw=True,
-                 out='{}/plots/MCTF'.format(model_name))
+                 ptdeg=degsMC[0], rhodeg=degsMC[1],
+                 out='{}/plots/TF_MC_only'.format(model_name))
 
         param_names = [p.name for p in tf_MCtempl.parameters.reshape(-1)]
         decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
@@ -317,7 +319,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             elif opts.justHZ is True:
                 include_samples = ['zcc', "hcc"]
             else:
-                include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hbb']
+                include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'stqq', 'hbb']
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
@@ -371,7 +373,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                         sample.setParamEffect(sys_muveto, 1.005)
                         sample.setParamEffect(sys_lumi, 1.025)
                         sample.setParamEffect(sys_trigger, 1.02)
-                    if sName not in ["qcd", 'tqq']:
+                    if sName not in ["qcd", 'tqq', 'stqq']:
                         sample.scale(SF[year]['V_SF'])
                         sample.setParamEffect(sys_veff,
                                             1.0 + SF[year]['V_SF_ERR'] / SF[year]['V_SF'])
@@ -412,7 +414,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                     if sName.startswith("h"):
                         sample.setParamEffect(sys_Hpt, 1.2)
 
-                if scale_syst and sName not in ["qcd", 'tqq']:
+                if scale_syst and sName not in ["qcd", 'tqq', 'stqq']:
                     # Scale and Smear
                     mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
@@ -432,7 +434,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                                           mtempl.get(shift=-7.)[0],
                                           scale=realshift/7.)
 
-                if smear_syst and sName not in ["qcd", 'tqq']:
+                if smear_syst and sName not in ["qcd", 'tqq', 'stqq']:
                     # To Do
                     # Match to boson mass instead of mean
                     # smear_in, smear_unc = 1, 0.11
@@ -464,7 +466,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                         _temp_yields = get_templM(f, region, samp, ptbin)[0]
                     else:
                         _temp_yields = get_templ(f, region, samp, ptbin)[0]
-                    if samp not in ['qcd', 'tqq'] and systs:
+                    if samp not in ['qcd', 'tqq', 'stqq'] and systs:
                         _temp_yields *= SF[year]['V_SF']
                     #print("D", samp, region, ptbin, np.sum(_temp_yields))
                     yields.append(_temp_yields)
@@ -535,7 +537,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
         for region in ['pass', 'fail']:
             ch = rl.Channel("muonCR%s" % (region, ))
             model.addChannel(ch)
-            include_samples = ["qcd", "tqq"]
+            include_samples = ["qcd", "tqq", 'stqq']
 
             for sName in include_samples:
                 if use_matched:
@@ -695,7 +697,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--degs",
                         type=str,
-                        default='2,2',
+                        default='1,1',
                         help="Polynomial degrees in the shape 'pt,rho' e.g. '2,2'")
 
     parser.add_argument("--degsMC",

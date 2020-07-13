@@ -3,6 +3,11 @@ from operator import methodcaller
 import numpy as np
 import math
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import mplhep as hep
+
+
 # Benstein polynomial calculation
 def bern_elem(x, v, n):
     # Bernstein element calculation
@@ -53,6 +58,7 @@ def TF_params(xparlist, xparnames=None, nrho=None, npt=None):
 
     return TF_cf_map, rhodeg, ptdeg
 
+
 def TF_smooth_plot(_tfmap, _rhodeg, _ptdeg):
     # Define fine bins for smooth TF plots
     fptbins = np.arange(450, 1202, 2)
@@ -66,9 +72,11 @@ def TF_smooth_plot(_tfmap, _rhodeg, _ptdeg):
     fvalidbins = (frhoscaled >= 0) & (frhoscaled <= 1)
     frhoscaled[~fvalidbins] = 1  # we will mask these out later
     
+
     def wrapTF(pT, rho):
         return TF(pT, rho, n_pT=_ptdeg, n_rho=_rhodeg, par_map=_tfmap)
     
+
     TFres = np.array(list(map(wrapTF, fptscaled.flatten(), frhoscaled.flatten()))).reshape(fptpts.shape)
 
     # return TF, msd bins, pt bins, mask
@@ -85,7 +93,6 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     pt: pT bins array (meshgrid-like)
     """
     import matplotlib.pyplot as plt
-    #import matplotlib.font_manager
     import mplhep as hep
     plt.style.use([hep.style.ROOT, {'font.size': 24}])
     plt.switch_backend('agg')
@@ -171,3 +178,80 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
         fig.savefig('{}.png'.format(out))#, bbox_inches="tight")
     else:
         return fig
+
+
+def plotTF_ratio(in_ratio, mask, region, args=None):
+    fig, ax = plt.subplots()
+
+    H = np.ma.masked_where(in_ratio * mask <= 0.01, in_ratio * mask)
+    zmin, zmax = np.floor(10*np.min(H))/10, np.ceil(10*np.max(H))/10
+    zmin, zmax = zmin + 0.001, zmax - 0.001
+    clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
+    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    msdbins = np.linspace(40, 201, 24)
+    hep.hist2dplot(H.T, msdbins, ptbins, vmin=1-clim, vmax=1+clim,
+                   cmap='RdBu_r', cbar=False)
+    cax = hep.make_square_add_cbar(ax, pad=0.2, size=0.5)
+    if abs(1-zmin) > .3 and abs(1-zmax) > .3:
+        c_extend = 'both'
+    elif abs(1-zmin) > .3:
+        c_extend = 'min'
+    elif abs(1-zmax) > .3:
+        c_extend = 'max'
+    else:
+        c_extend = 'neither'
+    cbar = fig.colorbar(ax.get_children()[0], cax=cax, extend=c_extend)
+
+    ax.set_xticks(np.arange(40, 220, 20))
+    ax.tick_params(axis='y', which='minor', left=False, right=False)
+    ax.invert_yaxis()
+
+    ax.set_title('{} QCD Ratio'.format(region), pad=15, fontsize=26)
+    ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1)
+    ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1)
+    cbar.set_label(r'(Pass QCD) / (Fail QCD * eff)', ha='right', y=1)
+
+    fig.savefig('{}/{}{}.png'.format(args.output_folder, "TF_ratio_", region),
+                bbox_inches="tight")
+
+
+def plot_qcd(qcd, fail=False, args=None):
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.gca(projection='3d')
+
+    ax.set_ylim(get_fixed_mins_maxs(450, 1200))
+    ax.set_xlim(get_fixed_mins_maxs(40, 201))
+    ax.set_zlim(get_fixed_mins_maxs(0, 6))
+
+    ax.set_title(('Fail' if fail else "Pass") + 'QCD')
+    ax.set_xlabel(r'Jet $\mathrm{m_{SD}}$', ha='right', x=1, labelpad=15)
+    ax.set_ylabel(r'Jet $\mathrm{p_{T}}$', ha='right', y=1, labelpad=15)
+    ax.set_zlabel(r'$\mathrm{log_{10}(N)}$', ha='left', labelpad=15)
+
+    ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
+    msdbins = np.linspace(40, 201, 24)
+    ptpts, msdpts = np.meshgrid(ptbins[:-1] + 0.3 * np.diff(ptbins),
+                                msdbins[:-1] + 0.5 * np.diff(msdbins),
+                                indexing='ij')
+
+    Xi = (msdpts-3.5).flatten()
+    Yi = np.array([list(ptbins[:-1])]*23).T.flatten()
+    Zi = 0
+    dx = 7
+    dy = np.array([list(np.diff(ptbins))]*23).T.flatten()
+    dz = qcd.ravel()
+    dz = np.where(dz > 2, dz, 1)
+
+    ax.bar3d(Xi, Yi, Zi, dx, dy, np.log10(dz), color='w')
+    ax.azim = ax.azim + 180
+    ax.invert_xaxis()
+
+    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.xaxis._axinfo["grid"]['color'] = (1, 1, 1, 0)
+    ax.yaxis._axinfo["grid"]['color'] = (1, 1, 1, 0)
+    # ax.zaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+
+    fig.savefig('{}/{}.png'.format(args.output_folder,
+                                   ("Fail" if fail else "Pass") + "QCD"),
+                bbox_inches="tight")

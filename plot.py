@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import os
 from collections import OrderedDict
@@ -49,6 +50,10 @@ parser.add_argument("--unmask",
                     action='store_false',
                     dest='mask',
                     help="Mask Higgs bins")
+parser.add_argument("--all",
+                    action='store_true',
+                    dest='run_all',
+                    help="Include split pT bin plots")
 parser.add_argument("-o", "--output-folder",
                     default='plots',
                     dest='output_folder',
@@ -82,6 +87,7 @@ cdict = {
     'wcq': 'green',
     'qcd': 'gray',
     'tqq': 'plum',
+    'stqq': 'lightblue',
     'zbb': 'dodgerblue',
     'zcc': 'red',
     'zqq': 'turquoise',
@@ -95,6 +101,7 @@ sdict = {
     'wcq': '-',
     'qcd': '-',
     'tqq': '-',
+    'stqq': '-',
     'zbb': '-',
     'zcc': '-',
     'zqq': '-',
@@ -115,6 +122,7 @@ label_dict = OrderedDict([
     ('hcc', "$\mathrm{H(c\\bar{c})}$"),
     ('qcd', "QCD"),
     ('tqq', "$\mathrm{t\\bar{t}}$"),
+    ('stqq', "$\mathrm{single-t}$"),
 ])
 
 
@@ -255,7 +263,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Stack qcd/ttbar
     tot_h, bins = None, None
-    for mc, zo in zip(['qcd', 'tqq'], [1, 0]):
+    for mc, zo in zip(['qcd', 'tqq', 'stqq'], [2, 1, 0]):
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -317,8 +325,9 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     # _yerr += 0.0000000001  # pad zeros
 
     y = np.copy(_y)
-    #for mc in ['qcd', 'tqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
-    for mc in ['qcd', 'tqq']:
+    #for mc in ['qcd', 'tqq', 'stqq', 'wcq', 'wqq', 'zbb', 'zqq', 'hbb']:
+    #for mc in ['qcd', 'tqq']:
+    for mc in ['qcd', 'tqq', 'stqq', 'wcq', 'wqq']:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -342,7 +351,8 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Stack plots
     tot_h, bins = None, None
-    stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    #stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
+    stack_samples = ['zbb', 'zcc', 'zqq']
     #stack_samples = ['zcc']
     if not args.scaleH:
         stack_samples = ['hcc', 'hbb'] + stack_samples
@@ -359,7 +369,6 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
             tot_h = h
         else:
             if mc == 'hcc':
-                print("BINXO")
                 plot_filled(bins, (h + tot_h)/_scale_for_mc, tot_h/_scale_for_mc, ax=rax, label=mc)
             else:
                 plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
@@ -367,7 +376,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
 
     # Separate scaled signal
     if args.scaleH:
-        for mc in ['hcc']:
+        for mc in ['hcc', 'hbb']:
             if mc not in avail_samples:
                 continue
             res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
@@ -475,7 +484,7 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     leg.set_title(title=fittype.capitalize(), prop={'size': "smaller"})
 
     if b'muon' in cats[0].name:
-        _iptname = "MuonCR"
+        _iptname = "_MuonCR"
     else:
         _iptname = str(str(ipt) if len(cats) == 1 else "")
     # name = str("pass" if "pass" in str(cats[0].name) else "fail"
@@ -502,7 +511,7 @@ for shape_type in shape_types:
         print("Plotting {} region".format(region), shape_type)
         mask = (args.mask & (region == "pass")) | (args.mask & (region == "pcc"))  | (args.mask & (region == "pbb"))
         for i in range(0, 6):
-            continue
+            if not args.run_all: continue
             cat_name = 'ptbin{}{}_{};1'.format(i, region, shape_type)
             try:
                 cat = f[cat_name]
@@ -545,7 +554,7 @@ try:
 
             # Per bin plots
             for i in range(0, 6):
-                continue
+                if not args.run_all: continue
                 full_plot([mockd['ptbin{}{}_{}'.format(i, region, shape_type)]],
                     pseudo=input_pseudo, fittype=shape_type, mask=mask, sqrtnerr=True, toys=False)
 
