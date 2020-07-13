@@ -48,6 +48,7 @@ python temp_Hxx.py # Must chose --data or --MC, other options get printed
 # Go to tempModel/
 cmsenv
 bash build.sh
+# text2workspace.py -P HiggsAnalysis.CombinedLimit.PhysicsModel:multiSignalModel  --PO verbose --PO 'map=.*/hcc:r[1,0,10]' --PO 'map=.*/zcc:z[1,0,10]' model_combined.txt
 
 combine -M FitDiagnostics --expectSignal 1 -d model_combined.root --rMin=-5 --rMax=10  --cminDefaultMinimizerStrategy 0 --robustFit=1 -t -1 --toysFrequentist
 combine -M Significance model_combined.root --expectSignal 1  -t -1 --toysFrequentist

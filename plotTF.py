@@ -98,7 +98,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     cbar.set_label(r'TF', ha='right', y=1)
 
     label = "MC" if MC else "Data"
-    if raw: 
+    if raw:
         label = "MCRaw"
     if out is None:
         fig.savefig('{}/{}{}.png'.format(args.output_folder,
@@ -107,7 +107,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
                     bbox_inches="tight")
     else:
         fig.savefig('TF{}.png'.format(out, bbox_inches="tight"))
-        
+
 
 
 def plotTF_ratio(in_ratio, mask, region):
@@ -224,6 +224,9 @@ if __name__ == '__main__':
         args.output_folder = os.path.join(args.dir, args.output_folder)
     make_dirs(args.output_folder)
 
+    import json
+    configs = json.load(open("config.json"))
+
     # Get fitDiagnostics File
     rf = r.TFile.Open(os.path.join(args.dir, args.fit))
 
@@ -254,29 +257,36 @@ if __name__ == '__main__':
 
     parmap = np.array(hmp).reshape(rhodeg+1, ptdeg+1)
     if len(MCTF) > 0:
-        MCTF_map = np.array(MCTF).reshape(rhodeg+1, ptdeg+1)\
+        degsMC = np.array([int(s) for s in configs['degsMC'].split(',')])
+        MCTF_map = np.array(MCTF).reshape(degsMC[0]+1, degsMC[1]+1)
 
     ##### Smooth plots
     from plotTF2 import plotTF as plotTFsmooth
     from plotTF2 import TF_smooth_plot, TF_params
     _values = hmp
     # TF Data
-    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=False, raw=args.isMC,
-                 out='{}/TF_data'.format(args.output_folder), year=args.year)
+    if configs['fitTF']:
+        plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=rhodeg, npt=ptdeg)), MC=False, raw=args.isMC,
+                     rhodeg=rhodeg, ptdeg=ptdeg,
+                     out='{}/TF_data'.format(args.output_folder), year=args.year)
 
     # TF MC Postfit
-    _vect = np.load('decoVector.npy')
-    _MCTF_nominal = np.load('MCTF.npy')
-    _values = _values = _vect.dot(np.array(MCTF)) + _MCTF_nominal
-    plotTFsmooth(*TF_smooth_plot(*TF_params(_values, nrho=2, npt=2)), MC=True, raw=args.isMC,
-                 out='{}/TF_MC'.format(args.output_folder), year=args.year)
-
+    if configs['MCTF']:
+        _vect = np.load('decoVector.npy')
+        _MCTF_nominal = np.load('MCTF.npy')
+        _values = _values = _vect.dot(np.array(MCTF)) + _MCTF_nominal
+        plotTFsmooth(*TF_smooth_plot(*TF_params(_values, npt=degsMC[0], nrho=degsMC[1])), MC=True, raw=args.isMC,
+                    out='{}/TF_MC'.format(args.output_folder), year=args.year)
+    
     # Effective TF (combination)
-    _tf1, _, _, _ = TF_smooth_plot(*TF_params(hmp, nrho=2, npt=2))
-    _tf2, bit1, bit2, bit3 = TF_smooth_plot(*TF_params(_values, nrho=2, npt=2))
-    plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=args.isMC,
-                 out='{}/TF_eff'.format(args.output_folder), year=args.year,
-                 label='Effective Transfer Factor')
+    if configs['fitTF']:
+        degsMC = tuple([int(s) for s in configs['degsMC'].split(',')])
+        degs = tuple([int(s) for s in configs['degs'].split(',')])
+        _tf1, _, _, _ = TF_smooth_plot(*TF_params(hmp, npt=degs[0], nrho=degs[1]))
+        _tf2, bit1, bit2, bit3 = TF_smooth_plot(*TF_params(_values, npt=degsMC[0], nrho=degsMC[1]))
+        plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=args.isMC,
+                    out='{}/TF_eff'.format(args.output_folder), year=args.year,
+                    label='Effective Transfer Factor')
 
     # Define bins
     # ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])

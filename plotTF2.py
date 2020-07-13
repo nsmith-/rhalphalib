@@ -48,7 +48,8 @@ def TF_params(xparlist, xparnames=None, nrho=None, npt=None):
     else:
         rhodeg, ptdeg = nrho, npt
 
-    TF_cf_map = np.array(xparlist).reshape(rhodeg + 1, ptdeg + 1)
+    #TF_cf_map = np.array(xparlist).reshape(rhodeg + 1, ptdeg + 1)
+    TF_cf_map = np.array(xparlist).reshape(ptdeg + 1, rhodeg + 1)
 
     return TF_cf_map, rhodeg, ptdeg
 
@@ -148,7 +149,7 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     if raw and MC:
         tMC = "Tagger Response (prefit)"
     if label is None:
-        label = '{} TF({},{})'.format(tMC, rhodeg, ptdeg)
+        label = '{} TF({},{})'.format(tMC, ptdeg, rhodeg)
     ax.set_title(label,
                  pad=9,
                  fontsize=22,

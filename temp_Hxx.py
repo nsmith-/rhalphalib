@@ -240,7 +240,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     # Separate out QCD to QCD fit
     if MCTF:
-        tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
+        degsMC = tuple([int(s) for s in opts.degsMC.split(',')])
+        tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", degsMC, ['pt', 'rho'],
                                       limits=(-50, 50))
         tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
 
@@ -313,6 +314,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             model.addChannel(ch)
             if justZ:
                 include_samples = ['zcc']
+            elif opts.justHZ is True:
+                include_samples = ['zcc', "hcc"]
             else:
                 include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'hbb']
             # Define mask
@@ -477,7 +480,6 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     if fitTF:
         degs = tuple([int(s) for s in opts.degs.split(',')])
-        print("XXX", degs)
         tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", degs, ['pt', 'rho'],
                                            limits=(-50, 50))
         tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
@@ -570,6 +572,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                 if throwPoisson:
                     yields = np.random.poisson(yields)
                 data_obs = (yields, msd.binning, msd.name)
+                
+            _nbinsmu = len(data_obs[0])
 
             ch.setObservation(data_obs)
 
@@ -587,6 +591,19 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
     model.renderCombine(model_name)
 
+    conf_dict = vars(opts)
+    # add info for F-test
+    conf_dict['NBINS'] = np.sum(validbins)
+    conf_dict['NBINSMU'] = _nbinsmu if muonCR else 0
+    
+    import json
+    # Serialize data into file:
+    json.dump(conf_dict,
+              open("{}/config.json".format(model_name), 'w'),
+              sort_keys=True,
+              indent=4,
+              separators=(',', ': '))
+
 
 if __name__ == '__main__':
     import argparse
@@ -601,10 +618,10 @@ if __name__ == '__main__':
             return False
         else:
             raise argparse.ArgumentTypeError('Boolean value expected.')
-    
+
     parser.add_argument("--throwPoisson",
                         type=str2bool,
-                        default='True',
+                        default='False',
                         choices={True, False},
                         help="If plotting data, redraw from poisson distribution")
 
@@ -650,6 +667,12 @@ if __name__ == '__main__':
                         choices={True, False},
                         help="Only run Z sample with QCD")
 
+    parser.add_argument("--justHZ",
+                        type=str2bool,
+                        default='False',
+                        choices={True, False},
+                        help="Only run H and Z sample with QCD")
+
     parser.add_argument("--year",
                         type=int,
                         default=2017,
@@ -674,7 +697,12 @@ if __name__ == '__main__':
                         type=str,
                         default='2,2',
                         help="Polynomial degrees in the shape 'pt,rho' e.g. '2,2'")
-    
+
+    parser.add_argument("--degsMC",
+                        type=str,
+                        default='1,2',
+                        help="Polynomial degrees in the shape 'pt,rho' e.g. '2,2'")
+
 
     args = parser.parse_args()
     print("Running with options:")

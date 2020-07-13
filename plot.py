@@ -45,7 +45,7 @@ parser.add_argument("--3reg",
                     action='store_true',
                     dest='three_regions',
                     help="By default plots pass/fail region. Set to plot pqq/pcc/pbb")
-parser.add_argument("--mask",
+parser.add_argument("--unmask",
                     action='store_false',
                     dest='mask',
                     help="Mask Higgs bins")
@@ -212,6 +212,12 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
             _h = h
         ax.step(bins, _h, where='post', label=label, c=cdict[label], **kwargs)
 
+    def plot_filled(bins, h, h0=0, ax=None, label=None, nozeros=True, **kwargs):
+        if h0 == 0:
+            h0 = np.zeros_like(h)
+        ax.fill_between(bins, h, h0, 
+                        step='post', label=label, color=cdict[label], **kwargs)
+
     # Sample proofing
     by_cat_samples = []
     for _cat in cats:
@@ -272,10 +278,17 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
-            plot_step(bins, h, ax=ax, label=mc)
+            if mc == 'hcc':
+                plot_filled(bins, h, h0=0, ax=ax, label=mc)
+            else:
+                plot_step(bins, h, ax=ax, label=mc)
             tot_h = h
+
         else:
-            plot_step(bins, h + tot_h, label=mc, ax=ax)
+            if mc == 'hcc':
+                plot_filled(bins, h + tot_h, h0=tot_h, ax=ax, label=mc)
+            else:
+                plot_step(bins, h + tot_h, label=mc, ax=ax)
             tot_h += h
 
     # Separate scaled signal
@@ -332,17 +345,24 @@ def full_plot(cats, pseudo=True, fittype="", mask=False,
     stack_samples = ['hbb', 'zbb', 'zcc', 'zqq', 'wcq', 'wqq']
     #stack_samples = ['zcc']
     if not args.scaleH:
-        stack_samples = ['hcc'] + stack_samples
+        stack_samples = ['hcc', 'hbb'] + stack_samples
     for mc in stack_samples:
         if mc not in avail_samples:
             continue
         res = np.array(list(map(th1_to_step, [cat[mc] for cat in cats])))
         bins, h = res[:, 0][0], np.sum(res[:, 1], axis=0)
         if tot_h is None:
-            plot_step(bins, h / _scale_for_mc, ax=rax, label=mc)
+            if mc == 'hcc':
+                plot_filled(bins, h / _scale_for_mc, ax=rax, label=mc)
+            else:
+                plot_step(bins, h / _scale_for_mc, ax=rax, label=mc)
             tot_h = h
         else:
-            plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
+            if mc == 'hcc':
+                print("BINXO")
+                plot_filled(bins, (h + tot_h)/_scale_for_mc, tot_h/_scale_for_mc, ax=rax, label=mc)
+            else:
+                plot_step(bins, (h + tot_h)/_scale_for_mc, label=mc, ax=rax)
             tot_h += h
 
     # Separate scaled signal

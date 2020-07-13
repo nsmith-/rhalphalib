@@ -3,6 +3,7 @@ from collections import defaultdict
 import rhalphalib as rl
 import numpy as np
 import pickle
+import ROOT
 import uproot
 rl.util.install_roofit_helpers()
 
@@ -77,8 +78,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
 
     # Get QCD efficiency
     if MCTF:
-        qcdmodelc = rl.Model("qcdmodelc")
-        qcdmodelb = rl.Model("qcdmodelb")
+        qcdmodelcc = rl.Model("qcdmodelcc")
+        qcdmodelbb = rl.Model("qcdmodelbb")
 
     qcdpqq, qcdpcc, qcdpbb = 0., 0., 0.
     for ptbin in range(npt):
@@ -99,44 +100,46 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
         qcdpbb += pbbCh.getObservation().sum()
 
         if MCTF:
-            qcdmodelc.addChannel(pqqCh)
-            qcdmodelc.addChannel(pccCh)
-            qcdmodelb.addChannel(pqqCh)
-            qcdmodelb.addChannel(pbbCh)
+            qcdmodelcc.addChannel(pqqCh)
+            qcdmodelcc.addChannel(pccCh)
+            qcdmodelbb.addChannel(pqqCh)
+            qcdmodelbb.addChannel(pbbCh)
 
-    qcdeff_c = qcdpcc / qcdpqq
-    qcdeff_b = qcdpbb / qcdpqq
+    qcdeff_cc = qcdpcc / qcdpqq
+    qcdeff_bb = qcdpbb / qcdpqq
 
     # Separate out QCD to QCD fit
     if MCTF:
-        tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ['pt', 'rho'],
-                                      limits=(-50, 50))
-        tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
+        # bb fit
+        tf_MCtemplbb = rl.BernsteinPoly("tf_MCtemplbb", (2, 2), ['pt', 'rho'],
+                                        limits=(-50, 50))
+        tf_MCtemplbb_params = qcdeff_bb * tf_MCtemplbb(ptscaled, rhoscaled)
 
         for ptbin in range(npt):
-            failCh = qcdmodel['ptbin%dfail' % ptbin]
-            passCh = qcdmodel['ptbin%dpass' % ptbin]
-            failObs = failCh.getObservation()[0]
+            pqqCh = qcdmodelbb['ptbin%dpqq' % ptbin]
+            pbbCh = qcdmodelbb['ptbin%dpbb' % ptbin]
+            pqqObs = pqqCh.getObservation()
+            #print(pqqObs)
             qcdparams = np.array([
-                rl.IndependentParameter('qcdparam_ptbin%d_msdbin%d' % (ptbin, i), 0)
+                rl.IndependentParameter('qcdparambb_ptbin%d_msdbin%d' % (ptbin, i), 0)
                 for i in range(msd.nbins)
             ])
             sigmascale = 10.
-            scaledparams = failObs * (
-                1 + sigmascale / np.maximum(1., np.sqrt(failObs)))**qcdparams
-            fail_qcd = rl.ParametericSample('ptbin%dfail_qcd' % ptbin,
+            scaledparams = pqqObs * (
+                1 + sigmascale / np.maximum(1., np.sqrt(pqqObs)))**qcdparams
+            pqq_qcd = rl.ParametericSample('ptbin%dpqq_qcd' % ptbin,
                                             rl.Sample.BACKGROUND, msd, scaledparams)
-            failCh.addSample(fail_qcd)
-            pass_qcd = rl.TransferFactorSample('ptbin%dpass_qcd' % ptbin,
+            pqqCh.addSample(pqq_qcd)
+            pbb_qcd = rl.TransferFactorSample('ptbin%dpbb_qcd' % ptbin,
                                                rl.Sample.BACKGROUND,
-                                               tf_MCtempl_params[ptbin, :], fail_qcd)
-            passCh.addSample(pass_qcd)
+                                               tf_MCtemplbb_params[ptbin, :], pqq_qcd)
+            pbbCh.addSample(pbb_qcd)
 
-            failCh.mask = validbins[ptbin]
-            passCh.mask = validbins[ptbin]
+            pqqCh.mask = validbins[ptbin]
+            pbbCh.mask = validbins[ptbin]
 
-        qcdfit_ws = ROOT.RooWorkspace('qcdfit_ws')
-        simpdf, obs = qcdmodel.renderRoofit(qcdfit_ws)
+        qcdfit_ws1 = ROOT.RooWorkspace('qcdfit_ws')
+        simpdf, obs = qcdmodelbb.renderRoofit(qcdfit_ws1)
         qcdfit = simpdf.fitTo(obs,
                               ROOT.RooFit.Extended(True),
                               ROOT.RooFit.SumW2Error(True),
@@ -146,13 +149,21 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
                               ROOT.RooFit.Offset(True),
                               ROOT.RooFit.PrintLevel(-1),
                               )
-        qcdfit_ws.add(qcdfit)
-        qcdfit_ws.writeToFile('qcdfit.root')
+        qcdfit_ws1.add(qcdfit)
+        qcdfit_ws1.writeToFile('qcdfit1.root')
         if qcdfit.status() != 0:
             qcdfit.Print()
             raise RuntimeError('Could not fit qcd')
 
-        qcdmodel.readRooFitResult(qcdfit)
+        qcdmodelbb.readRooFitResult(qcdfit)
+
+        param_names = [p.name for p in tf_MCtemplbb.parameters.reshape(-1)]
+        decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(
+            tf_MCtemplbb.name + '_deco', qcdfit, param_names)
+        np.save('{}/decoVector'.format(model_name), decoVector._transform)
+        tf_MCtempl.parameters = decoVector.correlated_params.reshape(
+            tf_MCtempl.parameters.shape)
+        tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
 
     # build actual fit model now
     model = rl.Model("temp3Model")
@@ -257,8 +268,13 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
         tf1_dataResidual_params = tf1_dataResidual(ptscaled, rhoscaled)
         tf2_dataResidual_params = tf2_dataResidual(ptscaled, rhoscaled)
 
-        tf1_params = qcdeff_c * tf1_dataResidual_params
-        tf2_params = qcdeff_b * tf2_dataResidual_params
+        if MCTF:
+            #tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
+            tf1_params = qcdeff_cc *  tf_MCtempl_params_final * tf1_dataResidual_params
+        else:
+            tf1_params = qcdeff_cc * tf1_dataResidual_params
+        
+        tf2_params = qcdeff_bb * tf2_dataResidual_params
 
         for ptbin in range(npt):
             pqqCh = model['ptbin%dpqq' % ptbin]
