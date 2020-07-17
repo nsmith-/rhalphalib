@@ -73,8 +73,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
     rhoscaled[~validbins] = 1  # we will mask these out later
 
     # Template reading
-    #f = uproot.open('hxx/templates3.root')
-    f = uproot.open('jax.root')
+    f = uproot.open('hxx/templates3.root')
+    #f = uproot.open('jax.root')
 
     # Get QCD efficiency
     if MCTF:
@@ -235,13 +235,29 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, fitTF, use_matched, paramVector
             pbb_nom = tot_region['pbb'] / tot_templ
             pcc_nom = tot_region['pcc'] / tot_templ
             pqq_nom = tot_region['pqq'] / tot_templ
-            pcc = rl.IndependentParameter('veff_%s_pcc' % sName, pcc_nom, 0, 1)
-            pbbscaled = rl.IndependentParameter('veff_%s_pbb' % sName, pbb_nom / (1 - pcc_nom), 0, 1)
-            pbb = pbbscaled * (1 - pcc)
-            pqq = 1 - pbb - pcc
-            vscalefactors['pbb'] = (pbbscaled, pbb * (1 / pbb_nom))
-            vscalefactors['pcc'] = (pcc, pcc * (1 / pcc_nom))
-            vscalefactors['pqq'] = (pcc, pqq * (1 / pqq_nom))
+            theta0 = np.arccos(np.sqrt(pbb_nom))
+            phi0 = np.arctan2(np.sqrt(pcc_nom), np.sqrt(pqq_nom))
+            constrain = False
+            if constrain:
+                # its broke
+                theta_param = rl.NuisanceParameter('veff_%s_theta' % sName, 'param')
+                phi_param = rl.NuisanceParameter('veff_%s_phi' % sName, 'param')
+                theta = theta0 + theta_param * 0.1
+                phi = phi0 + phi_param * 0.1
+            else:
+                theta = rl.IndependentParameter('veff_%s_theta' % sName, theta0, 0, np.pi/2)
+                theta_param = theta
+                phi = rl.IndependentParameter('veff_%s_phi' % sName, phi0, 0, np.pi/2)
+                phi_param = phi
+            pbb = rl.DependentParameter('veff_%s_pbb' % sName, "cos({0})**2", theta)
+            pbb.intermediate = True
+            pcc = rl.DependentParameter('veff_%s_pcc' % sName, "(sin({0})*sin({1}))**2", theta, phi)
+            pcc.intermediate = True
+            pqq = rl.DependentParameter('veff_%s_pqq' % sName, "(sin({0})*cos({1}))**2", theta, phi)
+            pqq.intermediate = True
+            vscalefactors['pbb'] = (theta_param, pbb * (1 / pbb_nom))
+            vscalefactors['pcc'] = (phi_param, pcc * (1 / pcc_nom))
+            vscalefactors['pqq'] = (theta_param, pqq * (1 / pqq_nom))
 
             for ptbin in range(npt):
                 for region in ['pbb', 'pcc', 'pqq']:

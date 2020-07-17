@@ -56,8 +56,8 @@ def plot_fractions(fitDiagnostics_file='fitDiagnostics.root',
     # par_names = rf.Get('fit_s').floatParsFinal().contentsString().split(',')
     # par_names = [p for p in par_names if 'veff' in p]
     par_names = [
-        'veff_wcq_pbb', 'veff_wcq_pcc', 'veff_wqq_pbb', 'veff_wqq_pcc', 'veff_zbb_pbb',
-        'veff_zbb_pcc', 'veff_zcc_pbb', 'veff_zcc_pcc', 'veff_zqq_pbb', 'veff_zqq_pcc'
+        'veff_wcq_theta', 'veff_wcq_phi', 'veff_wqq_theta', 'veff_wqq_phi', 'veff_zbb_theta',
+        'veff_zbb_phi', 'veff_zcc_theta', 'veff_zcc_phi', 'veff_zqq_theta', 'veff_zqq_phi'
     ]
 
     # Get initial values
@@ -94,11 +94,11 @@ def plot_fractions(fitDiagnostics_file='fitDiagnostics.root',
     def tobars(dic):
         pbb, pcc, pqq = [], [], []
         for samp in samples:
-            ec = get_dval("veff_{}_pcc".format(samp), actual=dic)
-            eb = get_dval("veff_{}_pbb".format(samp), actual=dic) * (1-ec)
-            pbb.append(eb)
-            pcc.append(ec)
-            pqq.append(1-eb-ec)
+            phi = get_dval("veff_{}_phi".format(samp), actual=dic)
+            theta = get_dval("veff_{}_theta".format(samp), actual=dic)
+            pbb.append(np.cos(theta)**2)
+            pcc.append((np.sin(theta)*np.sin(phi))**2)
+            pqq.append((np.sin(theta)*np.cos(phi))**2)
         return pbb, pcc, pqq
 
     def wasfitted(dic=res_dict):
@@ -106,15 +106,16 @@ def plot_fractions(fitDiagnostics_file='fitDiagnostics.root',
         yaynayc = []
         yaynayq = []
         for samp in samples:
-            if "veff_{}_pcc".format(samp) in dic.keys():
+            # this is a lie, b is accurate though
+            if "veff_{}_phi".format(samp) in dic.keys():
                 yaynayc.append(True)
             else:
                 yaynayc.append(False)
-            if "veff_{}_pbb".format(samp) in dic.keys():
+            if "veff_{}_theta".format(samp) in dic.keys():
                 yaynayb.append(True)
             else:
                 yaynayb.append(False)
-            if "veff_{}_pbb".format(samp) in dic.keys() or "veff_{}_pcc".format(samp) in dic.keys():
+            if "veff_{}_phi".format(samp) in dic.keys():
                 yaynayq.append(True)
             else:
                 yaynayq.append(False)
