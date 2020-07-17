@@ -146,7 +146,7 @@ class TemplateSample(Sample):
         '''
         if not isinstance(param, NuisanceParameter):
             if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
-                extras = effect_up.getDependents() - {param}
+                extras = effect_up.getDependents(deep=True) - {param}
                 if not all(isinstance(p, IndependentParameter) for p in extras):
                     raise ValueError("Normalization effects can only depend on one or more IndependentParameters")
                 self._extra_dependencies.update(extras)
@@ -334,7 +334,7 @@ class TemplateSample(Sample):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
             channel, sample = self.name[:self.name.find('_')], self.name[self.name.find('_') + 1:]
-            dependents = dep.getDependents()
+            dependents = dep.getDependents(deep=True)
             formula = dep.formula(rendering=True).format(**{var.name: '@%d' % i for i, var in enumerate(dependents)})
             return '{0} rateParam {1} {2} {3} {4}'.format(dep.name,
                                                           channel,
