@@ -90,8 +90,8 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False)
     #     sample += "125"
     if sample in ["hcc"]:
         sample += "125"
-    if sample in ["hbb"]:
-        sample = "hqq125"
+    if sample in ['hbb', 'zhbb', 'vbfhbb', 'whbb', 'tthbb']:
+        sample = sample.replace("bb", "qq")+"125"
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
@@ -113,8 +113,8 @@ def get_templ(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False)
 def get_templM(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False):
     if sample in ["hcc"]:
         sample += "125"
-    if sample in ["hbb"]:
-        sample = "hqq125"
+    if sample in ['hbb', 'zhbb', 'vbfhbb', 'whbb', 'tthbb']:
+        sample = sample.replace("bb", "qq")+"125"
     hist_name = '{}_{}'.format(sample, region)
     if syst is not None:
         hist_name += "_" + syst
@@ -319,13 +319,24 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             elif opts.justHZ is True:
                 include_samples = ['zcc', "hcc"]
             else:
-                include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'hcc', 'tqq', 'stqq', 'hbb']
+                include_samples = ['zbb', 'zcc', 'zqq', 'wcq', 'wqq', 'tqq', 'stqq',
+                                   'hcc',
+                                   'hbb', 'zhbb', 'vbfhbb', 'whbb', 'tthbb',  # hbb signals
+                                  ]
             # Define mask
             mask = validbins[ptbin].copy()
             if not pseudo and region == 'pass':
                 if blind and 'hbb' in include_samples:
-                    include_samples.remove('hbb')
                     mask[10:14] = False
+            # Remove empty samples
+            for sName in include_samples:
+                if use_matched:
+                    templ = get_templM(f, region, sName, ptbin)
+                else:
+                    templ = get_templ(f, region, sName, ptbin)
+                if np.sum(templ[0][mask]) < 0.00001:
+                    print('Sample {} in region = {}, ptbin = {}, would be empty, so it will be removed'.format(sName, region, ptbin))
+                    include_samples.remove(sName)
 
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
@@ -383,7 +394,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                         sample.setParamEffect(
                             sys_ddxeff,
                             ddx_SF(f, region, sName, ptbin, mask, use_matched, SF_unc=0.3))
-                    if sName in ["zbb", "hbb"]:
+                    if sName in ["zbb", "hbb", 'zhbb', 'vbfhbb', 'whbb', 'tthbb']:
                         # 1 +- 0.3
                         sample.setParamEffect(
                             sys_ddxeffbb,

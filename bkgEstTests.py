@@ -273,6 +273,7 @@ def ftest(base,alt,ntoys,iLabel,options):
         exec_me('mv higgsCombine%s.GoodnessOfFit.mH120.root base_%s.root'%(baseName,baseName), options.dryRun)
         exec_me('combine -M GoodnessOfFit %s --rMax %s --rMin %s --algorithm saturated  -n %s --freezeParameters %s' % (alt,options.rMax,options.rMin,altName, options.freezeNuisances),options.dryRun)
         exec_me('mv higgsCombine%s.GoodnessOfFit.mH120.root base_%s.root'%(altName,altName), options.dryRun)
+        
         exec_me('combine -M GenerateOnly %s --rMax %s --rMin %s --toysFrequentist -t %i --expectSignal %f --saveToys -n %s --freezeParameters %s -s %s' % (base,options.rMax,options.rMin,ntoys,options.r,baseName,options.freezeNuisances,options.seed),options.dryRun)
         #exec_me('mv higgsCombine%s.GenerateOnly.mH120.%s.root %s/'%(baseName,options.seed,options.odir))
         exec_me('combine -M GoodnessOfFit %s --rMax %s --rMin %s -t %i --toysFile %s/higgsCombine%s.GenerateOnly.mH120.%s.root --algorithm saturated -n %s --freezeParameters %s -s %s' % (base,options.rMax,options.rMin,ntoys,options.odir,baseName,options.seed,baseName, options.freezeNuisances,options.seed),options.dryRun)
@@ -568,9 +569,17 @@ if __name__ == "__main__":
         options.justPlot = True
         options.seed     = 'merged'
 
-    if options.method=='GoodnessOfFit':
-        goodness(options.datacard, options.toys, iLabel, options)
-    elif options.method=='FTest':
-        ftest(options.datacard, options.datacardAlt, options.toys, iLabel, options)
-    elif options.method=='Bias':
-        bias(options.datacard, options.datacardAlt, options.toys, options.r, iLabel, options)
+        if options.method=='GoodnessOfFit':
+            goodness(options.datacard, options.toys, iLabel, options)
+        elif options.method=='FTest':
+            ftest(options.datacard, options.datacardAlt, options.toys, iLabel, options)
+        elif options.method=='Bias':
+            bias(options.datacard, options.datacardAlt, options.toys, options.r, iLabel, options)
+
+    else:
+        if options.method=='GoodnessOfFit':
+            goodness(options.datacard, options.toys, iLabel, options)
+        elif options.method=='FTest':
+            ftest(options.datacard, options.datacardAlt, options.toys, iLabel, options)
+        elif options.method=='Bias':
+            bias(options.datacard, options.datacardAlt, options.toys, options.r, iLabel, options)
