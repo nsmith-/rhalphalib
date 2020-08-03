@@ -411,9 +411,10 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                     if sName.startswith("h"):
                         sample.setParamEffect(sys_Hpt, 1.2)
 
+                # Scale and Smear
+                mtempl = AffineMorphTemplate(templ)
+
                 if scale_syst and sName not in ["qcd", 'tqq', 'stqq']:
-                    # Scale and Smear
-                    mtempl = AffineMorphTemplate((templ[0], templ[1]))
                     # import pprint.pprint as pprint
                     # np.set_printoptions(linewidth=1000, precision=2)
                     if sName.startswith("h"):
@@ -427,8 +428,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                     realshift = _mass * SF[year]['shift_SF'] * SF[year]['shift_SF_ERR']
                     # realshift = 90 * 0.01
                     sample.setParamEffect(sys_scale,
-                                          mtempl.get(shift=7.)[0],
-                                          mtempl.get(shift=-7.)[0],
+                                          mtempl.get(shift=7.),
+                                          mtempl.get(shift=-7.),
                                           scale=realshift/7.)
 
                 if smear_syst and sName not in ["qcd", 'tqq', 'stqq']:
@@ -445,7 +446,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                                              shift=-mtempl.mean *
                                              (smear_in + -1 * smear_unc - 1))
                     #print(_smear_down)
-                    sample.setParamEffect(sys_smear, _smear_up[0], _smear_down[0])
+                    sample.setParamEffect(sys_smear, _smear_up, _smear_down)
 
                 ch.addSample(sample)
 

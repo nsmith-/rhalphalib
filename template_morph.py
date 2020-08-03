@@ -5,9 +5,9 @@ import numpy as np
 class AffineMorphTemplate(object):
     def __init__(self, hist):
         '''
-        hist: a numpy-histogram-like tuple of (sumw, edges)
+        hist: a numpy-histogram-like tuple of (sumw, edges, name)
         '''
-        self.sumw, self.edges = hist
+        self.sumw, self.edges, self.varname = hist
         self.norm = self.sumw.sum()
         self.mean = (self.sumw*(self.edges[:-1] + self.edges[1:])/2).sum() / self.norm
         self.cdf = interp1d(x=self.edges,
@@ -24,4 +24,4 @@ class AffineMorphTemplate(object):
         i.e. new edges = edges * scale + shift
         '''
         scaled_edges = (self.edges - shift) / scale
-        return np.diff(self.cdf(scaled_edges)) * self.norm, self.edges
+        return np.diff(self.cdf(scaled_edges)) * self.norm, self.edges, self.varname
