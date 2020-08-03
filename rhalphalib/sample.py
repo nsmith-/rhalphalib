@@ -173,14 +173,13 @@ class TemplateSample(Sample):
             zerobins = self._nominal <= 0.
             effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
-        if np.sum(effect_up * self._nominal) == 0:
+        if np.sum(effect_up * self._nominal) <= 0:
             # TODO: warning? this can happen regularly
             # we might even want some sort of threshold
             return
         elif np.all(effect_up == 1.):
             # some sort of threshold might be useful here as well
             return
-        self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
             if isinstance(effect_down, np.ndarray):
@@ -196,7 +195,7 @@ class TemplateSample(Sample):
                 zerobins = self._nominal <= 0.
                 effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
-                if np.sum(effect_down * self._nominal) == 0:
+                if np.sum(effect_down * self._nominal) <= 0:
                     # TODO: warning? this can happen regularly
                     # we might even want some sort of threshold
                     return
@@ -206,6 +205,9 @@ class TemplateSample(Sample):
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
+
+        # at this point we are assured both up and down templates are OK
+        self._paramEffectsUp[param] = effect_up
 
         if isinstance(scale, numbers.Number):
             if isinstance(effect_up, DependentParameter):
