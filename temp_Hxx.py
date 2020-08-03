@@ -283,8 +283,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
         qcdmodel.readRooFitResult(qcdfit)
 
         # # Plot it
-        from plotTF2 import TF_smooth_plot, TF_params
-        from plotTF2 import plotTF as plotMCTF
+        from _plot_TF import TF_smooth_plot, TF_params
+        from _plot_TF import plotTF as plotMCTF
         from utils import make_dirs
         _values = [par.value for par in tf_MCtempl.parameters.flatten()]
         _names = [par.name for par in tf_MCtempl.parameters.flatten()]
