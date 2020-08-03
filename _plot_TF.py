@@ -104,13 +104,17 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
     zmin, zmax = zmin + 0.001, zmax - 0.001
     clim = np.round(np.min([abs(zmin - 1), abs(zmax - 1)]), 1)
     if clim < .3: clim = .3
-    if clim > .5: clm = .5
+    if clim > .5: clim = .5
     levels = np.linspace(1-clim, 1+clim, 500)
 
-    if np.min(TF) < 1-clim and np.max(TF) > 1+clim: _extend = 'both '
-    elif np.max(TF) > 1+clim: _extend = 'max'
-    elif np.min(TF) < 1-clim: _extend = 'min'  
-    else: _extend = 'neither'
+    if np.min(TF) < 1-clim and np.max(TF) > 1 + clim:
+        _extend = 'both'
+    elif np.max(TF) > 1 + clim:
+        _extend = 'max'
+    elif np.min(TF) < 1 - clim:
+        _extend = 'min'
+    else:
+        _extend = 'neither'
 
     if mask is not None:
         contf = ax.contourf(msd, pt, TF, levels=levels,
@@ -180,13 +184,16 @@ def plotTF(TF, msd, pt, mask=None, MC=False, raw=False, rhodeg=2, ptdeg=2, out=N
         return fig
 
 
-def plotTF_ratio(in_ratio, mask, region, args=None):
+def plotTF_ratio(in_ratio, mask, region, args=None, zrange=None):
     fig, ax = plt.subplots()
 
     H = np.ma.masked_where(in_ratio * mask <= 0.01, in_ratio * mask)
-    zmin, zmax = np.floor(10*np.min(H))/10, np.ceil(10*np.max(H))/10
-    zmin, zmax = zmin + 0.001, zmax - 0.001
-    clim = np.max([.3, np.min([abs(zmin - 1), abs(zmax - 1)])])
+    zmin, zmax = np.nanmin(H), np.nanmax(H)
+    if zrange is None:
+        # Scale clim to fit range up to a max of 0.6
+        clim = np.max([.3, np.min([0.6, 1-zmin, zmax-1])])
+    else:
+        clim = zrange
     ptbins = np.array([450, 500, 550, 600, 675, 800, 1200])
     msdbins = np.linspace(40, 201, 24)
     hep.hist2dplot(H.T, msdbins, ptbins, vmin=1-clim, vmax=1+clim,

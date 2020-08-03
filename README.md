@@ -87,6 +87,13 @@ combineTool.py -M Impacts -d tempModel_combined.root -m 125 --allPars -o impacts
 plotImpacts.py -i impacts.json -o impacts_out --transparent --blind
 ```
 
+### Running likelihood scan
+```
+combineTool.py -M MultiDimFit -d model_combined.root --cminDefaultMinimizerStrategy 0 --expectSignal 1 --robustFit 1 --algo grid --points 40 --setParameterRanges r=-20,20 -m 125 -t -1 --toysFrequentist
+
+plot1DScan.py higgsCombine.Test.MultiDimFit.mH125.root -o LScan_data_Z --y-max 30 --y-cut 30
+```
+
 ## Requirements
 Standalone model creation requires:
   - Python 2.7+ or 3.6+

@@ -86,10 +86,14 @@ if __name__ == '__main__':
                                              par_names)))))))
 
     parmap = np.array(hmp).reshape(ptdeg+1, rhodeg+1)
-    if len(MCTF) > 0:
-        degsMC = np.array([int(s) for s in configs['degsMC'].split(',')])
-        MCTF_map = np.array(MCTF).reshape(degsMC[0]+1, degsMC[1]+1)
 
+    if configs['fitTF']:
+        degs = tuple([int(s) for s in configs['degs'].split(',')])
+    if configs['MCTF']:
+        degsMC = tuple([int(s) for s in configs['degsMC'].split(',')])
+
+    if len(MCTF) > 0:
+        MCTF_map = np.array(MCTF).reshape(degsMC[0]+1, degsMC[1]+1)
 
     ##### Smooth plots
     _values = hmp
@@ -113,8 +117,6 @@ if __name__ == '__main__':
     # Effective TF (combination)
     if configs['fitTF'] and configs['MCTF']:
         print("Plot TF - effective combination")
-        degsMC = tuple([int(s) for s in configs['degsMC'].split(',')])
-        degs = tuple([int(s) for s in configs['degs'].split(',')])
         _tf1, _, _, _ = TF_smooth_plot(*TF_params(hmp, npt=degs[0], nrho=degs[1]))
         _tf2, bit1, bit2, bit3 = TF_smooth_plot(*TF_params(_values, npt=degsMC[0], nrho=degsMC[1]))
         plotTFsmooth(_tf1*_tf2, bit1, bit2, bit3, MC=True, raw=args.isMC,

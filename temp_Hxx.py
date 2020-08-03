@@ -51,21 +51,17 @@ SF = {
 }
 
 
-def ddx_SF(f, region, sName, ptbin, mask, use_matched=False,
+def ddx_SF(f, region, sName, ptbin, mask,
            SF=SF["2017"]['CC_SF'], SF_unc=SF["2017"]['CC_SF_ERR']):
     if region == "pass":
         return 1. + SF_unc/SF
     else:
-        if use_matched:
-            _pass = get_templM(f, "pass", sName, ptbin)
-        else:
-            _pass = get_templ(f, "pass", sName, ptbin)
+        _pass = get_templX(f, "pass", sName, ptbin)
         _pass_rate = np.sum(_pass[0] * mask)
-        if use_matched:
-            _fail = get_templM(f, "fail", sName, ptbin)
-        else:
-            _fail = get_templ(f, "fail", sName, ptbin)
+
+        _fail = get_templX(f, "fail", sName, ptbin)
         _fail_rate = np.sum(_fail[0] * mask)
+
         if _fail_rate > 0:
             return 1. - SF_unc * (_pass_rate/_fail_rate)
         else:
@@ -152,7 +148,7 @@ def shape_to_numM(f, region, sName, ptbin, syst, mask):
     return 1.0 + _diff / (2. * _nom_rate)
 
 
-def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
+def dummy_rhalphabet(pseudo, throwPoisson, MCTF, justZ=False,
                      scale_syst=True, smear_syst=True, systs=True,
                      blind=True, runhiggs=False, fitTF=True, muonCR=True,
                      runboth=False, year=2017,
@@ -330,10 +326,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                     mask[10:14] = False
             # Remove empty samples
             for sName in include_samples:
-                if use_matched:
-                    templ = get_templM(f, region, sName, ptbin)
-                else:
-                    templ = get_templ(f, region, sName, ptbin)
+                templ = get_templX(f, region, sName, ptbin)
                 if np.sum(templ[0][mask]) < 0.00001:
                     print('Sample {} in region = {}, ptbin = {}, would be empty, so it will be removed'.format(sName, region, ptbin))
                     include_samples.remove(sName)
@@ -341,10 +334,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             if not fitTF:  # Add QCD sample when not running TF fit
                 include_samples.append('qcd')
             for sName in include_samples:
-                if use_matched:
-                    templ = get_templM(f, region, sName, ptbin)
-                else:
-                    templ = get_templ(f, region, sName, ptbin)
+                templ = get_templX(f, region, sName, ptbin)
                 if runhiggs:
                     _signals = ["hcc"]
                 elif runboth:
@@ -372,10 +362,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                     sys_names = ['JES', "JER", 'Pu']
                     sys_list = [sys_JES, sys_JER, sys_Pu]
                     for sys_name, sys in zip(sys_names, sys_list):
-                        if use_matched:
-                            _sys_ef = shape_to_numM(f, region, sName, ptbin, sys_name, mask)
-                        else:
-                            _sys_ef = shape_to_num(f, region, sName, ptbin, sys_name, mask)
+                        _sys_ef = shape_to_numX(f, region, sName, ptbin, sys_name, mask)
                         sample.setParamEffect(sys, _sys_ef)
 
                     # Sample specific
@@ -393,13 +380,12 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                         sample.scale(SF[year]['CC_SF'])
                         sample.setParamEffect(
                             sys_ddxeff,
-                            ddx_SF(f, region, sName, ptbin, mask, use_matched, SF_unc=0.3))
+                            ddx_SF(f, region, sName, ptbin, mask, SF_unc=0.3))
                     if sName in ["zbb", "hbb", 'zhbb', 'vbfhbb', 'whbb', 'tthbb']:
                         # 1 +- 0.3
                         sample.setParamEffect(
                             sys_ddxeffbb,
-                            ddx_SF(f, region, sName, ptbin, mask, use_matched,
-                                SF=1, SF_unc=0.3))
+                            ddx_SF(f, region, sName, ptbin, mask, SF=1, SF_unc=0.3))
                     # if sName in ["wcq", "wqq"]:
                     #     # 1 +- 0.3
                     #     sample.setParamEffect(
@@ -465,21 +451,19 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
 
             if not pseudo:
                 data_obs = get_templ(f, region, 'data_obs', ptbin)
-                if ptbin == 0 and region == "pass":
-                    print("Reading real data")
+                if ptbin == 0 and region == "pass": print("Reading real data")
 
             else:
                 yields = []
                 if 'qcd' not in include_samples:
                     include_samples = include_samples + ['qcd']
                 for samp in include_samples:
-                    if use_matched:
-                        _temp_yields = get_templM(f, region, samp, ptbin)[0]
+                    if samp == "qcd" and opts.mockQCD and region == "pass":
+                        _temp_yields = get_templX(f, "fail", samp, ptbin)[0] * qcdeff * np.linspace(0.8, 1.2, len(get_templX(f, "fail", samp, ptbin)[0]))
                     else:
-                        _temp_yields = get_templ(f, region, samp, ptbin)[0]
+                        _temp_yields = get_templX(f, region, samp, ptbin)[0]
                     if samp not in ['qcd', 'tqq', 'stqq'] and systs:
                         _temp_yields *= SF[year]['V_SF']
-                    #print("D", samp, region, ptbin, np.sum(_temp_yields))
                     yields.append(_temp_yields)
                 yields = np.sum(np.array(yields), axis=0)
                 if throwPoisson:
@@ -551,11 +535,8 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             include_samples = ["qcd", "tqq", 'stqq']
 
             for sName in include_samples:
-                if use_matched:
-                    templ = get_templM(f_mu, region, sName, ptbin, muon=True)
-                else:
-                    templ = get_templ(f_mu, region, sName, ptbin, muon=True)
 
+                templ = get_templX(f_mu, region, sName, ptbin, muon=True)
                 stype = rl.Sample.BACKGROUND
                 sample = rl.TemplateSample(ch.name + '_' + sName, stype, templ)
 
@@ -574,10 +555,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
             else:
                 yields = []
                 for samp in include_samples:
-                    if use_matched:
-                        _temp_yields = get_templM(f_mu, region, samp, ptbin, muon=True)[0]
-                    else:
-                        _temp_yields = get_templ(f_mu, region, samp, ptbin, muon=True)[0]
+                    _temp_yields = get_templX(f_mu, region, samp, ptbin, muon=True)[0]
                     # if samp not in ['qcd', 'tqq'] and systs:
                     #     _temp_yields *= SF[year]['V_SF']
                     yields.append(_temp_yields)
@@ -585,7 +563,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
                 if throwPoisson:
                     yields = np.random.poisson(yields)
                 data_obs = (yields, msd.binning, msd.name)
-                
+
             _nbinsmu = len(data_obs[0])
 
             ch.setObservation(data_obs)
@@ -608,7 +586,7 @@ def dummy_rhalphabet(pseudo, throwPoisson, MCTF, use_matched, justZ=False,
     # add info for F-test
     conf_dict['NBINS'] = np.sum(validbins)
     conf_dict['NBINSMU'] = _nbinsmu if muonCR else 0
-    
+
     import json
     # Serialize data into file:
     json.dump(conf_dict,
@@ -706,6 +684,8 @@ if __name__ == '__main__':
     parser.add_argument('--higgs', action='store_true', dest='runhiggs', help="Set Higgs as signal instead of z")
     parser.add_argument('--both', action='store_true', dest='runboth', help="Both Z and H signals")
 
+    parser.add_argument('--mockQCD', action='store_true', dest='mockQCD', help="Replace true pass QCD with scaled true fail QCD in pseudo data")
+
     parser.add_argument("--degs",
                         type=str,
                         default='1,1',
@@ -721,13 +701,36 @@ if __name__ == '__main__':
     print("Running with options:")
     print("    ", args)
 
+    def get_templX(f, region, sample, ptbin, syst=None, read_sumw2=False, muon=False):
+        if args.matched:
+            return get_templM(f,
+                              region,
+                              sample,
+                              ptbin,
+                              syst=syst,
+                              read_sumw2=read_sumw2,
+                              muon=muon)
+        else:
+            return get_templ(f,
+                             region,
+                             sample,
+                             ptbin,
+                             syst=syst,
+                             read_sumw2=read_sumw2,
+                             muon=muon)
+
+    def shape_to_numX(f, region, sName, ptbin, syst, mask):
+        if args.matched:
+            return shape_to_numM(f, region, sName, ptbin, syst, mask)
+        else:
+            return shape_to_num(f, region, sName, ptbin, syst, mask)
+
     dummy_rhalphabet(pseudo=args.pseudo,
                      throwPoisson=args.throwPoisson,
                      MCTF=args.MCTF,
                      scale_syst=args.scale,
                      smear_syst=args.smear,
                      systs=args.systs,
-                     use_matched=args.matched,
                      justZ=args.justZ,
                      blind=(not args.unblind),
                      runhiggs=args.runhiggs,
