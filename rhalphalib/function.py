@@ -76,6 +76,8 @@ class BernsteinPoly(object):
 
     def coefficients(self, *xvals):
         # evaluate Bernstein polynomial product tensor
+        if len(xvals) != len(self._order):
+            raise ValueError("Number of dimensions provided does not match")
         bpolyval = np.ones_like(xvals[0])
         for x, n, B in zip(xvals, self._order, self._bmatrices):
             xpow = np.power.outer(x, np.arange(n + 1))
@@ -94,8 +96,6 @@ class BernsteinPoly(object):
         nominal = kwargs.pop('nominal', False)
         if len(kwargs) > 0:
             raise ValueError("Extra keyword arguments supplied!")
-        if len(vals) != len(self._order):
-            raise ValueError("Not all dimension values specified")
         xvals = []
         shape = None
         for x in vals:
