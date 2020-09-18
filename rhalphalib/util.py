@@ -77,6 +77,7 @@ def install_roofit_helpers():
     _ROOT.gEnv.SetValue("RooFit.Banner=0")
     # TODO: configurable verbosity
     _ROOT.RooMsgService.instance().setGlobalKillBelow(_ROOT.RooFit.WARNING)
+    root_version = _ROOT.gROOT.GetVersionInt()
 
     _ROOT.TH1.AddDirectory(False)
 
@@ -107,20 +108,21 @@ def install_roofit_helpers():
 
     _ROOT.RooWorkspace.add = _RooWorkspace_add
 
-    def _RooAbsCollection__iter__(self):
-        it = self.iterator()
-        obj = it.Next()
-        while obj != None:  # noqa: E711
-            yield obj
-            obj = it.Next()
-
-    if hasattr(_ROOT.RooAbsCollection, '__iter__'):
+    if root_version < 62200:
         # https://sft.its.cern.ch/jira/browse/ROOT-10457
-        del _ROOT.RooAbsCollection.__iter__
-        del _ROOT.RooArgList.__iter__
-        del _ROOT.RooArgSet.__iter__
+        def _RooAbsCollection__iter__(self):
+            it = self.iterator()
+            obj = it.Next()
+            while obj != None:  # noqa: E711
+                yield obj
+                obj = it.Next()
 
-    _ROOT.RooAbsCollection.__iter__ = _RooAbsCollection__iter__
+        if hasattr(_ROOT.RooAbsCollection, "__iter__"):
+            del _ROOT.RooAbsCollection.__iter__
+            del _ROOT.RooArgList.__iter__
+            del _ROOT.RooArgSet.__iter__
+
+        _ROOT.RooAbsCollection.__iter__ = _RooAbsCollection__iter__
 
     # This is mainly for collections of parameters
     def _RooAbsCollection_assign(self, other):
