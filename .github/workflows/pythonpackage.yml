@@ -1,13 +1,30 @@
-name: Python package
+name: PR Tests
 
 on:
   pull_request:
     branches:
     - master
 
-jobs:
-  build:
+stages:
+  - linter
+  - test
 
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        flake8 rhalphalib --count --show-source --statistics
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -18,17 +35,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Lint with flake8
-      run: |
-        source $CONDA/etc/profile.d/conda.sh
-        conda activate $PWD/condaenv
-        pip install flake8
-        flake8 rhalphalib --count --show-source --statistics
-    - name: Install conda
+    - name: Install ROOT ${{ matrix.root-version }}
       run: |
         source $CONDA/etc/profile.d/conda.sh
         conda create --prefix condaenv python=${{ matrix.python-version }} -y
