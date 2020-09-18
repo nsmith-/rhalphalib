@@ -11,29 +11,34 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
-      fail-fast: false
+      fail-fast: true
       matrix:
-        python-version: [2.7, 3.7]
+        python-version: [3.7]
+        root-version: [6.16, 6.22]
 
     steps:
     - uses: actions/checkout@v1
-    - name: Install conda
-      run: |
-        source $CONDA/etc/profile.d/conda.sh
-        conda create --prefix condaenv python=${{ matrix.python-version }} -y
-        conda activate $PWD/condaenv
-        conda install -c conda-forge numpy scipy nomkl root
-    - name: Install package
-      run: |
-        source $CONDA/etc/profile.d/conda.sh
-        conda activate $PWD/condaenv
-        pip install -e .
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
     - name: Lint with flake8
       run: |
         source $CONDA/etc/profile.d/conda.sh
         conda activate $PWD/condaenv
         pip install flake8
         flake8 rhalphalib --count --show-source --statistics
+    - name: Install conda
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda create --prefix condaenv python=${{ matrix.python-version }} -y
+        conda activate $PWD/condaenv
+        conda install -c conda-forge numpy scipy nomkl root==${{ matrix.root-version }}
+    - name: Install package
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate $PWD/condaenv
+        pip install -e .
     - name: Test with pytest
       run: |
         source $CONDA/etc/profile.d/conda.sh
