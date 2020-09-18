@@ -121,7 +121,8 @@ class TemplateSample(Sample):
 
     def show(self):
         print(self._nominal)
-        if self._sumw2 is not None: print(self._sumw2)
+        if self._sumw2 is not None:
+            print(self._sumw2)
 
     def scale(self, _scale):
         self._nominal *= _scale
@@ -240,11 +241,9 @@ class TemplateSample(Sample):
             raise ValueError("No self._sumw2 defined in template")
             return
 
-        import copy
-        zerobins = self._nominal <= 0.
-
         for i in range(self.observable.nbins):
-            if self._nominal[i] <= 0. or self._sumw2[i] <= 0.: continue
+            if self._nominal[i] <= 0. or self._sumw2[i] <= 0.:
+                continue
             effect_up = np.ones_like(self._nominal)
             effect_down = np.ones_like(self._nominal)
             effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
