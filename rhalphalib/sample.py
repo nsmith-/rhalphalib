@@ -126,6 +126,8 @@ class TemplateSample(Sample):
 
     def scale(self, _scale):
         self._nominal *= _scale
+        if self._sumw2 is not None:
+            self._sumw2 *= _scale*_scale
 
     @property
     def parameters(self):
