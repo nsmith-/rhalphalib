@@ -5,26 +5,25 @@ on:
     branches:
     - master
 
-stages:
-  - linter
-  - test
-
 jobs:
   linter:
+    name: Linter
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.7
       uses: actions/setup-python@v1
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.7
     - name: Lint with flake8
       run: |
         pip install flake8
         flake8 rhalphalib --count --show-source --statistics
 
   test:
+    name: Run pytest
+    needs: linter
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
