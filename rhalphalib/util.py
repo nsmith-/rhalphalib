@@ -9,8 +9,10 @@ def _to_numpy(hinput, read_sumw2=False):
             raise ValueError("Expected numpy array for element 1 of tuple %r" % hinput)
         if not isinstance(hinput[2], str):
             raise ValueError("Expected string for element 2 of tuple %r" % hinput)
+        if read_sumw2 and len(hinput) < 4:
+            raise ValueError("Expected 4 elements of tuple %r, as read_sumw2=True" % hinput)
         if read_sumw2 and not isinstance(hinput[3], np.ndarray):
-            raise ValueError("Expected numpy array for eleement 3 of tuple %r, as read_sumw2=True" % hinput)
+            raise ValueError("Expected numpy array for element 3 of tuple %r, as read_sumw2=True" % hinput)
         if hinput[0].size != hinput[1].size - 1:
             raise ValueError("Counts array and binning array are incompatible in tuple %r" % (hinput,))
         if read_sumw2 and hinput[3].size != hinput[1].size - 1:
