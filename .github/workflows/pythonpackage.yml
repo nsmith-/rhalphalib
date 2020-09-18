@@ -22,8 +22,7 @@ jobs:
         source $CONDA/etc/profile.d/conda.sh
         conda create --prefix condaenv python=${{ matrix.python-version }} -y
         conda activate $PWD/condaenv
-        conda install numpy scipy
-        conda install -c conda-forge root
+        conda install -c conda-forge numpy scipy nomkl root
     - name: Install package
       run: |
         source $CONDA/etc/profile.d/conda.sh
