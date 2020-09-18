@@ -105,10 +105,15 @@ class TemplateSample(Sample):
             (for the others, the observable name is taken from the x axis name)
         '''
         super(TemplateSample, self).__init__(name, sampletype)
-        sumw, binning, obs_name = _to_numpy(template)
+        sumw2 = None
+        try:
+            sumw, binning, obs_name, sumw2 = _to_numpy(template, read_sumw2=True)
+        except ValueError:
+            sumw, binning, obs_name = _to_numpy(template)
         observable = Observable(obs_name, binning)
         self._observable = observable
         self._nominal = sumw
+        self._sumw2 = sumw2
         self._paramEffectsUp = {}
         self._paramEffectsDown = {}
         self._paramEffectScales = {}
@@ -116,6 +121,7 @@ class TemplateSample(Sample):
 
     def show(self):
         print(self._nominal)
+        if self._sumw2 is not None: print(self._sumw2)
 
     def scale(self, _scale):
         self._nominal *= _scale
@@ -225,6 +231,26 @@ class TemplateSample(Sample):
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
                 return 1. / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
+
+    def autoMCStats(self):
+        '''                                                                                                                              Set MC statical uncertainties based on self._sumw2
+        '''
+
+        if self._sumw2 is None:
+            raise ValueError("No self._sumw2 defined in template")
+            return
+
+        import copy
+        zerobins = self._nominal <= 0.
+
+        for i in range(self.observable.nbins):
+            if self._nominal[i] <= 0. or self._sumw2[i] <= 0.: continue
+            effect_up = np.ones_like(self._nominal)
+            effect_down = np.ones_like(self._nominal)
+            effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
+            effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i]))/self._nominal[i], 0.)
+            param = NuisanceParameter(self.name + '_mcstat_bin%i' % i, combinePrior='shape')
+            self.setParamEffect(param, effect_up, effect_down)
 
     def getExpectation(self, nominal=False):
         '''
