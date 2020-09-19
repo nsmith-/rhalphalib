@@ -4,19 +4,19 @@ import numpy as np
 def _to_numpy(hinput, read_sumw2=False):
     if isinstance(hinput, tuple) and len(hinput) >= 3:
         if not isinstance(hinput[0], np.ndarray):
-            raise ValueError("Expected numpy array for element 0 of tuple %r" % hinput)
+            raise ValueError("Expected numpy array for element 0 of tuple {}".format(hinput))
         if not isinstance(hinput[1], np.ndarray):
-            raise ValueError("Expected numpy array for element 1 of tuple %r" % hinput)
+            raise ValueError("Expected numpy array for element 1 of tuple {}".format(hinput))
         if not isinstance(hinput[2], str):
-            raise ValueError("Expected string for element 2 of tuple %r" % hinput)
+            raise ValueError("Expected string for element 2 of tuple {}".format(hinput))
         if read_sumw2 and len(hinput) < 4:
-            raise ValueError("Expected 4 elements of tuple %r, as read_sumw2=True" % hinput)
+            raise ValueError("Expected 4 elements of tuple {}, as read_sumw2=True".format(hinput))
         if read_sumw2 and not isinstance(hinput[3], np.ndarray):
-            raise ValueError("Expected numpy array for element 3 of tuple %r, as read_sumw2=True" % hinput)
+            raise ValueError("Expected numpy array for element 3 of tuple {}, as read_sumw2=True".format(hinput))
         if hinput[0].size != hinput[1].size - 1:
-            raise ValueError("Counts array and binning array are incompatible in tuple %r" % (hinput,))
+            raise ValueError("Counts array and binning array are incompatible in tuple {}".format(hinput))
         if read_sumw2 and hinput[3].size != hinput[1].size - 1:
-            raise ValueError("Sumw2 array and binning array are incompatible in tuple %r" % (hinput,))
+            raise ValueError("Sumw2 array and binning array are incompatible in tuple {}".format(hinput))
         return hinput
     elif "<class 'ROOT.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())
