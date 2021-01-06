@@ -22,7 +22,7 @@ def _to_numpy(hinput, read_sumw2=False):
         sumw = np.zeros(hinput.GetNbinsX())
         sumw2 = np.zeros(hinput.GetNbinsX())
         binning = np.zeros(sumw.size + 1)
-        name = hinput.GetName()
+        name = hinput.GetXaxis().GetTitle()
         for i in range(1, sumw.size + 1):
             sumw[i-1] = hinput.GetBinContent(i)
             sumw2[i-1] = hinput.GetBinError(i)**2
