@@ -91,7 +91,7 @@ class Model(object):
                 pdf, obs = channel.renderRoofit(workspace)
                 rooSimul.addPdf(pdf, channel.name)
                 # const string magic: https://root.cern.ch/phpBB3/viewtopic.php?f=15&t=16882&start=15#p86985
-                obsmap.insert(ROOT.std.pair('const string, RooDataHist*')(channel.name, obs))
+                obsmap.insert(ROOT.std.pair('const string, RooDataHist*')(bytes(channel.name), obs))
 
             workspace.add(rooSimul)
             rooObservable = ROOT.RooArgList(channel.observable.renderRoofit(workspace))
@@ -278,7 +278,7 @@ class Channel(object):
             rooObservable = self.observable.renderRoofit(workspace)
             rooData = ROOT.RooDataHist(dataName, dataName, ROOT.RooArgList(rooObservable), _to_TH1(self.getObservation(), self.observable.binning, self.observable.name))
             workspace.add(rooData)
-        elif rooPdf == None or rooData == None:  # noqa: E711
+        elif rooPdf != None or rooData != None:  # noqa: E711
             raise RuntimeError('Channel %r has either a pdf or dataset already embedded in workspace %r' % (self, workspace))
         rooPdf = workspace.pdf(self.name)
         rooData = workspace.data(dataName)
