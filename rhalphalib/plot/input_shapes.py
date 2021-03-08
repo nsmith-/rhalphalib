@@ -1,7 +1,10 @@
-import argparse, rhalphalib, numpy as np, pickle
+import argparse
+import rhalphalib
+import numpy as np
+import pickle
 
 def input_dict_maker(input_file):
-    with open(input_file, 'rb') as (fout):
+    with open(input_file, 'rb') as fout:
         model = pickle.load(fout)
 
     class ndict(dict):
@@ -50,10 +53,8 @@ def input_dict_maker(input_file):
                 mockd[cat_name][sname].name = sname
             except:
                 pass
-
         if TotalSig == []:
-            TotalSig = [
-             np.zeros(len(bins) - 1)]
+            TotalSig = [np.zeros(len(bins) - 1)]
         TotalSig = np.vstack(TotalSig).sum(axis=0)
         TotalBkg = np.vstack(TotalBkg).sum(axis=0)
         TotalProcs = np.vstack(TotalProcs).sum(axis=0)
@@ -64,8 +65,8 @@ def input_dict_maker(input_file):
         mockd[cat_name]['TotalProcs'] = TH1.from_numpy((TotalProcs, bins))
         mockd[cat_name]['TotalProcs'].name = 'TotalProcs'
         data = model[cat.name].getObservation()
-        mockd[cat_name]['data_obs'] = TH1.from_numpy((data, bins))
-        mockd[cat_name]['data_obs'].name = 'data_obs'
+        mockd[cat_name]['data'] = TH1.from_numpy((data, bins))
+        mockd[cat_name]['data'].name = 'data'
         qcd = data - TotalProcs
         mockd[cat_name]['qcd'] = TH1.from_numpy((qcd, bins))
         mockd[cat_name]['qcd'].name = 'qcd'
