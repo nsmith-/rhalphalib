@@ -131,6 +131,7 @@ class Channel(object):
         self._observable = None
         self._observation = None
         self._mask = None
+        self._mask_val = 0.
 
     def __getitem__(self, key):
         if key in self._samples:
@@ -192,19 +193,19 @@ class Channel(object):
         Return the current observation set for this Channel as plain numpy array
         If it is non-poisson, it will be returned as a tuple (sumw, sumw2)
         '''
-        _mask_val = float(0)
+
         if self._observation is None:
             raise RuntimeError("Channel %r has no observation set" % self)
         if isinstance(self._observation, tuple):
             obs, var = (self._observation[0].copy(), self._observation[1].copy())
             if self.mask is not None:
-                obs[~self.mask] = _mask_val
-                var[~self.mask] = _mask_val
+                obs[~self.mask] = self._mask_val
+                var[~self.mask] = self._mask_val
             return (obs, var)
         else:
             obs = self._observation.copy()
             if self.mask is not None:
-                obs[~self.mask] = _mask_val
+                obs[~self.mask] = self._mask_val
             return obs
 
     def __repr__(self):

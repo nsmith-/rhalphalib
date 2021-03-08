@@ -24,6 +24,7 @@ class Sample(object):
         self._sampletype = sampletype
         self._observable = None
         self._mask = None
+        self._mask_val = 0.
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -273,10 +274,10 @@ class TemplateSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
-        _mask_val = float(0)
+
         nominalval = self._nominal.copy()
         if self.mask is not None:
-            nominalval[~self.mask] = _mask_val
+            nominalval[~self.mask] = self._mask_val
         if nominal:
             return nominalval
         else:
@@ -490,11 +491,10 @@ class ParametericSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
-        # _mask_val = float(1e-20)
-        _mask_val = float(0)
+
         out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
-            out[~self.mask] = [IndependentParameter("masked", _mask_val, constant=True) for _ in range((~self.mask).sum())]
+            out[~self.mask] = [IndependentParameter("masked", self._mask_val, constant=True) for _ in range((~self.mask).sum())]
         if nominal:
             return np.array([p.value for p in out])
         else:
