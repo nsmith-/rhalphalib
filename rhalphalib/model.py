@@ -115,8 +115,8 @@ class Model(object):
             channel.renderCard(os.path.join(outputPath, "%s.txt" % channel.name), self.name)
         with open(os.path.join(outputPath, "build.sh"), "w") as fout:
             cstr = " ".join("{0}={0}.txt".format(channel.name) for channel in self)
-            fout.write("combineCards.py %s > %s_combined.txt\n" % (cstr, self.name))
-            fout.write("text2workspace.py %s_combined.txt\n" % self.name)
+            fout.write("combineCards.py %s > %s_combined.txt\n" % (cstr, "model"))
+            fout.write("text2workspace.py %s_combined.txt\n" % "model")
 
 
 class Channel(object):
@@ -131,6 +131,7 @@ class Channel(object):
         self._observable = None
         self._observation = None
         self._mask = None
+        self._mask_val = 0.
 
     def __getitem__(self, key):
         if key in self._samples:
@@ -192,18 +193,19 @@ class Channel(object):
         Return the current observation set for this Channel as plain numpy array
         If it is non-poisson, it will be returned as a tuple (sumw, sumw2)
         '''
+
         if self._observation is None:
             raise RuntimeError("Channel %r has no observation set" % self)
         if isinstance(self._observation, tuple):
             obs, var = (self._observation[0].copy(), self._observation[1].copy())
             if self.mask is not None:
-                obs[~self.mask] = 0.
-                var[~self.mask] = 0.
+                obs[~self.mask] = self._mask_val
+                var[~self.mask] = self._mask_val
             return (obs, var)
         else:
             obs = self._observation.copy()
             if self.mask is not None:
-                obs[~self.mask] = 0.
+                obs[~self.mask] = self._mask_val
             return obs
 
     def __repr__(self):

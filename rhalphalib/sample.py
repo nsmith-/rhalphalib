@@ -24,6 +24,7 @@ class Sample(object):
         self._sampletype = sampletype
         self._observable = None
         self._mask = None
+        self._mask_val = 0.
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -182,7 +183,7 @@ class TemplateSample(Sample):
             zerobins = self._nominal <= 0.
             effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
-        if np.sum(effect_up * self._nominal) == 0:
+        if np.sum(effect_up * self._nominal) <= 0:
             # TODO: warning? this can happen regularly
             # we might even want some sort of threshold
             return
@@ -205,7 +206,7 @@ class TemplateSample(Sample):
                 zerobins = self._nominal <= 0.
                 effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
-                if np.sum(effect_down * self._nominal) == 0:
+                if np.sum(effect_down * self._nominal) <= 0:
                     # TODO: warning? this can happen regularly
                     # we might even want some sort of threshold
                     return
@@ -235,32 +236,48 @@ class TemplateSample(Sample):
                 return 1. / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self):
-        '''                                                                                                                              Set MC statical uncertainties based on self._sumw2
+    def autoMCStats(self, lnN=False, epsilon=0):
+        '''
+        Set MC statical uncertainties based on self._sumw2
+        lnN: aggregate differences
+        epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
         '''
 
         if self._sumw2 is None:
             raise ValueError("No self._sumw2 defined in template")
             return
 
-        for i in range(self.observable.nbins):
-            if self._nominal[i] <= 0. or self._sumw2[i] <= 0.:
-                continue
-            effect_up = np.ones_like(self._nominal)
-            effect_down = np.ones_like(self._nominal)
-            effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
-            effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i]))/self._nominal[i], 0.)
-            param = NuisanceParameter(self.name + '_mcstat_bin%i' % i, combinePrior='shape')
-            self.setParamEffect(param, effect_up, effect_down)
+        if lnN:
+            _nom_rate = np.sum(self._nominal)
+            if _nom_rate < .0001:
+                effect = 1.0
+            else:
+                _down_rate = np.sum(np.nan_to_num(self._nominal - np.sqrt(self._sumw2), 0.0))
+                _up_rate = np.sum(np.nan_to_num(self._nominal + np.sqrt(self._sumw2), 0.0))
+                _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
+                effect = 1.0 + _diff / (2. * _nom_rate)
+            param = NuisanceParameter(self.name + '_mcstat', 'lnN')
+            self.setParamEffect(param, effect)
+        else:
+            for i in range(self.observable.nbins):
+                if self._nominal[i] <= 0. or self._sumw2[i] <= 0.:
+                    continue
+                effect_up = np.ones_like(self._nominal)
+                effect_down = np.ones_like(self._nominal)
+                effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
+                effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i]))/self._nominal[i], epsilon)
+                param = NuisanceParameter(self.name + '_mcstat_bin%i' % i, combinePrior='shape')
+                self.setParamEffect(param, effect_up, effect_down)
 
     def getExpectation(self, nominal=False):
         '''
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
+
         nominalval = self._nominal.copy()
         if self.mask is not None:
-            nominalval[~self.mask] = 0.
+            nominalval[~self.mask] = self._mask_val
         if nominal:
             return nominalval
         else:
@@ -474,9 +491,10 @@ class ParametericSample(Sample):
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
         '''
+
         out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
-            out[~self.mask] = [IndependentParameter("masked", 0, constant=True) for _ in range((~self.mask).sum())]
+            out[~self.mask] = [IndependentParameter("masked", self._mask_val, constant=True) for _ in range((~self.mask).sum())]
         if nominal:
             return np.array([p.value for p in out])
         else:
