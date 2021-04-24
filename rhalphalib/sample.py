@@ -180,7 +180,7 @@ class TemplateSample(Sample):
             effect_up, binning, _ = _to_numpy(effect_up)
             if not np.array_equal(binning, self.observable.binning):
                 raise ValueError("effect_up has incompatible binning with sample %r" % self)
-            zerobins = self._nominal <= 0.
+            zerobins = (self._nominal <= 0.) | (effect_up <= 0.)
             effect_up[zerobins] = 1.
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
@@ -203,7 +203,7 @@ class TemplateSample(Sample):
                 effect_down, binning, _ = _to_numpy(effect_down)
                 if not np.array_equal(binning, self.observable.binning):
                     raise ValueError("effect_down has incompatible binning with sample %r" % self)
-                zerobins = self._nominal <= 0.
+                zerobins = (self._nominal <= 0.) | (effect_down <= 0.)
                 effect_down[zerobins] = 1.
                 effect_down[~zerobins] /= self._nominal[~zerobins]
                 if np.sum(effect_down * self._nominal) <= 0:

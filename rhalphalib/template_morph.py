@@ -26,4 +26,5 @@ class AffineMorphTemplate(object):
         i.e. new edges = edges * scale + shift
         '''
         scaled_edges = (self.edges - shift) / scale
-        return np.diff(self.cdf(scaled_edges)) * self.norm, self.edges, self.varname
+        values = np.diff(self.cdf(scaled_edges)) * self.norm
+        return values.clip(min=0), self.edges, self.varname

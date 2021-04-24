@@ -67,6 +67,8 @@ def input_dict_maker(input_file):
         data = model[cat.name].getObservation()
         mockd[cat_name]['data'] = TH1.from_numpy((data, bins))
         mockd[cat_name]['data'].name = 'data'
+        if 'muon' in cat_name:
+            continue
         qcd = data - TotalProcs
         mockd[cat_name]['qcd'] = TH1.from_numpy((qcd, bins))
         mockd[cat_name]['qcd'].name = 'qcd'
@@ -82,12 +84,19 @@ def input_dict_maker(input_file):
     qcdeff = qcdp / qcdf
     for i, cat in enumerate(model.channels):
         cat_name = cat.name + '_inputs'
-        if 'fail' in cat_name:
+        if 'fail' in cat_name or 'muon' in cat_name:
             continue
         _fail_qcd = mockd[cat_name.replace('pass', 'fail')]['qcd']
         _fail_qcd_scaled = _fail_qcd.values * qcdeff
-        mockd[cat_name]['qcd'] = TH1.from_numpy((_fail_qcd_scaled, bins))
+        mockd[cat_name]['qcd'] = TH1.from_numpy((_fail_qcd_scaled, _fail_qcd.edges ))
         mockd[cat_name]['qcd'].name = 'qcd'
+
+    # binwnorm to match with fitDiag output
+    for key, cat in mockd.items():
+        for hname, h in cat.items():
+	    print(key, cat, bins)
+            vals, bins = h.numpy()
+            cat[hname] = TH1.from_numpy((vals / 7., bins))
 
     return mockd
 
