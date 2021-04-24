@@ -2,7 +2,6 @@ import ROOT as r
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from collections import OrderedDict
 import mplhep as hep
 import root_numpy as rnp
 
@@ -22,12 +21,12 @@ def plot_cov(fitDiagnostics_file='fitDiagnostics.root',
     labs = labs[1:-1]  # Remove over/under flows
 
     if include == 'all':
-        sel_labs = [l for l in labs]
+        sel_labs = [lab for lab in labs]
     elif include == 'tf':
-        sel_labs = [l for l in labs if not (l.startswith('qcdparam') or 'mcstat' in l)]
+        sel_labs = [lab for lab in labs if not (lab.startswith('qcdparam') or 'mcstat' in lab)]
     else:
-        sel_labs = [l for l in labs if not (l.startswith('qcdparam') or 'mcstat' in l or l.startswith('tf'))]
-    sel_ixes = [labs.index(l) for l in sel_labs]
+        sel_labs = [lab for lab in labs if not (lab.startswith('qcdparam') or 'mcstat' in lab or lab.startswith('tf'))]
+    sel_ixes = [labs.index(lab) for lab in sel_labs]
 
     # Get only values we want
     def extract(arr2d, ix):

@@ -1,14 +1,12 @@
-import argparse
-import rhalphalib
 import numpy as np
 import pickle
+
 
 def input_dict_maker(input_file):
     with open(input_file, 'rb') as fout:
         model = pickle.load(fout)
 
     class ndict(dict):
-
         def __init__(self, *arg, **kw):
             super(ndict, self).__init__(*arg, **kw)
             self._name = ''
@@ -51,7 +49,7 @@ def input_dict_maker(input_file):
                 TotalProcs.append(h)
                 mockd[cat_name][sname] = TH1.from_numpy((h, bins))
                 mockd[cat_name][sname].name = sname
-            except:
+            except:  # noqa
                 pass
         if TotalSig == []:
             TotalSig = [np.zeros(len(bins) - 1)]
@@ -88,15 +86,14 @@ def input_dict_maker(input_file):
             continue
         _fail_qcd = mockd[cat_name.replace('pass', 'fail')]['qcd']
         _fail_qcd_scaled = _fail_qcd.values * qcdeff
-        mockd[cat_name]['qcd'] = TH1.from_numpy((_fail_qcd_scaled, _fail_qcd.edges ))
+        mockd[cat_name]['qcd'] = TH1.from_numpy((_fail_qcd_scaled, _fail_qcd.edges))
         mockd[cat_name]['qcd'].name = 'qcd'
 
     # binwnorm to match with fitDiag output
     for key, cat in mockd.items():
         for hname, h in cat.items():
-	    print(key, cat, bins)
+            print(key, cat, bins)
             vals, bins = h.numpy()
             cat[hname] = TH1.from_numpy((vals / 7., bins))
 
     return mockd
-
