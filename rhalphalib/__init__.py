@@ -18,6 +18,9 @@ from .function import (
     BernsteinPoly,
     DecorrelatedNuisanceVector,
 )
+from .template_morph import (
+    AffineMorphTemplate,
+)
 from .version import __version__
 
 __all__ = [
@@ -33,5 +36,6 @@ __all__ = [
     'DependentParameter',
     'BernsteinPoly',
     'DecorrelatedNuisanceVector',
+    'AffineMorphTemplate',
     '__version__',
 ]
