@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import datetime
 from functools import reduce
 from itertools import chain
@@ -16,6 +16,7 @@ class Model(object):
     def __init__(self, name):
         self._name = name
         self._channels = OrderedDict()
+        self.t2w_config = None
 
     def __getitem__(self, key):
         if key in self._channels:
@@ -116,8 +117,10 @@ class Model(object):
         with open(os.path.join(outputPath, "build.sh"), "w") as fout:
             cstr = " ".join("{0}={0}.txt".format(channel.name) for channel in self)
             fout.write("combineCards.py %s > %s_combined.txt\n" % (cstr, "model"))
-            fout.write("text2workspace.py %s_combined.txt\n" % "model")
-
+            if self.t2w_config is None:
+                fout.write("text2workspace.py model_combined.txt")
+            else:
+                fout.write("text2workspace.py {} model_combined.txt".format(self.t2w_config))
 
 class Channel(object):
     """
@@ -290,7 +293,7 @@ class Channel(object):
         observation = self.getObservation()
         if isinstance(observation, tuple):
             observation = observation[0]
-        signalSamples = [s for s in self if s.sampletype == Sample.SIGNAL]
+        signalSamples = [s for s in self if s.sampletype <= 0]
         nSig = len(signalSamples)
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
         nBkg = len(bkgSamples)

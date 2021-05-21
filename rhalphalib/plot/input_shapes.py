@@ -74,6 +74,7 @@ def input_dict_maker(input_file):
     qcdp, qcdf = (0, 0)
     for i, cat in enumerate(model.channels):
         cat_name = cat.name + '_inputs'
+        if 'qcd' not in mockd[cat_name].keys(): continue
         if 'fail' in cat_name:
             qcdf += mockd[cat_name]['qcd'].values.sum()
         else:
@@ -92,7 +93,7 @@ def input_dict_maker(input_file):
     # binwnorm to match with fitDiag output
     for key, cat in mockd.items():
         for hname, h in cat.items():
-            print(key, cat, bins)
+            #print(key, cat, bins)
             vals, bins = h.numpy()
             cat[hname] = TH1.from_numpy((vals / 7., bins))
 
