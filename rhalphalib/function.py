@@ -5,14 +5,34 @@ from .parameter import IndependentParameter, NuisanceParameter
 from .util import install_roofit_helpers
 
 
-class BernsteinPoly(object):
-    def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
+def matrix_bernstein(n):
+    v = np.arange(n + 1)
+    bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1., np.subtract.outer(v, v)))
+    bmat[np.greater.outer(v, v)] = 0  # v > l
+    return bmat
+
+
+def matrix_chebyshev(n):
+    M = np.zeros((n+1, n+1))
+    for nth in range(1, n+2):
+        _coef_basis = np.zeros(nth)
+        _coef_basis[-1] = 1
+        c = np.polynomial.Chebyshev(_coef_basis, domain=[0, 1]) 
+        p = c.convert(kind=np.polynomial.Polynomial)
+        M[nth-1, :nth] = p.coef
+    return M
+
+def matrix_poly(n):
+    return np.identity(n+1)
+
+class BasisPoly(object):
+    def __init__(self, name, order, dim_names=None, basis='Bernstein', init_params=None, limits=None, coefficient_transform=None):
         '''
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
             order: tuple of order in each dimension
             dim_names: optional, names of each dimension
-            initial_params: ndarray of initial params
+            init_params: ndarray of initial params
             limits: tuple of independent parameter limits, default: (0, 10)
             coefficient_transform: callable to transform coefficients before multiplying by parameters
         '''
@@ -20,6 +40,7 @@ class BernsteinPoly(object):
         if not isinstance(order, tuple):
             raise ValueError
         self._order = order
+        self._basis = basis
         self._shape = tuple(n + 1 for n in order)
         if dim_names:
             if len(order) != len(dim_names):
@@ -33,18 +54,27 @@ class BernsteinPoly(object):
             self._init_params = init_params
         elif init_params is None:
             self._init_params = np.ones(shape=self._shape)
+            #self._init_params = np.zeros(shape=self._shape)
+            #self._init_params[0, 0] = 1
+            # print(self._init_params)
+            # quit()
         else:
             raise ValueError
         if limits is None:
             limits = (0., 10.)
         self._transform = coefficient_transform
 
-        # Construct Bernstein matrix for each dimension
+        # Construct companion matrix for each dimension
         self._bmatrices = []
         for idim, n in enumerate(self._order):
-            v = np.arange(n + 1)
-            bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1., np.subtract.outer(v, v)))
-            bmat[np.greater.outer(v, v)] = 0  # v > l
+            if self._basis == 'Bernstein':
+                bmat = matrix_bernstein(n)
+            elif self._basis == 'Chebyshev':
+                bmat = matrix_chebyshev(n)
+            elif self._basis == 'Polynomial':
+                bmat = matrix_poly(n)
+            else:
+                raise NotImplementedError("Basis='{}' not implemented".format(basis))
             self._bmatrices.append(bmat)
 
         # Construct parameter tensor
@@ -56,6 +86,18 @@ class BernsteinPoly(object):
     @property
     def name(self):
         return self._name
+
+    @property
+    def order(self):
+        return self._order
+
+    @property
+    def dim_names(self):
+        return self._dim_names
+
+    @property
+    def basis(self):
+        return self._basis
 
     @property
     def parameters(self):
@@ -73,6 +115,17 @@ class BernsteinPoly(object):
             if pnew.intermediate:
                 pnew.intermediate = False
         self._params = newparams
+
+
+    def update_from_roofit(self, fit_result, from_deco=False):
+        par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(',') if self.name in p])
+        par_results = {p: round(fit_result.floatParsFinal().find(p).getVal(), 3) for p in par_names}
+        for par in self._params.reshape(-1):
+            par.value = par_results[par.name]
+
+    def set_parvalues(self, parvalues):
+        for par, new_val in zip(self._params.reshape(-1), parvalues):
+           par.value = new_val
 
     def coefficients(self, *xvals):
         # evaluate Bernstein polynomial product tensor

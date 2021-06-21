@@ -15,11 +15,12 @@ from .parameter import (
     DependentParameter,
 )
 from .function import (
-    BernsteinPoly,
+    BasisPoly,
     DecorrelatedNuisanceVector,
 )
 from .template_morph import (
     AffineMorphTemplate,
+    MorphHistW2,
 )
 from .version import __version__
 
