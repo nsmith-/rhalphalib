@@ -404,7 +404,7 @@ class TemplateSample(Sample):
             if down is None:
                 return '%.3f' % up
             else:
-                return '%.3f/%.3f' % (up, down)
+                return '%.3f/%.3f' % (down, up)
 
 
 class ParametericSample(Sample):
