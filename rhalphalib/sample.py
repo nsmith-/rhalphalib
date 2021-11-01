@@ -371,7 +371,7 @@ class TemplateSample(Sample):
         if self._paramEffectsUp.get(param, None) is None:
             return '-'
         elif 'shape' in param.combinePrior:
-            return '%.3f' % self._paramEffectScales.get(param, 1)
+            return '%.4f' % self._paramEffectScales.get(param, 1)
         elif isinstance(self.getParamEffect(param, up=True), DependentParameter):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
@@ -402,9 +402,9 @@ class TemplateSample(Sample):
                 # Here we can safely defer to combine to calculate symmeterized effect
                 down = None
             if down is None:
-                return '%.3f' % up
+                return '%.4f' % up
             else:
-                return '%.3f/%.3f' % (up, down)
+                return '%.4f/%.4f' % (down, up)
 
 
 class ParametericSample(Sample):
