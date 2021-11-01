@@ -233,7 +233,12 @@ class TemplateSample(Sample):
         else:
             if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
-                return 1. / self._paramEffectsUp[param]
+                if param.combinePrior == 'lnN':
+                    return 1. / self._paramEffectsUp[param]
+                elif param.combinePrior == 'shape':
+                    return self._nominal - abs(self._nominal - self._paramEffectsUp[param])
+                else:
+                    raise NotImplementedError
             return self._paramEffectsDown[param]
 
     def autoMCStats(self, lnN=False, epsilon=0):
