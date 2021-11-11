@@ -1,4 +1,4 @@
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 import datetime
 from functools import reduce
 from itertools import chain
@@ -121,6 +121,7 @@ class Model(object):
                 fout.write("text2workspace.py model_combined.txt")
             else:
                 fout.write("text2workspace.py {} model_combined.txt".format(self.t2w_config))
+
 
 class Channel(object):
     """

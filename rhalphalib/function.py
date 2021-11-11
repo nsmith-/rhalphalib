@@ -13,17 +13,19 @@ def matrix_bernstein(n):
 
 
 def matrix_chebyshev(n):
-    M = np.zeros((n+1, n+1))
-    for nth in range(1, n+2):
+    M = np.zeros((n + 1, n + 1))
+    for nth in range(1, n + 2):
         _coef_basis = np.zeros(nth)
         _coef_basis[-1] = 1
-        c = np.polynomial.Chebyshev(_coef_basis, domain=[0, 1]) 
+        c = np.polynomial.Chebyshev(_coef_basis, domain=[0, 1])
         p = c.convert(kind=np.polynomial.Polynomial)
         M[nth-1, :nth] = p.coef
     return M
 
+
 def matrix_poly(n):
-    return np.identity(n+1)
+    return np.identity(n + 1)
+
 
 class BasisPoly(object):
     def __init__(self, name, order, dim_names=None, basis='Bernstein', init_params=None, limits=None, coefficient_transform=None):
@@ -54,10 +56,6 @@ class BasisPoly(object):
             self._init_params = init_params
         elif init_params is None:
             self._init_params = np.ones(shape=self._shape)
-            #self._init_params = np.zeros(shape=self._shape)
-            #self._init_params[0, 0] = 1
-            # print(self._init_params)
-            # quit()
         else:
             raise ValueError
         if limits is None:
@@ -116,7 +114,6 @@ class BasisPoly(object):
                 pnew.intermediate = False
         self._params = newparams
 
-
     def update_from_roofit(self, fit_result, from_deco=False):
         par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(',') if self.name in p])
         par_results = {p: round(fit_result.floatParsFinal().find(p).getVal(), 3) for p in par_names}
@@ -125,7 +122,7 @@ class BasisPoly(object):
 
     def set_parvalues(self, parvalues):
         for par, new_val in zip(self._params.reshape(-1), parvalues):
-           par.value = new_val
+            par.value = new_val
 
     def coefficients(self, *xvals):
         # evaluate Bernstein polynomial product tensor

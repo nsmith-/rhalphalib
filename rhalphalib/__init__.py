@@ -35,8 +35,9 @@ __all__ = [
     'NuisanceParameter',
     'IndependentParameter',
     'DependentParameter',
-    'BernsteinPoly',
+    'BasisPoly',
     'DecorrelatedNuisanceVector',
     'AffineMorphTemplate',
+    'MorphHistW2',
     '__version__',
 ]
