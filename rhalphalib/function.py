@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import binom
 import numbers
+import warnings
 from .parameter import IndependentParameter, NuisanceParameter
 from .util import install_roofit_helpers
 
@@ -125,7 +126,7 @@ class BasisPoly(object):
             par.value = new_val
 
     def coefficients(self, *xvals):
-        # evaluate Bernstein polynomial product tensor
+        # evaluate polynomial product tensor
         bpolyval = np.ones_like(xvals[0])
         for x, n, B in zip(xvals, self._order, self._bmatrices):
             xpow = np.power.outer(x, np.arange(n + 1))
@@ -175,6 +176,22 @@ class BasisPoly(object):
             p.intermediate = False
             out[i] = p
         return out.reshape(shape)
+
+
+class BernsteinPoly(BasisPoly):
+    def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
+        '''
+        Backcompatibility subclass of BasisPoly with fixed poly basis
+        '''
+        super().__init__(self,
+                         name=name,
+                         order=order,
+                         dim_names=dim_names,
+                         basis='Bernstein',
+                         init_params=init_params,
+                         limits=limits,
+                         coefficient_transform=coefficient_transform)
+        warnings.warn("Consider switching to ``BasisPoly(..., basis='Bernstein', ...)")
 
 
 class DecorrelatedNuisanceVector(object):
