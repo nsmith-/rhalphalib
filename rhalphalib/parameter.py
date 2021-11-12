@@ -298,7 +298,7 @@ class Observable(Parameter):
         self._binning = np.array(binning)
 
     def __eq__(self, other):
-        if isinstance(other, Observable) and self._name == other._name and np.array_equal(self._binning, other._binning):
+        if isinstance(other, Observable) and self._name == other._name and np.allclose(self._binning, other._binning):
             return True
         return False
 
