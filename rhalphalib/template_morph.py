@@ -33,22 +33,27 @@ class AffineMorphTemplate(object):
 
 
 class MorphHistW2(object):
+    """
+    Extends AffineMorphTemplate to shift variances as well
+
+    Parameters
+    ----------
+    object : hist object or tuple
+    """
     def __init__(self, hist):
         '''
         hist: uproot/UHI histogram or a tuple (values, edges, variances)
         '''
-        try:
+        try:  # hist object
             self.sumw = hist.values
             self.edges = hist.edges
+            self.varname = hist.axes[0].name
             self.variances = hist.variances
-        except:  # noqa
+        except:  # tuple  # noqa
             self.sumw = hist[0]
             self.edges = hist[1]
             self.varname = hist[2]
             self.variances = hist[3]
-
-        from mplhep.error_estimation import poisson_interval
-        down, up = np.nan_to_num(np.abs(poisson_interval(self.sumw, self.variances)), 0.)
 
         self.nominal = AffineMorphTemplate((self.sumw, self.edges, self.varname))
         self.w2s = AffineMorphTemplate((self.variances, self.edges, self.varname))
