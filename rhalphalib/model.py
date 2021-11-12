@@ -294,7 +294,7 @@ class Channel(object):
         observation = self.getObservation()
         if isinstance(observation, tuple):
             observation = observation[0]
-        signalSamples = [s for s in self if s.sampletype <= 0]
+        signalSamples = [s for s in self if s.sampletype == Sample.SIGNAL]
         nSig = len(signalSamples)
         bkgSamples = [s for s in self if s.sampletype == Sample.BACKGROUND]
         nBkg = len(bkgSamples)
