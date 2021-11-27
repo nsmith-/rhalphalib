@@ -192,7 +192,9 @@ class TemplateSample(Sample):
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
         if 'shape' in param.combinePrior and _weighted_effect_magnitude > 0.5:
-            print("effect_up ({}, {}) has weighted effect magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100))
+            print("effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
+                  "you might be passing absolute values instead of relative"
+                  .format(param.name, self._name, _weighted_effect_magnitude * 100))
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
@@ -218,7 +220,9 @@ class TemplateSample(Sample):
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
             if 'shape' in param.combinePrior and _weighted_effect_magnitude > 0.5:
-                print("effect_down ({}, {}) has weighted effect magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100))
+                print("effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), "
+                      "you might be passing absolute values instead of relative"
+                      .format(param.name, self._name, _weighted_effect_magnitude * 100))
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
