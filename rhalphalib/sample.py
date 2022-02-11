@@ -187,7 +187,7 @@ class TemplateSample(Sample):
             # TODO: warning? this can happen regularly
             # we might even want some sort of threshold
             return
-        elif np.all(effect_up == 1.):
+        elif effect_down is None and np.all(effect_up == 1.):
             # some sort of threshold might be useful here as well
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
@@ -215,7 +215,7 @@ class TemplateSample(Sample):
                     # TODO: warning? this can happen regularly
                     # we might even want some sort of threshold
                     return
-                elif np.all(effect_down == 1.):
+                elif np.all(effect_up == 1.) and np.all(effect_down == 1.):
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
