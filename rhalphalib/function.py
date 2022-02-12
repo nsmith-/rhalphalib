@@ -184,12 +184,12 @@ class BernsteinPoly(BasisPoly):
         Backcompatibility subclass of BasisPoly with fixed poly basis
         '''
         super(BernsteinPoly, self).__init__(name=name,
-                         order=order,
-                         dim_names=dim_names,
-                         basis='Bernstein',
-                         init_params=init_params,
-                         limits=limits,
-                         coefficient_transform=coefficient_transform)
+                                            order=order,
+                                            dim_names=dim_names,
+                                            basis='Bernstein',
+                                            init_params=init_params,
+                                            limits=limits,
+                                            coefficient_transform=coefficient_transform)
         warnings.warn("Consider switching to ``BasisPoly(..., basis='Bernstein', ...)")
 
 
