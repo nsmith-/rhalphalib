@@ -100,7 +100,7 @@ class TemplateSample(Sample):
         '''
         name: self-explanatory
         sampletype: Sample.SIGNAL or BACKGROUND or DATA
-        template: Either a ROOT TH1, a 1D Coffea Hist object, or a numpy histogram
+        template: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram
             in the latter case, please extend the numpy histogram tuple to define an observable name
             i.e. (sumw, binning, name)
             (for the others, the observable name is taken from the x axis name)
