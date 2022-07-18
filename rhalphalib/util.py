@@ -38,6 +38,26 @@ def _to_numpy(hinput, read_sumw2=False):
         if read_sumw2:
             return (sumw, binning, name, sumw2)
         return (sumw, binning, name)
+    elif str(type(hinput)) == "<class 'hist.hist.Hist'>":
+        if read_sumw2 and hinput.variances() is None:
+            raise ValueError("Expected Weight storage in Hist {}, as read_sumw2=True".format(hinput))
+
+        if len(hinput.axes) > 1:
+            if str(type(hinput.axes[0])) == "<class 'hist.axis.StrCategory'>":
+                if len(hinput.axes[0]) == 1:
+                    hinput = hinput[0, :]
+                else:
+                    raise ValueError("Expected single sample in Hist {}".format(hinput))
+            else:
+                raise ValueError("Expected 1D histogram in Hist {}".format(hinput))
+
+        sumw = hinput.values()
+        binning = hinput.axes[0].edges
+        name = hinput.axes[0].name
+        if read_sumw2:
+            sumw2 = hinput.variances()
+            return (sumw, binning, name, sumw2)
+        return (sumw, binning, name)
     else:
         raise ValueError("Cannot understand template type of %r" % hinput)
 
