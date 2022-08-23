@@ -251,16 +251,21 @@ class TemplateSample(Sample):
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self, lnN=False, epsilon=0):
+    def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None):
         '''
         Set MC statical uncertainties based on self._sumw2
         lnN: aggregate differences
         epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
+        threshold: if relative uncertainty is < treshold, won't be added ()
+        sample_name: custom name for e.g. using same parameters in two regions. Uses ``self.name``
+            by default (if sample_name=None).
         '''
 
         if self._sumw2 is None:
             raise ValueError("No self._sumw2 defined in template")
             return
+
+        name = self.name if sample_name is None else sample_name
 
         if lnN:
             _nom_rate = np.sum(self._nominal)
@@ -271,7 +276,7 @@ class TemplateSample(Sample):
                 _up_rate = np.sum(np.nan_to_num(self._nominal + np.sqrt(self._sumw2), 0.0))
                 _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
                 effect = 1.0 + _diff / (2. * _nom_rate)
-            param = NuisanceParameter(self.name + '_mcstat', 'lnN')
+            param = NuisanceParameter(name + '_mcstat', 'lnN')
             self.setParamEffect(param, effect)
         else:
             for i in range(self.observable.nbins):
@@ -279,9 +284,13 @@ class TemplateSample(Sample):
                     continue
                 effect_up = np.ones_like(self._nominal)
                 effect_down = np.ones_like(self._nominal)
+
+                if (np.sqrt(self._sumw2[i]) / (self._nominal[i] + 1e-12)) < threshold:
+                    continue
+
                 effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
                 effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i]))/self._nominal[i], epsilon)
-                param = NuisanceParameter(self.name + '_mcstat_bin%i' % i, combinePrior='shape')
+                param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
                 self.setParamEffect(param, effect_up, effect_down)
 
     def getExpectation(self, nominal=False):
