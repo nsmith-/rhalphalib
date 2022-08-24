@@ -251,23 +251,30 @@ class TemplateSample(Sample):
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None):
+    def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None, bini=None):
         '''
         Set MC statical uncertainties based on self._sumw2
         lnN: aggregate differences
         epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
-        threshold: if relative uncertainty is < treshold, won't be added ()
+        threshold: if relative uncertainty is < treshold, won't be added (only for lnN = False)
         sample_name: custom name for e.g. using same parameters in two regions. Uses ``self.name``
             by default (if sample_name=None).
+        bini: create parameter for a specific bin. By default creates for all (if bin=None) 
+            (only if lnN = False).
         '''
 
         if self._sumw2 is None:
             raise ValueError("No self._sumw2 defined in template")
             return
 
-        name = self.name if sample_name is None else sample_name
+        name = self._name if sample_name is None else sample_name
 
         if lnN:
+            if threshold > 0:
+                raise ValueError("No threshold implemented for lnN stat uncertainty")
+            if bini is not None:
+                raise ValueError("Bin-specific uncertainty not implemented for lnN stat uncertainty")
+        
             _nom_rate = np.sum(self._nominal)
             if _nom_rate < .0001:
                 effect = 1.0
@@ -279,7 +286,12 @@ class TemplateSample(Sample):
             param = NuisanceParameter(name + '_mcstat', 'lnN')
             self.setParamEffect(param, effect)
         else:
+            if bini is not None:
+                assert bini >= 0 and bini < len(self.observable.nbins), "autoMCStats bini %d out of range for sample %r " % (bini, self)
+
             for i in range(self.observable.nbins):
+                if bini is not None and bini != i:
+                    continue
                 if self._nominal[i] <= 0. or self._sumw2[i] <= 0.:
                     continue
                 effect_up = np.ones_like(self._nominal)
