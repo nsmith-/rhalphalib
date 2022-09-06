@@ -360,11 +360,13 @@ class Channel(object):
 
         name = self._name if channel_name is None else channel_name
 
-        for i in range(self._samples[0].observable.nbins):
+        first_sample = self._samples[list(self._samples.keys())[0]]
+
+        for i in range(first_sample.observable.nbins):
             ntot, etot2 = 0, 0
 
             # check if neff = ntot^2 / etot2 > threshold
-            for sample in self._samples:
+            for sample in self._samples.values():
                 if not include_signal and sample._sampletype == Sample.SIGNAL:
                     continue
                 
@@ -376,17 +378,17 @@ class Channel(object):
 
             neff = ntot ** 2 / etot2
             if neff <= threshold:
-                for sample in self._samples:
+                for sample in self._samples.values():
                     sample_name = None if channel_name is None else channel_name + "_" + sample._name
                     sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
             else:
-                effect_up = np.ones_like(self._samples[0]._nominal)
-                effect_down = np.ones_like(self._samples[0]._nominal)
+                effect_up = np.ones_like(first_sample._nominal)
+                effect_down = np.ones_like(first_sample._nominal)
 
                 effect_up[i] = (ntot + np.sqrt(etot2)) / ntot
                 effect_down[i] = max((ntot - np.sqrt(etot2))/ ntot, epsilon)
 
                 param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
 
-                for sample in self._samples:
+                for sample in self._samples.values():
                     sample.setParamEffect(param, effect_up, effect_down)
