@@ -351,7 +351,7 @@ class Channel(object):
     def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None):
         '''
         Barlow-Beeston-lite method i.e. single stats parameter for all processes per bin.
-        Same general algorithm as described in 
+        Same general algorithm as described in
         https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
         but *without the analytic minimisation*.
         '''
@@ -369,7 +369,7 @@ class Channel(object):
             for sample in self._samples.values():
                 if not include_signal and sample._sampletype == Sample.SIGNAL:
                     continue
-                
+
                 ntot += sample._nominal[i]
                 etot2 += sample._sumw2[i]
 
@@ -386,7 +386,7 @@ class Channel(object):
                 effect_down = np.ones_like(first_sample._nominal)
 
                 effect_up[i] = (ntot + np.sqrt(etot2)) / ntot
-                effect_down[i] = max((ntot - np.sqrt(etot2))/ ntot, epsilon)
+                effect_down[i] = max((ntot - np.sqrt(etot2)) / ntot, epsilon)
 
                 param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
 
