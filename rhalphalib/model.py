@@ -5,7 +5,7 @@ from itertools import chain
 import os
 import numpy as np
 from .sample import Sample
-from .parameter import Observable, IndependentParameter
+from .parameter import Observable, IndependentParameter, NuisanceParameter
 from .util import _to_numpy, _to_TH1, install_roofit_helpers
 
 
@@ -347,3 +347,48 @@ class Channel(object):
                     effect = sample.combineParamEffect(param)
                     if effect != '-':
                         fout.write(effect + "\n")
+
+    def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None):
+        '''
+        Barlow-Beeston-lite method i.e. single stats parameter for all processes per bin.
+        Same general algorithm as described in
+        https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
+        but *without the analytic minimisation*.
+        '''
+        if not len(self._samples):
+            raise RuntimeError('Channel %r has no samples for which to run autoMCStats' % (self))
+
+        name = self._name if channel_name is None else channel_name
+
+        first_sample = self._samples[list(self._samples.keys())[0]]
+
+        for i in range(first_sample.observable.nbins):
+            ntot, etot2 = 0, 0
+
+            # check if neff = ntot^2 / etot2 > threshold
+            for sample in self._samples.values():
+                if not include_signal and sample._sampletype == Sample.SIGNAL:
+                    continue
+
+                ntot += sample._nominal[i]
+                etot2 += sample._sumw2[i]
+
+            if etot2 <= 0.:
+                continue
+
+            neff = ntot ** 2 / etot2
+            if neff <= threshold:
+                for sample in self._samples.values():
+                    sample_name = None if channel_name is None else channel_name + "_" + sample._name
+                    sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
+            else:
+                effect_up = np.ones_like(first_sample._nominal)
+                effect_down = np.ones_like(first_sample._nominal)
+
+                effect_up[i] = (ntot + np.sqrt(etot2)) / ntot
+                effect_down[i] = max((ntot - np.sqrt(etot2)) / ntot, epsilon)
+
+                param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
+
+                for sample in self._samples.values():
+                    sample.setParamEffect(param, effect_up, effect_down)
