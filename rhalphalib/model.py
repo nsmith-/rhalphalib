@@ -358,7 +358,13 @@ class Channel(object):
         if not len(self._samples):
             raise RuntimeError('Channel %r has no samples for which to run autoMCStats' % (self))
 
-        name = self._name if channel_name is None else channel_name
+        if channel_name is None:
+            name = self._name
+            sample_name = None
+        else:
+            name = channel_name
+            # remove channel prefix of sample
+            sample_name = channel_name + "_" + sample._name[sample._name.find('_') + 1:]
 
         first_sample = self._samples[list(self._samples.keys())[0]]
 
@@ -383,7 +389,6 @@ class Channel(object):
                 # this means there is signal but no background, so create stats unc. for signal only
                 for sample in self._samples.values():
                     if sample._sampletype == Sample.SIGNAL:
-                        sample_name = None if channel_name is None else channel_name + "_" + sample._name
                         sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
 
                 continue
@@ -391,7 +396,6 @@ class Channel(object):
             neff_bb = ntot_bb ** 2 / etot2_bb
             if neff_bb <= threshold:
                 for sample in self._samples.values():
-                    sample_name = None if channel_name is None else channel_name + "_" + sample._name
                     sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
             else:
                 effect_up = np.ones_like(first_sample._nominal)
