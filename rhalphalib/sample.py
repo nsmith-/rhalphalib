@@ -253,13 +253,15 @@ class TemplateSample(Sample):
 
     def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None, bini=None):
         '''
-        Set MC statical uncertainties based on self._sumw2
+        Set MC statical uncertainties based on self._sumw2. `sample_name` and `bini` parameters
+        don't need to modified for typical use cases.
+
         lnN: aggregate differences
         epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
-        threshold: if relative uncertainty is < treshold, won't be added (only for lnN = False)
+        threshold: if relative uncertainty is < threshold, won't be added (only for lnN = False)
         sample_name: custom name for e.g. using same parameters in two regions. Uses ``self.name``
             by default (if sample_name=None).
-        bini: create parameter for a specific bin. By default creates for all (if bin=None) 
+        bini: create parameter for a specific bin. By default creates for all (if bin=None)
             (only if lnN = False).
         '''
 
@@ -274,7 +276,7 @@ class TemplateSample(Sample):
                 raise ValueError("No threshold implemented for lnN stat uncertainty")
             if bini is not None:
                 raise ValueError("Bin-specific uncertainty not implemented for lnN stat uncertainty")
-        
+
             _nom_rate = np.sum(self._nominal)
             if _nom_rate < .0001:
                 effect = 1.0
@@ -287,7 +289,7 @@ class TemplateSample(Sample):
             self.setParamEffect(param, effect)
         else:
             if bini is not None:
-                assert bini >= 0 and bini < len(self.observable.nbins), "autoMCStats bini %d out of range for sample %r " % (bini, self)
+                assert bini >= 0 and bini < self.observable.nbins, "autoMCStats bini %d out of range for sample %r " % (bini, self)
 
             for i in range(self.observable.nbins):
                 if bini is not None and bini != i:
