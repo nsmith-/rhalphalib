@@ -354,6 +354,7 @@ class Channel(object):
         Same general algorithm as described in
         https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
         but *without the analytic minimisation*.
+        `include_signal` only refers to whether signal stats are included in the *decision* to use bb-lite or not.
         '''
         if not len(self._samples):
             raise RuntimeError('Channel %r has no samples for which to run autoMCStats' % (self))
@@ -363,23 +364,35 @@ class Channel(object):
         first_sample = self._samples[list(self._samples.keys())[0]]
 
         for i in range(first_sample.observable.nbins):
-            ntot, etot2 = 0, 0
+            ntot_bb, etot2_bb = 0, 0  # for the decision to use bblite or not
+            ntot, etot2 = 0, 0  # for the bblite uncertainty
 
             # check if neff = ntot^2 / etot2 > threshold
             for sample in self._samples.values():
-                if not include_signal and sample._sampletype == Sample.SIGNAL:
-                    continue
-
                 ntot += sample._nominal[i]
                 etot2 += sample._sumw2[i]
 
+                if not include_signal and sample._sampletype == Sample.SIGNAL:
+                    continue
+
+                ntot_bb += sample._nominal[i]
+                etot2_bb += sample._sumw2[i]
+
             if etot2 <= 0.:
                 continue
-
-            neff = ntot ** 2 / etot2
-            if neff <= threshold:
+            elif etot2_bb <= 0:
+                # this means there is signal but no background, so create stats unc. for signal only
                 for sample in self._samples.values():
-                    sample_name = None if channel_name is None else channel_name + "_" + sample._name
+                    if sample._sampletype == Sample.SIGNAL:
+                        sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find('_') + 1:]
+                        sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
+
+                continue
+
+            neff_bb = ntot_bb ** 2 / etot2_bb
+            if neff_bb <= threshold:
+                for sample in self._samples.values():
+                    sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find('_') + 1:]
                     sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
             else:
                 effect_up = np.ones_like(first_sample._nominal)
