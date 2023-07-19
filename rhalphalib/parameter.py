@@ -113,6 +113,10 @@ class Parameter(object):
     def __pow__(self, other):
         return self._binary_op(('_pow_', '**', False), other)
 
+    def max(self, val):
+        """Return maximum out of param value and given ``val``"""
+        return DependentParameter("max(%s,%s)" % (self.name, val), "TMath::Max({0}, %s)" % val, self)
+
 
 class IndependentParameter(Parameter):
     DefaultRange = (-10, 10)

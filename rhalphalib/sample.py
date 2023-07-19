@@ -627,7 +627,7 @@ class ParametericSample(Sample):
 
 
 class TransferFactorSample(ParametericSample):
-    def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None):
+    def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None, min_val=None):
         '''
         Create a sample that depends on another Sample by some transfer factor.
         The transfor factor can be a constant, an array of parameters of same length
@@ -635,6 +635,7 @@ class TransferFactorSample(ParametericSample):
         dimension matches the sample binning, i.e. expectation = tf @ dependent_expectation.
         The latter requires an additional observable argument to specify the definition of the first dimension.
         In all cases, please use numpy object arrays of Parameter types.
+        Passing in a ``min_val`` means param values will be clipped at the min_val.
         '''
         if not isinstance(transferfactor, np.ndarray):
             raise ValueError("Transfer factor is not a numpy array")
@@ -644,9 +645,15 @@ class TransferFactorSample(ParametericSample):
             if observable is None:
                 raise ValueError("Transfer factor is 2D array, please provide an observable")
             params = np.dot(transferfactor, dependentsample.getExpectation())
+            if min_val is not None:
+                for idx, p in np.ndenumerate(params):
+                    params[idx] = p.max(min_val)
         elif len(transferfactor.shape) <= 1:
             observable = dependentsample.observable
             params = transferfactor * dependentsample.getExpectation()
+            if min_val is not None:
+                for i, p in enumerate(params):
+                    params[i] = p.max(min_val)
         else:
             raise ValueError("Transfer factor has invalid dimension")
         super(TransferFactorSample, self).__init__(name, sampletype, observable, params)
