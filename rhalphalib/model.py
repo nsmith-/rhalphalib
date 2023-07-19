@@ -354,6 +354,7 @@ class Channel(object):
         Same general algorithm as described in
         https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
         but *without the analytic minimisation*.
+        `include_signal` only refers to whether signal stats are included in the *decision* to use bb-lite or not.
         '''
         if not len(self._samples):
             raise RuntimeError('Channel %r has no samples for which to run autoMCStats' % (self))
