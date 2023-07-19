@@ -195,7 +195,6 @@ class TemplateSample(Sample):
             print("effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
                   "you might be passing absolute values instead of relative"
                   .format(param.name, self._name, _weighted_effect_magnitude * 100))
-        self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
             if isinstance(effect_down, np.ndarray):
@@ -226,6 +225,7 @@ class TemplateSample(Sample):
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
+        self._paramEffectsUp[param] = effect_up
 
         if isinstance(scale, numbers.Number):
             if isinstance(effect_up, DependentParameter):
@@ -246,7 +246,12 @@ class TemplateSample(Sample):
                 if param.combinePrior == 'lnN':
                     return 1. / self._paramEffectsUp[param]
                 elif param.combinePrior == 'shape':
-                    return self._nominal - abs(self._nominal - self._paramEffectsUp[param])
+                    zerobins = (self._nominal <= 0.)
+                    effect_down = self._nominal
+                    effect_down[zerobins] = 1.0
+                    effect_down[~zerobins] -= abs(self._nominal - self._paramEffectsUp[param])[~zerobins]
+                    effect_down[~zerobins] /= self._nominal[~zerobins]
+                    return effect_down
                 else:
                     raise NotImplementedError
             return self._paramEffectsDown[param]
