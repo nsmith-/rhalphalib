@@ -646,9 +646,8 @@ class TransferFactorSample(ParametericSample):
                 raise ValueError("Transfer factor is 2D array, please provide an observable")
             params = np.dot(transferfactor, dependentsample.getExpectation())
             if min_val is not None:
-                for i in range(params.shape[0]):
-                    for j, p in enumerate(params[i]):
-                        params[i][j] = p.max(min_val)
+                for idx, p in np.ndenumerate(params):
+                    params[idx] = p.max(min_val)
         elif len(transferfactor.shape) <= 1:
             observable = dependentsample.observable
             params = transferfactor * dependentsample.getExpectation()
