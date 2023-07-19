@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import binom
 import numbers
 import warnings
-from .parameter import IndependentParameter, NuisanceParameter
+from .parameter import IndependentParameter, NuisanceParameter, DependentParameter
 from .util import install_roofit_helpers
 
 
@@ -29,7 +29,7 @@ def matrix_poly(n):
 
 
 class BasisPoly(object):
-    def __init__(self, name, order, dim_names=None, basis='Bernstein', init_params=None, limits=None, coefficient_transform=None):
+    def __init__(self, name, order, dim_names=None, basis='Bernstein', init_params=None, limits=None, coefficient_transform=None, square_params=False):
         '''
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
@@ -80,7 +80,11 @@ class BasisPoly(object):
         self._params = np.full(self._shape, None)
         for ipar, initial in np.ndenumerate(self._init_params):
             param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=limits[0], hi=limits[1])
-            self._params[ipar] = param
+            if not square_params:
+                self._params[ipar] = param
+            else:
+                paramsq = DependentParameter('_'.join([self.name] + ['%s_parsq%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), "{0}*{0}", param)
+                self._params[ipar] = paramsq
 
     @property
     def name(self):
