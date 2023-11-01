@@ -29,8 +29,8 @@ def matrix_poly(n):
 
 
 class BasisPoly(object):
-    def __init__(self, name, order, dim_names=None, basis='Bernstein', init_params=None, limits=None, coefficient_transform=None, square_params=False):
-        '''
+    def __init__(self, name, order, dim_names=None, basis="Bernstein", init_params=None, limits=None, coefficient_transform=None, square_params=False):
+        """
         Construct a multidimensional Bernstein polynomial
             name: will be used to prefix any RooFit object names
             order: tuple of order in each dimension
@@ -40,7 +40,7 @@ class BasisPoly(object):
             coefficient_transform: callable to transform coefficients before multiplying by parameters
             square_params: if True, square the parameters before multiplying by coefficient;
               this is a way to ensure a positive definite polynomial in the Bernstein basis.
-        '''
+        """
         self._name = name
         if not isinstance(order, tuple):
             raise ValueError
@@ -64,7 +64,7 @@ class BasisPoly(object):
         if limits is None:
             limits = (0.0, 10.0)
         self._transform = coefficient_transform
-        if square_params and self._basis != 'Bernstein':
+        if square_params and self._basis != "Bernstein":
             raise ValueError("square_params only applicable for Bernstein basis")
 
         # Construct companion matrix for each dimension
@@ -83,11 +83,11 @@ class BasisPoly(object):
         # Construct parameter tensor
         self._params = np.full(self._shape, None)
         for ipar, initial in np.ndenumerate(self._init_params):
-            param = IndependentParameter('_'.join([self.name] + ['%s_par%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=limits[0], hi=limits[1])
+            param = IndependentParameter("_".join([self.name] + ["%s_par%d" % (d, i) for d, i in zip(self._dim_names, ipar)]), initial, lo=limits[0], hi=limits[1])
             if not square_params:
                 self._params[ipar] = param
             else:
-                paramsq = DependentParameter('_'.join([self.name] + ['%s_parsq%d' % (d, i) for d, i in zip(self._dim_names, ipar)]), "{0}*{0}", param)
+                paramsq = DependentParameter("_".join([self.name] + ["%s_parsq%d" % (d, i) for d, i in zip(self._dim_names, ipar)]), "{0}*{0}", param)
                 self._params[ipar] = paramsq
 
     @property
