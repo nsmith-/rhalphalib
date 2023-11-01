@@ -38,6 +38,8 @@ class BasisPoly(object):
             init_params: ndarray of initial params
             limits: tuple of independent parameter limits, default: (0, 10)
             coefficient_transform: callable to transform coefficients before multiplying by parameters
+            square_params: if True, square the parameters before multiplying by coefficient;
+              this is a way to ensure a positive definite polynomial in the Bernstein basis.
         '''
         self._name = name
         if not isinstance(order, tuple):
@@ -62,6 +64,8 @@ class BasisPoly(object):
         if limits is None:
             limits = (0., 10.)
         self._transform = coefficient_transform
+        if square_params and self._basis != 'Bernstein':
+            raise ValueError("square_params only applicable for Bernstein basis")
 
         # Construct companion matrix for each dimension
         self._bmatrices = []
