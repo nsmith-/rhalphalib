@@ -17,6 +17,7 @@ class Sample(object):
     """
     Sample base class
     """
+
     SIGNAL, BACKGROUND = range(2)
 
     def __init__(self, name, sampletype):
@@ -24,7 +25,7 @@ class Sample(object):
         self._sampletype = sampletype
         self._observable = None
         self._mask = None
-        self._mask_val = 0.
+        self._mask_val = 0.0
 
     def __repr__(self):
         return "<%s (%s) instance at 0x%x>" % (
@@ -58,10 +59,10 @@ class Sample(object):
 
     @property
     def mask(self):
-        '''
+        """
         An array matching the observable binning that specifies which bins to populate
         i.e. when mask[i] is False, the bin content will be set to 0.
-        '''
+        """
         return self._mask
 
     @mask.setter
@@ -97,14 +98,14 @@ class Sample(object):
 
 class TemplateSample(Sample):
     def __init__(self, name, sampletype, template):
-        '''
+        """
         name: self-explanatory
         sampletype: Sample.SIGNAL or BACKGROUND or DATA
         template: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram
             in the latter case, please extend the numpy histogram tuple to define an observable name
             i.e. (sumw, binning, name)
             (for the others, the observable name is taken from the x axis name)
-        '''
+        """
         super(TemplateSample, self).__init__(name, sampletype)
         sumw2 = None
         try:
@@ -128,19 +129,19 @@ class TemplateSample(Sample):
     def scale(self, _scale):
         self._nominal *= _scale
         if self._sumw2 is not None:
-            self._sumw2 *= _scale*_scale
+            self._sumw2 *= _scale * _scale
 
     @property
     def parameters(self):
-        '''
+        """
         Set of independent parameters that affect this sample
-        '''
+        """
         pset = set(self._paramEffectsUp.keys())
         pset.update(self._extra_dependencies)
         return pset
 
     def setParamEffect(self, param, effect_up, effect_down=None, scale=None):
-        '''
+        """
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         param: a Parameter object
         effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
@@ -153,7 +154,7 @@ class TemplateSample(Sample):
             magnified to ensure good vertical interpolation
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
-        '''
+        """
         if not isinstance(param, NuisanceParameter):
             if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
                 extras = effect_up.getDependents() - {param}
@@ -164,7 +165,7 @@ class TemplateSample(Sample):
                     self._paramEffectsUp[extra] = None
                 if effect_down is not None:
                     raise ValueError("Asymmetric normalization modifiers not supported. You can encode the effect in the dependent parameter")
-                effect_up.name = param.name + '_effect_' + self.name
+                effect_up.name = param.name + "_effect_" + self.name
                 self._paramEffectsUp[param] = effect_up
                 return
             else:
@@ -174,27 +175,28 @@ class TemplateSample(Sample):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
         elif isinstance(effect_up, numbers.Number):
-            if 'shape' in param.combinePrior:
+            if "shape" in param.combinePrior:
                 effect_up = np.full(self.observable.nbins, effect_up)
         else:
             effect_up, binning, _ = _to_numpy(effect_up)
             if not np.array_equal(binning, self.observable.binning):
                 raise ValueError("effect_up has incompatible binning with sample %r" % self)
-            zerobins = (self._nominal <= 0.) | (effect_up <= 0.)
-            effect_up[zerobins] = 1.
+            zerobins = (self._nominal <= 0.0) | (effect_up <= 0.0)
+            effect_up[zerobins] = 1.0
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
             # TODO: warning? this can happen regularly
             # we might even want some sort of threshold
             return
-        elif effect_down is None and np.all(effect_up == 1.):
+        elif effect_down is None and np.all(effect_up == 1.0):
             # some sort of threshold might be useful here as well
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
-        if 'shape' in param.combinePrior and _weighted_effect_magnitude > 0.5:
-            print("effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                  "you might be passing absolute values instead of relative"
-                  .format(param.name, self._name, _weighted_effect_magnitude * 100))
+        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
+            print(
+                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
+                "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+            )
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
@@ -202,27 +204,28 @@ class TemplateSample(Sample):
                 if len(effect_down) != self.observable.nbins:
                     raise ValueError("effect_down has the wrong number of bins (%d, expected %d)" % (len(effect_down), self.observable.nbins))
             elif isinstance(effect_down, numbers.Number):
-                if 'shape' in param.combinePrior:
+                if "shape" in param.combinePrior:
                     effect_down = np.full(self.observable.nbins, effect_down)
             else:
                 effect_down, binning, _ = _to_numpy(effect_down)
                 if not np.array_equal(binning, self.observable.binning):
                     raise ValueError("effect_down has incompatible binning with sample %r" % self)
-                zerobins = (self._nominal <= 0.) | (effect_down <= 0.)
-                effect_down[zerobins] = 1.
+                zerobins = (self._nominal <= 0.0) | (effect_down <= 0.0)
+                effect_down[zerobins] = 1.0
                 effect_down[~zerobins] /= self._nominal[~zerobins]
                 if np.sum(effect_down * self._nominal) <= 0:
                     # TODO: warning? this can happen regularly
                     # we might even want some sort of threshold
                     return
-                elif np.all(effect_up == 1.) and np.all(effect_down == 1.):
+                elif np.all(effect_up == 1.0) and np.all(effect_down == 1.0):
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
-            if 'shape' in param.combinePrior and _weighted_effect_magnitude > 0.5:
-                print("effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                      "you might be passing absolute values instead of relative"
-                      .format(param.name, self._name, _weighted_effect_magnitude * 100))
+            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
+                print(
+                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), "
+                    "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+                )
             self._paramEffectsDown[param] = effect_down
         else:
             self._paramEffectsDown[param] = None
@@ -235,24 +238,24 @@ class TemplateSample(Sample):
             raise ValueError("Cannot understand scale value %r. It should be a number" % scale)
 
     def getParamEffect(self, param, up=True):
-        '''
+        """
         Get the parameter effect
-        '''
+        """
         if up:
             return self._paramEffectsUp[param]
         else:
             if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
-                if param.combinePrior == 'lnN':
-                    return 1. / self._paramEffectsUp[param]
-                elif param.combinePrior == 'shape':
+                if param.combinePrior == "lnN":
+                    return 1.0 / self._paramEffectsUp[param]
+                elif param.combinePrior == "shape":
                     return self._nominal - abs(self._nominal - self._paramEffectsUp[param])
                 else:
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
     def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None, bini=None):
-        '''
+        """
         Set MC statical uncertainties based on self._sumw2. `sample_name` and `bini` parameters
         don't need to modified for typical use cases.
 
@@ -263,7 +266,7 @@ class TemplateSample(Sample):
             by default (if sample_name=None).
         bini: create parameter for a specific bin. By default creates for all (if bin=None)
             (only if lnN = False).
-        '''
+        """
 
         if self._sumw2 is None:
             raise ValueError("No self._sumw2 defined in template")
@@ -278,14 +281,14 @@ class TemplateSample(Sample):
                 raise ValueError("Bin-specific uncertainty not implemented for lnN stat uncertainty")
 
             _nom_rate = np.sum(self._nominal)
-            if _nom_rate < .0001:
+            if _nom_rate < 0.0001:
                 effect = 1.0
             else:
                 _down_rate = np.sum(np.nan_to_num(self._nominal - np.sqrt(self._sumw2), 0.0))
                 _up_rate = np.sum(np.nan_to_num(self._nominal + np.sqrt(self._sumw2), 0.0))
-                _diff = np.abs(_up_rate-_nom_rate) + np.abs(_down_rate-_nom_rate)
-                effect = 1.0 + _diff / (2. * _nom_rate)
-            param = NuisanceParameter(name + '_mcstat', 'lnN')
+                _diff = np.abs(_up_rate - _nom_rate) + np.abs(_down_rate - _nom_rate)
+                effect = 1.0 + _diff / (2.0 * _nom_rate)
+            param = NuisanceParameter(name + "_mcstat", "lnN")
             self.setParamEffect(param, effect)
         else:
             if bini is not None:
@@ -294,7 +297,7 @@ class TemplateSample(Sample):
             for i in range(self.observable.nbins):
                 if bini is not None and bini != i:
                     continue
-                if self._nominal[i] <= 0. or self._sumw2[i] <= 0.:
+                if self._nominal[i] <= 0.0 or self._sumw2[i] <= 0.0:
                     continue
                 effect_up = np.ones_like(self._nominal)
                 effect_down = np.ones_like(self._nominal)
@@ -302,16 +305,16 @@ class TemplateSample(Sample):
                 if (np.sqrt(self._sumw2[i]) / (self._nominal[i] + 1e-12)) < threshold:
                     continue
 
-                effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i]))/self._nominal[i]
-                effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i]))/self._nominal[i], epsilon)
-                param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
+                effect_up[i] = (self._nominal[i] + np.sqrt(self._sumw2[i])) / self._nominal[i]
+                effect_down[i] = max((self._nominal[i] - np.sqrt(self._sumw2[i])) / self._nominal[i], epsilon)
+                param = NuisanceParameter(name + "_mcstat_bin%i" % i, combinePrior="shape")
                 self.setParamEffect(param, effect_up, effect_down)
 
     def getExpectation(self, nominal=False):
-        '''
+        """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
-        '''
+        """
 
         nominalval = self._nominal.copy()
         if self.mask is not None:
@@ -331,39 +334,40 @@ class TemplateSample(Sample):
                 if isinstance(effect_up, DependentParameter):
                     out = out * effect_up
                 elif self._paramEffectsDown[param] is None:
-                    if param.combinePrior == 'shape':
-                        out = out * (1 + (effect_up - 1)*param_scaled)
-                    elif param.combinePrior == 'shapeN':
+                    if param.combinePrior == "shape":
+                        out = out * (1 + (effect_up - 1) * param_scaled)
+                    elif param.combinePrior == "shapeN":
                         out = out * (effect_up**param_scaled)
-                    elif param.combinePrior == 'lnN':
+                    elif param.combinePrior == "lnN":
                         # TODO: ensure scalar effect
                         out = out * (effect_up**param_scaled)
                     else:
-                        raise NotImplementedError('per-bin effects for other nuisance parameter types')
+                        raise NotImplementedError("per-bin effects for other nuisance parameter types")
                 else:
                     effect_down = self.getParamEffect(param, up=False)
                     smoothStep = SmoothStep(param_scaled)
-                    if param.combinePrior == 'shape':
-                        combined_effect = smoothStep * (1 + (effect_up - 1)*param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1)*param_scaled)
-                    elif param.combinePrior == 'shapeN':
+                    if param.combinePrior == "shape":
+                        combined_effect = smoothStep * (1 + (effect_up - 1) * param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1) * param_scaled)
+                    elif param.combinePrior == "shapeN":
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
-                    elif param.combinePrior == 'lnN':
+                    elif param.combinePrior == "lnN":
                         # TODO: ensure scalar effect
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     else:
-                        raise NotImplementedError('per-bin effects for other nuisance parameter types')
+                        raise NotImplementedError("per-bin effects for other nuisance parameter types")
                     out = out * combined_effect
 
             return out
 
     def renderRoofit(self, workspace):
-        '''
+        """
         Import the necessary Roofit objects into the workspace for this sample
         and return an extended pdf representing this sample's prediciton for pdf and norm.
-        '''
+        """
         import ROOT
+
         install_roofit_helpers()
-        normName = self.name + '_norm'
+        normName = self.name + "_norm"
         rooShape = workspace.pdf(self.name)
         rooNorm = workspace.function(normName)
         if rooShape == None and rooNorm == None:  # noqa: E711
@@ -373,17 +377,17 @@ class TemplateSample(Sample):
             workspace.add(rooTemplate)
             for param in self.parameters:
                 effect_up = self.getParamEffect(param, up=True)
-                if 'shape' not in param.combinePrior:
+                if "shape" not in param.combinePrior:
                     # Normalization systematics can just go into combine datacards (although if we build PDF here, will need it)
                     if isinstance(effect_up, DependentParameter):
                         # this is a rateParam, we should add the IndependentParameter to the workspace
                         param.renderRoofit(workspace)
                     continue
-                name = self.name + '_' + param.name + 'Up'
+                name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
-                name = self.name + '_' + param.name + 'Down'
+                name = self.name + "_" + param.name + "Down"
                 shape = nominal * self.getParamEffect(param, up=False)
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
@@ -393,45 +397,46 @@ class TemplateSample(Sample):
             rooNorm = IndependentParameter(normName, nominal.sum(), constant=True).renderRoofit(workspace)
             # TODO build the pdf with systematics
         elif rooShape == None or rooNorm == None:  # noqa: E711
-            raise RuntimeError('Sample %r has either a shape or norm already embedded in workspace %r' % (self, workspace))
+            raise RuntimeError("Sample %r has either a shape or norm already embedded in workspace %r" % (self, workspace))
         rooShape = workspace.pdf(self.name)
-        rooNorm = workspace.function(self.name + '_norm')
+        rooNorm = workspace.function(self.name + "_norm")
         return rooShape, rooNorm
 
     def combineNormalization(self):
         return self.getExpectation(nominal=True).sum()
 
     def combineParamEffect(self, param):
-        '''
+        """
         A formatted string for placement into the combine datacard that represents
         the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
-        '''
+        """
         if self._paramEffectsUp.get(param, None) is None:
-            return '-'
-        elif 'shape' in param.combinePrior:
-            return '%.4f' % self._paramEffectScales.get(param, 1)
+            return "-"
+        elif "shape" in param.combinePrior:
+            return "%.4f" % self._paramEffectScales.get(param, 1)
         elif isinstance(self.getParamEffect(param, up=True), DependentParameter):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
-            channel, sample = self.name[:self.name.find('_')], self.name[self.name.find('_') + 1:]
+            channel, sample = self.name[: self.name.find("_")], self.name[self.name.find("_") + 1 :]
             dependents = dep.getDependents()
-            formula = dep.formula(rendering=True).format(**{var.name: '@%d' % i for i, var in enumerate(dependents)})
-            return '{0} rateParam {1} {2} {3} {4}'.format(dep.name,
-                                                          channel,
-                                                          sample,
-                                                          formula,
-                                                          ",".join(p.name for p in dependents),
-                                                          )
+            formula = dep.formula(rendering=True).format(**{var.name: "@%d" % i for i, var in enumerate(dependents)})
+            return "{0} rateParam {1} {2} {3} {4}".format(
+                dep.name,
+                channel,
+                sample,
+                formula,
+                ",".join(p.name for p in dependents),
+            )
         else:
             # TODO the scaling here depends on the prior of the nuisance parameter
-            scale = self._paramEffectScales.get(param, 1.)
+            scale = self._paramEffectScales.get(param, 1.0)
             up = (self.getParamEffect(param, up=True) - 1) * scale + 1
             down = (self.getParamEffect(param, up=False) - 1) * scale + 1
             if isinstance(up, np.ndarray):
                 # Convert shape to norm (note symmeterized effect on shape != symmeterized effect on norm)
                 nominal = self.getExpectation(nominal=True)
                 if nominal.sum() == 0:
-                    up = 1.
+                    up = 1.0
                     down = None
                 else:
                     up = (up * nominal).sum() / nominal.sum()
@@ -440,20 +445,20 @@ class TemplateSample(Sample):
                 # Here we can safely defer to combine to calculate symmeterized effect
                 down = None
             if down is None:
-                return '%.4f' % up
+                return "%.4f" % up
             else:
-                return '%.4f/%.4f' % (down, up)
+                return "%.4f/%.4f" % (down, up)
 
 
 class ParametericSample(Sample):
     PreferRooParametricHist = True
 
     def __init__(self, name, sampletype, observable, params):
-        '''
+        """
         Create a sample that is a binned function, where each bin yield
         is given by the param in params.  The list params should have the
         same number of bins as observable.
-        '''
+        """
         super(ParametericSample, self).__init__(name, sampletype)
         if not isinstance(observable, Observable):
             raise ValueError
@@ -468,16 +473,16 @@ class ParametericSample(Sample):
 
     @property
     def parameters(self):
-        '''
+        """
         Set of independent parameters that affect this sample
-        '''
+        """
         pset = set()
         for p in self.getExpectation():
             pset.update(p.getDependents(deep=True))
         return pset
 
     def setParamEffect(self, param, effect_up, effect_down=None):
-        '''
+        """
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
         param: a Parameter object
         effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
@@ -485,7 +490,7 @@ class ParametericSample(Sample):
         effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
-        '''
+        """
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via a NuisanceParameter")
 
@@ -493,7 +498,7 @@ class ParametericSample(Sample):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
         elif isinstance(effect_up, numbers.Number):
-            if 'shape' in param.combinePrior:
+            if "shape" in param.combinePrior:
                 effect_up = np.full(self.observable.nbins, effect_up)
         else:
             raise ValueError("unrecognized effect_up type")
@@ -504,7 +509,7 @@ class ParametericSample(Sample):
                 if len(effect_down) != self.observable.nbins:
                     raise ValueError("effect_down has the wrong number of bins (%d, expected %d)" % (len(effect_down), self.observable.nbins))
             elif isinstance(effect_down, numbers.Number):
-                if 'shape' in param.combinePrior:
+                if "shape" in param.combinePrior:
                     effect_down = np.full(self.observable.nbins, effect_down)
             else:
                 raise ValueError("unrecognized effect_down type")
@@ -513,22 +518,22 @@ class ParametericSample(Sample):
             self._paramEffectsDown[param] = None
 
     def getParamEffect(self, param, up=True):
-        '''
+        """
         Get the parameter effect
-        '''
+        """
         if up:
             return self._paramEffectsUp[param]
         else:
             if self._paramEffectsDown[param] is None:
                 # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
-                return 1. / self._paramEffectsUp[param]
+                return 1.0 / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
 
     def getExpectation(self, nominal=False):
-        '''
+        """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
-        '''
+        """
 
         out = self._nominal.copy()  # this is a shallow copy
         if self.mask is not None:
@@ -549,7 +554,7 @@ class ParametericSample(Sample):
                     out = out * combined_effect
 
             for i, p in enumerate(out):
-                p.name = self.name + '_bin%d' % i
+                p.name = self.name + "_bin%d" % i
                 if isinstance(p, DependentParameter):
                     # Let's make sure to render these
                     p.intermediate = False
@@ -557,35 +562,38 @@ class ParametericSample(Sample):
             return out
 
     def renderRoofit(self, workspace):
-        '''
+        """
         Produce a RooParametricHist (if available) or RooParametricStepFunction and add to workspace
         Note: for RooParametricStepFunction, bin values cannot be zero due to this ridiculous line:
         https://github.com/root-project/root/blob/master/roofit/roofit/src/RooParametricStepFunction.cxx#L212-L213
-        '''
+        """
         import ROOT
+
         install_roofit_helpers()
         rooShape = workspace.pdf(self.name)
-        rooNorm = workspace.function(self.name + '_norm')
+        rooNorm = workspace.function(self.name + "_norm")
         if rooShape == None and rooNorm == None:  # noqa: E711
             rooObservable = self.observable.renderRoofit(workspace)
             params = self.getExpectation()
 
-            if hasattr(ROOT, 'RooParametricHist') and self.PreferRooParametricHist:
+            if hasattr(ROOT, "RooParametricHist") and self.PreferRooParametricHist:
                 rooParams = [p.renderRoofit(workspace) for p in params]
                 # need a dummy hist to generate proper binning
                 dummyHist = _to_TH1(np.zeros(self.observable.nbins), self.observable.binning, self.observable.name)
                 rooShape = ROOT.RooParametricHist(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), dummyHist)
-                rooNorm = ROOT.RooAddition(self.name + '_norm', self.name + '_norm', ROOT.RooArgList.fromiter(rooParams))
+                rooNorm = ROOT.RooAddition(self.name + "_norm", self.name + "_norm", ROOT.RooArgList.fromiter(rooParams))
                 workspace.add(rooShape)
                 workspace.add(rooNorm)
             else:
                 if self.PreferRooParametricHist:
-                    warnings.warn("Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n"
-                                  "Set ParametericSample.PreferRooParametricHist = False to disable this warning",
-                                  RuntimeWarning)
+                    warnings.warn(
+                        "Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n"
+                        "Set ParametericSample.PreferRooParametricHist = False to disable this warning",
+                        RuntimeWarning,
+                    )
                 # RooParametricStepFunction expects parameters to represent PDF density (i.e. bin width normalized, and integrates to 1)
                 norm = _pairwise_sum(params)
-                norm.name = self.name + '_norm'
+                norm.name = self.name + "_norm"
                 norm.intermediate = False
 
                 binw = np.diff(self.observable.binning)
@@ -597,38 +605,33 @@ class ParametericSample(Sample):
 
                 # The last bin value is defined by 1 - sum(others), so no need to render it
                 rooParams = [p.renderRoofit(workspace) for p in dparams[:-1]]
-                rooShape = ROOT.RooParametricStepFunction(self.name, self.name,
-                                                          rooObservable,
-                                                          ROOT.RooArgList.fromiter(rooParams),
-                                                          self.observable.binningTArrayD(),
-                                                          self.observable.nbins
-                                                          )
+                rooShape = ROOT.RooParametricStepFunction(self.name, self.name, rooObservable, ROOT.RooArgList.fromiter(rooParams), self.observable.binningTArrayD(), self.observable.nbins)
                 workspace.add(rooShape)
                 rooNorm = norm.renderRoofit(workspace)  # already rendered but we want to return it
         elif rooShape == None or rooNorm == None:  # noqa: E711
-            raise RuntimeError('Channel %r has either a shape or norm already embedded in workspace %r' % (self, workspace))
+            raise RuntimeError("Channel %r has either a shape or norm already embedded in workspace %r" % (self, workspace))
         rooShape = workspace.pdf(self.name)
-        rooNorm = workspace.function(self.name + '_norm')
+        rooNorm = workspace.function(self.name + "_norm")
         return rooShape, rooNorm
 
     def combineNormalization(self):
-        '''
+        """
         For combine, the normalization in the card is used to scale the parameteric process PDF
         Since we provide an explicit normalization function, this should always stay at 1.
-        '''
+        """
         # TODO: optionally we could set the normalization here and leave only normalization modifiers
-        return 1.
+        return 1.0
 
     def combineParamEffect(self, param):
-        '''
+        """
         Combine cannot build shape param effects for parameterized templates, so we have to do it in the model.
-        '''
-        return '-'
+        """
+        return "-"
 
 
 class TransferFactorSample(ParametericSample):
     def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None, min_val=None):
-        '''
+        """
         Create a sample that depends on another Sample by some transfer factor.
         The transfor factor can be a constant, an array of parameters of same length
         as the dependent sample binning, or a matrix of parameters where the second
@@ -636,7 +639,7 @@ class TransferFactorSample(ParametericSample):
         The latter requires an additional observable argument to specify the definition of the first dimension.
         In all cases, please use numpy object arrays of Parameter types.
         Passing in a ``min_val`` means param values will be clipped at the min_val.
-        '''
+        """
         if not isinstance(transferfactor, np.ndarray):
             raise ValueError("Transfer factor is not a numpy array")
         if not isinstance(dependentsample, Sample):

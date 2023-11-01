@@ -11,15 +11,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Set up Python 3.7
-      uses: actions/setup-python@v1
-      with:
-        python-version: 3.7
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        flake8 rhalphalib --count --show-source --statistics
+      - name: Check out Git repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.9
+
+      - name: Install Python dependencies
+        run: pip install black flake8
+
+      - name: Run black
+        uses: wearerequired/lint-action@v2
+        with:
+          auto_fix: true
+          black: true
+          black_auto_fix: true
+      
+      - name: Lint with flake8
+        run: flake8 rhalphalib --count --show-source --statistics
 
   test:
     name: Run pytest (Python ${{ matrix.python-version }}, ROOT ${{ matrix.root-version }})
