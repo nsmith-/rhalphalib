@@ -32,31 +32,31 @@ class Parameter(object):
 
     @property
     def intermediate(self):
-        '''
+        """
         An intermediate parameter is one that should not be explicitly rendered.
         The formula will be expanded recursively until it depends only on non-intermediate value.
         Only DependentParameters can be intermediate, hence one can modify this flag for them.
-        '''
+        """
         return self._intermediate
 
     def hasPrior(self):
-        '''
+        """
         True if the prior is not flat
-        '''
+        """
         return self._hasPrior
 
     @property
     def combinePrior(self):
-        '''
+        """
         By default assume param has no prior and we are just informing combine about it
-        '''
-        return 'flatParam'
+        """
+        return "flatParam"
 
     def getDependents(self, rendering=False, deep=False):
         return {self}
 
     def formula(self):
-        return '{' + self._name + '}'
+        return "{" + self._name + "}"
 
     def renderRoofit(self, workspace):
         raise NotImplementedError
@@ -84,34 +84,34 @@ class Parameter(object):
         return NotImplemented
 
     def __radd__(self, other):
-        return self._binary_op(('_add_', '+', True), other)
+        return self._binary_op(("_add_", "+", True), other)
 
     def __rsub__(self, other):
-        return self._binary_op(('_sub_', '-', True), other)
+        return self._binary_op(("_sub_", "-", True), other)
 
     def __rmul__(self, other):
-        return self._binary_op(('_mul_', '*', True), other)
+        return self._binary_op(("_mul_", "*", True), other)
 
     def __rtruediv__(self, other):
-        return self._binary_op(('_div_', '/', True), other)
+        return self._binary_op(("_div_", "/", True), other)
 
     def __rpow__(self, other):
-        return self._binary_op(('_pow_', '**', True), other)
+        return self._binary_op(("_pow_", "**", True), other)
 
     def __add__(self, other):
-        return self._binary_op(('_add_', '+', False), other)
+        return self._binary_op(("_add_", "+", False), other)
 
     def __sub__(self, other):
-        return self._binary_op(('_sub_', '-', False), other)
+        return self._binary_op(("_sub_", "-", False), other)
 
     def __mul__(self, other):
-        return self._binary_op(('_mul_', '*', False), other)
+        return self._binary_op(("_mul_", "*", False), other)
 
     def __truediv__(self, other):
-        return self._binary_op(('_div_', '/', False), other)
+        return self._binary_op(("_div_", "/", False), other)
 
     def __pow__(self, other):
-        return self._binary_op(('_pow_', '**', False), other)
+        return self._binary_op(("_pow_", "**", False), other)
 
     def max(self, val):
         """Return maximum out of param value and given ``val``"""
@@ -157,6 +157,7 @@ class IndependentParameter(Parameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+
         install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self._name, self._name, self._value, self._lo, self._hi)
@@ -167,7 +168,7 @@ class IndependentParameter(Parameter):
 
 class NuisanceParameter(IndependentParameter):
     def __init__(self, name, combinePrior, value=0, lo=None, hi=None):
-        '''
+        """
         A nuisance parameter.
         name: name of parameter
         combinePrior: one of 'shape', 'shapeN', 'lnN', etc.
@@ -175,10 +176,10 @@ class NuisanceParameter(IndependentParameter):
         Render the prior somewhere else?  Probably in Model because the prior needs
         to be added at the RooSimultaneus level (I think)
         Filtering the set of model parameters for these classes can collect needed priors.
-        '''
+        """
         super(NuisanceParameter, self).__init__(name, value, lo, hi)
         self._hasPrior = True
-        if combinePrior not in {'shape', 'shapeN', 'shapeU', 'lnN', 'lnU', 'gmM', 'trG', 'param'}:
+        if combinePrior not in {"shape", "shapeN", "shapeU", "lnN", "lnU", "gmM", "trG", "param"}:
             raise ValueError("Unrecognized combine prior %s" % combinePrior)
         self._prior = combinePrior
 
@@ -189,12 +190,12 @@ class NuisanceParameter(IndependentParameter):
 
 class DependentParameter(Parameter):
     def __init__(self, name, formula, *dependents):
-        '''
+        """
         Create a dependent parameter
             name: name of parameter
             formula: a python format-string using only indices, e.g.
                 '{0} + sin({1})*{2}'
-        '''
+        """
         super(DependentParameter, self).__init__(name, np.nan)
         if not all(isinstance(d, Parameter) for d in dependents):
             raise ValueError
@@ -212,14 +213,14 @@ class DependentParameter(Parameter):
         self._intermediate = val
 
     def getDependents(self, rendering=False, deep=False):
-        '''
+        """
         Return a set of parameters that this parameter depends on, which will be rendered.
         By default, this means all non-intermediate dependent parameters, recursively descending and stopping at
         the first renderable parameter (i.e. either non-intermediate or an IndependentParameter)
         If this parameter itself is renderable, we return a set of just this parameter.
         If rendering=True, we pass through this parameter if it is renderable.
         If deep=True, descend all the way to the IndependentParameters
-        '''
+        """
         dependents = set()
         if deep:
             for p in self._dependents:
@@ -244,6 +245,7 @@ class DependentParameter(Parameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+
         install_roofit_helpers()
         if workspace.function(self._name) == None:  # noqa: E711
             if self.intermediate:
@@ -254,7 +256,7 @@ class DependentParameter(Parameter):
             rooVars = [v.renderRoofit(workspace) for v in self.getDependents(rendering=True)]
             # Originally just passed the named variables to RooFormulaVar but it seems the TFormula class
             # is more sensitive to variable names than is reasonable, so we reindex here
-            formula = self.formula(rendering=True).format(**{var.GetName(): '@%d' % i for i, var in enumerate(rooVars)})
+            formula = self.formula(rendering=True).format(**{var.GetName(): "@%d" % i for i, var in enumerate(rooVars)})
             var = ROOT.RooFormulaVar(self._name, self._name, formula, ROOT.RooArgList.fromiter(rooVars))
             workspace.add(var)
         return workspace.function(self._name)
@@ -266,7 +268,7 @@ class SmoothStep(DependentParameter):
             raise ValueError("Expected a Parameter instance, got %r" % param)
         if param.intermediate:
             raise ValueError("SmoothStep can only depend on a non-intermediate parameter")
-        super(SmoothStep, self).__init__(param.name + '_smoothstep', '{0}', param)
+        super(SmoothStep, self).__init__(param.name + "_smoothstep", "{0}", param)
         self.intermediate = False
 
     @property
@@ -278,6 +280,7 @@ class SmoothStep(DependentParameter):
 
     def renderRoofit(self, workspace):
         import ROOT
+
         install_roofit_helpers()
         if workspace.function(self._name) == None:  # noqa: E711
             # Formula satisfies f(x<=-1) = 0, f(x>=1) = 1, f'(-1) = f'(1) = f''(-1) = f''(1) = 0
@@ -291,12 +294,13 @@ class SmoothStep(DependentParameter):
 
 
 class Observable(Parameter):
-    '''
+    """
     A simple struct that holds the name of an observable (e.g. x axis of discriminator histogram) and its binning
     The first sample attached to a channel will dictate how the rendering of the observable is done.
     Subequent samples attached will be checked against the first, and if they match, their observable will be set
     to the first samples' instance of this class.
-    '''
+    """
+
     def __init__(self, name, binning):
         super(Observable, self).__init__(name, np.nan)
         self._binning = np.array(binning)
@@ -320,13 +324,15 @@ class Observable(Parameter):
 
     def binningTArrayD(self):
         import ROOT
+
         return ROOT.TArrayD(len(self._binning), self._binning)
 
     def renderRoofit(self, workspace):
-        '''
+        """
         Return a RooObservable following the definition
-        '''
+        """
         import ROOT
+
         install_roofit_helpers()
         if workspace.var(self._name) == None:  # noqa: E711
             var = ROOT.RooRealVar(self.name, self.name, self.binning[0], self.binning[-1])

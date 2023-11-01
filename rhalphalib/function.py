@@ -8,7 +8,7 @@ from .util import install_roofit_helpers
 
 def matrix_bernstein(n):
     v = np.arange(n + 1)
-    bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1., np.subtract.outer(v, v)))
+    bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1.0, np.subtract.outer(v, v)))
     bmat[np.greater.outer(v, v)] = 0  # v > l
     return bmat
 
@@ -20,7 +20,7 @@ def matrix_chebyshev(n):
         _coef_basis[-1] = 1
         c = np.polynomial.Chebyshev(_coef_basis, domain=[0, 1])
         p = c.convert(kind=np.polynomial.Polynomial)
-        M[nth-1, :nth] = p.coef
+        M[nth - 1, :nth] = p.coef
     return M
 
 
@@ -52,7 +52,7 @@ class BasisPoly(object):
                 raise ValueError
             self._dim_names = dim_names
         else:
-            self._dim_names = ['dim%d' % i for i in range(len(self._order))]
+            self._dim_names = ["dim%d" % i for i in range(len(self._order))]
         if isinstance(init_params, np.ndarray):
             if init_params.shape != self._shape:
                 raise ValueError
@@ -62,7 +62,7 @@ class BasisPoly(object):
         else:
             raise ValueError
         if limits is None:
-            limits = (0., 10.)
+            limits = (0.0, 10.0)
         self._transform = coefficient_transform
         if square_params and self._basis != 'Bernstein':
             raise ValueError("square_params only applicable for Bernstein basis")
@@ -70,11 +70,11 @@ class BasisPoly(object):
         # Construct companion matrix for each dimension
         self._bmatrices = []
         for idim, n in enumerate(self._order):
-            if self._basis == 'Bernstein':
+            if self._basis == "Bernstein":
                 bmat = matrix_bernstein(n)
-            elif self._basis == 'Chebyshev':
+            elif self._basis == "Chebyshev":
                 bmat = matrix_chebyshev(n)
-            elif self._basis == 'Polynomial':
+            elif self._basis == "Polynomial":
                 bmat = matrix_poly(n)
             else:
                 raise NotImplementedError("Basis='{}' not implemented".format(basis))
@@ -124,7 +124,7 @@ class BasisPoly(object):
         self._params = newparams
 
     def update_from_roofit(self, fit_result, from_deco=False):
-        par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(',') if self.name in p])
+        par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(",") if self.name in p])
         par_results = {p: round(fit_result.floatParsFinal().find(p).getVal(), 3) for p in par_names}
         for par in self._params.reshape(-1):
             par.value = par_results[par.name]
@@ -145,12 +145,12 @@ class BasisPoly(object):
         return bpolyval
 
     def __call__(self, *vals, **kwargs):
-        '''
+        """
         vals: a ndarray for each dimension's values to evaluate the polynomial at
         kwargs:
             nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
-        '''
-        nominal = kwargs.pop('nominal', False)
+        """
+        nominal = kwargs.pop("nominal", False)
         if len(kwargs) > 0:
             raise ValueError("Extra keyword arguments supplied!")
         if len(vals) != len(self._order):
@@ -172,15 +172,15 @@ class BasisPoly(object):
         coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
         if nominal:
             parameters = np.vectorize(lambda p: p.value)(parameters)
-            return (parameters*coefficients).sum(axis=1).reshape(shape)
+            return (parameters * coefficients).sum(axis=1).reshape(shape)
 
         out = np.full(coefficients.shape[0], None)
         for i in range(coefficients.shape[0]):
             # sum small coefficients first
             order = np.argsort(coefficients[i])
-            p = np.sum(parameters[order]*coefficients[i][order])
-            dimstr = '_'.join('%s%.3f' % (d, v[i]) for d, v in zip(self._dim_names, xvals))
-            p.name = self.name + '_eval_' + dimstr.replace('.', 'p')
+            p = np.sum(parameters[order] * coefficients[i][order])
+            dimstr = "_".join("%s%.3f" % (d, v[i]) for d, v in zip(self._dim_names, xvals))
+            p.name = self.name + "_eval_" + dimstr.replace(".", "p")
             p.intermediate = False
             out[i] = p
         return out.reshape(shape)
@@ -188,16 +188,10 @@ class BasisPoly(object):
 
 class BernsteinPoly(BasisPoly):
     def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
-        '''
+        """
         Backcompatibility subclass of BasisPoly with fixed poly basis
-        '''
-        super(BernsteinPoly, self).__init__(name=name,
-                                            order=order,
-                                            dim_names=dim_names,
-                                            basis='Bernstein',
-                                            init_params=init_params,
-                                            limits=limits,
-                                            coefficient_transform=coefficient_transform)
+        """
+        super(BernsteinPoly, self).__init__(name=name, order=order, dim_names=dim_names, basis="Bernstein", init_params=init_params, limits=limits, coefficient_transform=coefficient_transform)
         warnings.warn("Consider switching to ``BasisPoly(..., basis='Bernstein', ...)")
 
 
@@ -207,20 +201,17 @@ class DecorrelatedNuisanceVector(object):
             raise ValueError("Expecting param_in to be numpy array")
         if not isinstance(param_cov, np.ndarray):
             raise ValueError("Expecting param_cov to be numpy array")
-        if not (len(param_in.shape) == 1
-                and len(param_cov.shape) == 2
-                and param_cov.shape[0] == param_in.shape[0]
-                and param_cov.shape[1] == param_in.shape[0]):
+        if not (len(param_in.shape) == 1 and len(param_cov.shape) == 2 and param_cov.shape[0] == param_in.shape[0] and param_cov.shape[1] == param_in.shape[0]):
             raise ValueError("param_in and param_cov have mismatched shapes")
 
         _, s, v = np.linalg.svd(param_cov)
         self._transform = np.sqrt(s)[:, None] * v
-        self._parameters = np.array([NuisanceParameter(prefix + str(i), 'param') for i in range(param_in.size)])
+        self._parameters = np.array([NuisanceParameter(prefix + str(i), "param") for i in range(param_in.size)])
         self._correlated = np.full(self._parameters.shape, None)
         for i in range(self._parameters.size):
             coef = self._transform[:, i]
             order = np.argsort(np.abs(coef))
-            self._correlated[i] = np.sum(self._parameters[order]*coef[order]) + param_in[i]
+            self._correlated[i] = np.sum(self._parameters[order] * coef[order]) + param_in[i]
 
     @classmethod
     def fromRooFitResult(cls, prefix, fitresult, param_names=None):
