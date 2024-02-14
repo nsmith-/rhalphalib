@@ -73,10 +73,7 @@ def test_rhalphabet(tmpdir):
             scaledparams = failObs * (1 + sigmascale / np.maximum(1.0, np.sqrt(failObs))) ** qcdparams
             fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         else:
-            qcdparams = np.array([
-                rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), n, lo=0, hi=2*n)
-                for i, n in enumerate(failObs)
-            ])
+            qcdparams = np.array([rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), n, lo=0, hi=2 * n) for i, n in enumerate(failObs)])
             scaledparams = qcdparams
         fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         failCh.addSample(fail_qcd)
