@@ -8,7 +8,6 @@ import pickle
 import ROOT
 
 rl.util.install_roofit_helpers()
-rl.ParametericSample.PreferRooParametricHist = False
 
 
 def expo_sample(norm, scale, obs):
@@ -23,6 +22,7 @@ def gaus_sample(norm, loc, scale, obs):
 
 def test_rhalphabet(tmpdir):
     throwPoisson = False
+    rescale_qcd = True
 
     jec = rl.NuisanceParameter("CMS_jec", "lnN")
     massScale = rl.NuisanceParameter("CMS_msdScale", "shape")
@@ -54,7 +54,7 @@ def test_rhalphabet(tmpdir):
         # mock template
         ptnorm = 1
         failTempl = expo_sample(norm=ptnorm * 1e5, scale=40, obs=msd)
-        passTempl = expo_sample(norm=ptnorm * 1e3, scale=40, obs=msd)
+        passTempl = expo_sample(norm=ptnorm * 1e3, scale=50, obs=msd)
         failCh.setObservation(failTempl)
         passCh.setObservation(passTempl)
         qcdfail += failCh.getObservation().sum()
@@ -67,9 +67,17 @@ def test_rhalphabet(tmpdir):
         failCh = qcdmodel["ptbin%dfail" % ptbin]
         passCh = qcdmodel["ptbin%dpass" % ptbin]
         failObs = failCh.getObservation()
-        qcdparams = np.array([rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), 0) for i in range(msd.nbins)])
-        sigmascale = 10.0
-        scaledparams = failObs * (1 + sigmascale / np.maximum(1.0, np.sqrt(failObs))) ** qcdparams
+        if rescale_qcd:
+            qcdparams = np.array([rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), 0) for i in range(msd.nbins)])
+            sigmascale = 1.0
+            scaledparams = failObs * (1 + sigmascale / np.maximum(1.0, np.sqrt(failObs))) ** qcdparams
+            fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
+        else:
+            qcdparams = np.array([
+                rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), n, lo=0, hi=2*n)
+                for i, n in enumerate(failObs)
+            ])
+            scaledparams = qcdparams
         fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         failCh.addSample(fail_qcd)
         pass_qcd = rl.TransferFactorSample("ptbin%dpass_qcd" % ptbin, rl.Sample.BACKGROUND, tf_MCtempl_params[ptbin, :], fail_qcd)
@@ -87,7 +95,7 @@ def test_rhalphabet(tmpdir):
         ROOT.RooFit.Strategy(2),
         ROOT.RooFit.Save(),
         ROOT.RooFit.Minimizer("Minuit2", "migrad"),
-        ROOT.RooFit.PrintLevel(-1),
+        ROOT.RooFit.PrintLevel(1),
     )
     qcdfit_ws.add(qcdfit)
     if "pytest" not in sys.modules:
