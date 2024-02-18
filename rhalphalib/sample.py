@@ -679,7 +679,6 @@ class TransferFactorSample(ParametericSample):
                         continue
                     effect_up[i] = 1.0 + min(1.0, stat_unc[i])
                     effect_down[i] = max(epsilon, 1.0 - min(1.0, stat_unc[i]))
-                    print("TF",samplename, i, stat_unc[i], name + '_mcstat_bin%i' % i)
                     param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
                     MCStat.setParamEffect(param, effect_up, effect_down)
                 params = transferfactor * MCStat.getExpectation() * dependentsample.getExpectation()
