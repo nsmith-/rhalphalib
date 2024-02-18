@@ -157,7 +157,7 @@ class TemplateSample(Sample):
         """
         if not isinstance(param, NuisanceParameter):
             if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
-                extras = effect_up.getDependents() - {param}
+                extras = effect_up.getDependents(deep=True) - {param}
                 if not all(isinstance(p, IndependentParameter) for p in extras):
                     raise ValueError("Normalization effects can only depend on one or more IndependentParameters")
                 self._extra_dependencies.update(extras)
@@ -322,7 +322,8 @@ class TemplateSample(Sample):
         if nominal:
             return nominalval
         else:
-            out = np.array([IndependentParameter(self.name + "_bin%d_nominal" % i, v, constant=True) for i, v in enumerate(nominalval)])
+            #out = np.array([IndependentParameter(self.name + "_bin%d_nominal" % i, v, constant=True) for i, v in enumerate(nominalval)])
+            out = nominalval
             for param in self.parameters:
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
@@ -381,7 +382,10 @@ class TemplateSample(Sample):
                     # Normalization systematics can just go into combine datacards (although if we build PDF here, will need it)
                     if isinstance(effect_up, DependentParameter):
                         # this is a rateParam, we should add the IndependentParameter to the workspace
-                        param.renderRoofit(workspace)
+                        #param.renderRoofit(workspace)
+                        dependents = effect_up.getDependents(deep=True)
+                        for p in dependents:
+                            p.renderRoofit(workspace)
                     continue
                 name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
@@ -418,7 +422,7 @@ class TemplateSample(Sample):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
             channel, sample = self.name[: self.name.find("_")], self.name[self.name.find("_") + 1 :]
-            dependents = dep.getDependents()
+            dependents = dep.getDependents(deep=True)
             formula = dep.formula(rendering=True).format(**{var.name: "@%d" % i for i, var in enumerate(dependents)})
             return "{0} rateParam {1} {2} {3} {4}".format(
                 dep.name,
