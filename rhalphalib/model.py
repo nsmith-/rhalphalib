@@ -353,7 +353,7 @@ class Channel(object):
                     if effect != "-":
                         fout.write(effect + "\n")
 
-    def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None):
+    def autoMCStats(channel, epsilon=1e-5, effect_threshold=0.01, threshold=0, include_signal=0, channel_name=None):
         """
         Barlow-Beeston-lite method i.e. single stats parameter for all processes per bin.
         Same general algorithm as described in
@@ -361,52 +361,73 @@ class Channel(object):
         but *without the analytic minimisation*.
         `include_signal` only refers to whether signal stats are included in the *decision* to use bb-lite or not.
         """
-        if not len(self._samples):
-            raise RuntimeError("Channel %r has no samples for which to run autoMCStats" % (self))
-
-        name = self._name if channel_name is None else channel_name
-
-        first_sample = self._samples[list(self._samples.keys())[0]]
-
-        for i in range(first_sample.observable.nbins):
-            ntot_bb, etot2_bb = 0, 0  # for the decision to use bblite or not
-            ntot, etot2 = 0, 0  # for the bblite uncertainty
-
-            # check if neff = ntot^2 / etot2 > threshold
-            for sample in self._samples.values():
-                ntot += sample._nominal[i]
-                etot2 += sample._sumw2[i]
-
+        if not len(channel._samples):
+            raise RuntimeError("Channel %r has no samples for which to run autoMCStats" % (channel))
+        
+        name = channel._name if channel_name is None else channel_name
+        
+        first_sample = channel._samples[list(channel._samples.keys())[0]]
+    
+        ntot_bb, etot2_bb = np.zeros_like(first_sample._nominal), np.zeros_like(first_sample._sumw2)
+        ntot, etot2 = np.zeros_like(first_sample._nominal), np.zeros_like(first_sample._sumw2)
+        
+        for sample in channel._samples.values():
+            if isinstance(sample, TransferFactorSample):
+                ntot += sample._nominal_values
+                etot2 += (sample._stat_unc*sample._nominal_values)**2
+            elif isinstance(sample, TemplateSample):
+                ntot += sample._nominal
+                etot2 += sample._sumw2
                 if not include_signal and sample._sampletype == Sample.SIGNAL:
                     continue
-
-                ntot_bb += sample._nominal[i]
-                etot2_bb += sample._sumw2[i]
-
-            if etot2 <= 0.0:
+                ntot_bb += sample._nominal
+                etot2_bb += sample._sumw2
+            else:
                 continue
-            elif etot2_bb <= 0:
+    
+        for sample in channel._samples.values():
+            if not isinstance(sample, TransferFactorSample):
+                continue
+            channel._samples[sample.name] = TransferFactorSample(sample.name, 
+                                                                 Sample.BACKGROUND, 
+                                                                 sample.transferfactor, 
+                                                                 sample.dependentsample, 
+                                                                 nominal_values=sample.nominal_values, 
+                                                                 stat_unc=np.sqrt(etot2)/ntot, 
+                                                                 channel_name=name)
+            
+        for i in range(first_sample.observable.nbins):
+            if etot2[i] <= 0.0:
+                continue
+            elif etot2_bb[i] <= 0:
                 # this means there is signal but no background, so create stats unc. for signal only
-                for sample in self._samples.values():
+                for sample in channel._samples.values():
                     if sample._sampletype == Sample.SIGNAL:
                         sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find("_") + 1 :]
                         sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
-
+        
                 continue
-
-            neff_bb = ntot_bb**2 / etot2_bb
+    
+            neff_bb = ntot_bb[i]**2 / etot2_bb[i]
             if neff_bb <= threshold:
-                for sample in self._samples.values():
+                for sample in channel._samples.values():
                     sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find("_") + 1 :]
                     sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
             else:
                 effect_up = np.ones_like(first_sample._nominal)
                 effect_down = np.ones_like(first_sample._nominal)
-
-                effect_up[i] = (ntot + np.sqrt(etot2)) / ntot
-                effect_down[i] = max((ntot - np.sqrt(etot2)) / ntot, epsilon)
-
+    
+                effect = np.sqrt(etot2[i])/ntot[i]
+                if effect < effect_threshold:
+                    continue
+                effect_up[i] = 1.0 + min(1.0, effect)
+                effect_down[i] = max(epsilon, 1.0 - min(1.0, effect))
+        
                 param = NuisanceParameter(name + "_mcstat_bin%i" % i, combinePrior="shape")
-
-                for sample in self._samples.values():
+        
+                for sample in channel._samples.values():
+                    if not isinstance(sample, TemplateSample):
+                        continue
+                    if sample._nominal[i] <= 1e-5:
+                        continue
                     sample.setParamEffect(param, effect_up, effect_down)
