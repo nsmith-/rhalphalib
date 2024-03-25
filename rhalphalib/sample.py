@@ -310,7 +310,7 @@ class TemplateSample(Sample):
                 param = NuisanceParameter(name + "_mcstat_bin%i" % i, combinePrior="shape")
                 self.setParamEffect(param, effect_up, effect_down)
 
-    def getExpectation(self, nominal=False):
+    def getExpectation(self, nominal=False, eval=False):
         """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
@@ -356,8 +356,11 @@ class TemplateSample(Sample):
                     else:
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                     out = out * combined_effect
-
-            return out
+            
+            if eval:
+                return np.array([p.value for p in out])
+            else:
+                return out
 
     def renderRoofit(self, workspace):
         """
