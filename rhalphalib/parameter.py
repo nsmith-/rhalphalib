@@ -205,7 +205,7 @@ class DependentParameter(Parameter):
 
     @property
     def value(self):
-        return eval(self.formula().format(**{p.name : p.value for p in self.getDependents(deep=True)}))
+        return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     @Parameter.intermediate.setter
     def intermediate(self, val):

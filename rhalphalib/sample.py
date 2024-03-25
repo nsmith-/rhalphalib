@@ -358,7 +358,7 @@ class TemplateSample(Sample):
                     else:
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                     out = out * combined_effect
-            
+
             if eval:
                 return np.array([p.value for p in out])
             else:
