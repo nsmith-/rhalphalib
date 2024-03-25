@@ -205,8 +205,7 @@ class DependentParameter(Parameter):
 
     @property
     def value(self):
-        # TODO: value from rendering formula and eval() or numexpr or TFormula or ...
-        raise NotImplementedError
+        return eval(self.formula().replace("_smoothstep", "").format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     @Parameter.intermediate.setter
     def intermediate(self, val):
@@ -273,7 +272,7 @@ class SmoothStep(DependentParameter):
 
     @property
     def value(self):
-        raise NotImplementedError
+        return eval(self.formula().replace("_smoothstep", "").format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     def formula(self, rendering=False):
         return "{" + self.name + "}"

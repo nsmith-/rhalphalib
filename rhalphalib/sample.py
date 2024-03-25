@@ -170,6 +170,8 @@ class TemplateSample(Sample):
                 return
             else:
                 raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
@@ -310,7 +312,7 @@ class TemplateSample(Sample):
                 param = NuisanceParameter(name + "_mcstat_bin%i" % i, combinePrior="shape")
                 self.setParamEffect(param, effect_up, effect_down)
 
-    def getExpectation(self, nominal=False):
+    def getExpectation(self, nominal=False, eval=False):
         """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
@@ -357,7 +359,10 @@ class TemplateSample(Sample):
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                     out = out * combined_effect
 
-            return out
+            if eval:
+                return np.array([p.value for p in out])
+            else:
+                return out
 
     def renderRoofit(self, workspace):
         """
@@ -493,6 +498,8 @@ class ParametericSample(Sample):
         """
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via a NuisanceParameter")
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
