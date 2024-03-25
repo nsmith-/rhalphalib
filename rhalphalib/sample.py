@@ -170,6 +170,8 @@ class TemplateSample(Sample):
                 return
             else:
                 raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
@@ -496,6 +498,8 @@ class ParametericSample(Sample):
         """
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via a NuisanceParameter")
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
 
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
