@@ -117,7 +117,7 @@ class Model(object):
         self.renderRoofit(workspace)
         workspace.writeToFile(os.path.join(outputPath, "%s.root" % self.name))
         _seen = set()
-        _duplicated = [x for x in [_p.name for _p in self.parameters] if x in _seen or _seen.add(x)]  
+        _duplicated = [x for x in [_p.name for _p in self.parameters] if x in _seen or _seen.add(x)]
         if len(_duplicated) > 0:
             logging.warning(f"Duplicate instances of parameters with names: {_duplicated} have been found. This is likely not a desired behaviour.")
             for pname in _duplicated:

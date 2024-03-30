@@ -120,7 +120,10 @@ class TemplateSample(Sample):
             if sumw2:
                 sumw2[sumw2 < 0] = 0.0
         if np.any(sumw < 0):
-            logging.warning(f"Sample '{name}' template contains negative yields. This may cause normalization mismatch issues when building the workspace. Set `log_level` to 'logging.DEBUG' to show the template:")
+            logging.warning(
+                f"Sample '{name}' template contains negative yields. This may cause normalization mismatch issues when building the workspace. "
+                "Set `log_level` to 'logging.DEBUG' to show the template:"
+            )
             logging.debug(f"Sample '{name}' template = {sumw}.")
         observable = Observable(obs_name, binning)
         self._observable = observable
