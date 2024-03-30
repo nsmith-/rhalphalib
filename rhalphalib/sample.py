@@ -117,7 +117,7 @@ class TemplateSample(Sample):
             if np.any(sumw < 0):
                 logging.info(f"Negative values found in sample '{name}'. They are being set to 0.")
             sumw[sumw < 0] = 0.0
-            if sumw2:
+            if sumw2 is not None:
                 sumw2[sumw2 < 0] = 0.0
         if np.any(sumw < 0):
             logging.warning(
