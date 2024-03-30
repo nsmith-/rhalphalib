@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 import numbers
 import warnings
+import logging
 from .parameter import (
     Parameter,
     IndependentParameter,
@@ -97,7 +98,7 @@ class Sample(object):
 
 
 class TemplateSample(Sample):
-    def __init__(self, name, sampletype, template):
+    def __init__(self, name, sampletype, template, force_positive=False):
         """
         name: self-explanatory
         sampletype: Sample.SIGNAL or BACKGROUND or DATA
@@ -112,6 +113,15 @@ class TemplateSample(Sample):
             sumw, binning, obs_name, sumw2 = _to_numpy(template, read_sumw2=True)
         except ValueError:
             sumw, binning, obs_name = _to_numpy(template)
+        if force_positive:
+            if np.any(sumw < 0):
+                logging.info(f"Negative values found in sample '{name}'. They are being set to 0.")
+            sumw[sumw < 0] = 0.0
+            if sumw2:
+                sumw2[sumw2 < 0] = 0.0
+        if np.any(sumw < 0):
+            logging.warning(f"Sample '{name}' template contains negative yields. This may cause normalization mismatch issues when building the workspace. Set `log_level` to 'logging.DEBUG' to show the template:")
+            logging.debug(f"Sample '{name}' template = {sumw}.")
         observable = Observable(obs_name, binning)
         self._observable = observable
         self._nominal = sumw
@@ -171,8 +181,7 @@ class TemplateSample(Sample):
             else:
                 raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
         if param.name in [p.name for p in self.parameters]:
-            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
-
+            raise ValueError(f"Parameter '{param.name}' already exists in sample '{self.name}': {sorted([p.name for p in self.parameters])}")
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
@@ -499,8 +508,7 @@ class ParametericSample(Sample):
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via a NuisanceParameter")
         if param.name in [p.name for p in self.parameters]:
-            raise ValueError("Parameter {} already exists in sample: {}".format(param.name, [p.name for p in self.parameters]))
-
+            raise ValueError(f"Parameter '{param.name}' already exists in sample '{self.name}': {sorted([p.name for p in self.parameters])}")
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
