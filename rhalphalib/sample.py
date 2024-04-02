@@ -328,6 +328,7 @@ class TemplateSample(Sample):
         """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
+            eval: if True, calculate the expectation, based on current parameter values
         """
 
         nominalval = self._nominal.copy()
