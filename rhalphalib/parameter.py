@@ -205,7 +205,7 @@ class DependentParameter(Parameter):
 
     @property
     def value(self):
-        return eval(self.formula().replace("_smoothstep", "").format(**{p.name: p.value for p in self.getDependents(deep=True)}))
+        return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     @Parameter.intermediate.setter
     def intermediate(self, val):
@@ -267,15 +267,16 @@ class SmoothStep(DependentParameter):
             raise ValueError("Expected a Parameter instance, got %r" % param)
         if param.intermediate:
             raise ValueError("SmoothStep can only depend on a non-intermediate parameter")
+        self.original_name = param.name
         super(SmoothStep, self).__init__(param.name + "_smoothstep", "{0}", param)
         self.intermediate = False
 
     @property
     def value(self):
-        return eval(self.formula().replace("_smoothstep", "").format(**{p.name: p.value for p in self.getDependents(deep=True)}))
+        return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     def formula(self, rendering=False):
-        return "{" + self.name + "}"
+        return "((((0.1875**x - 0.625)*x*x + 0.9375)*x + 0.5)*(x > -1)*(x < 1) + 1*(x >= 1))".replace("x", "{%s}" % self.original_name)
 
     def renderRoofit(self, workspace):
         import ROOT
