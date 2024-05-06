@@ -2,6 +2,7 @@ from collections import OrderedDict
 import datetime
 from functools import reduce
 from itertools import chain
+import logging
 import os
 import numpy as np
 from .sample import Sample
@@ -115,6 +116,12 @@ class Model(object):
         workspace = ROOT.RooWorkspace(self.name)
         self.renderRoofit(workspace)
         workspace.writeToFile(os.path.join(outputPath, "%s.root" % self.name))
+        _seen = set()
+        _duplicated = [x for x in [_p.name for _p in self.parameters] if x in _seen or _seen.add(x)]
+        if len(_duplicated) > 0:
+            logging.warning(f"Duplicate instances of parameters with names: {_duplicated} have been found. This is likely not a desired behaviour.")
+            for pname in _duplicated:
+                logging.warning(f"'{pname}': {[_p for _p in self.parameters if _p.name == pname]}")
         for channel in self:
             channel.renderCard(os.path.join(outputPath, "%s.txt" % channel.name), self.name)
         with open(os.path.join(outputPath, "build.sh"), "w") as fout:

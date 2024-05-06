@@ -1,7 +1,9 @@
 import numpy as np
+import copy
 
 
 def _to_numpy(hinput, read_sumw2=False):
+    hinput = copy.deepcopy(hinput)
     if isinstance(hinput, tuple) and len(hinput) >= 3:
         if not isinstance(hinput[0], np.ndarray):
             raise ValueError("Expected numpy array for element 0 of tuple {}".format(hinput))
