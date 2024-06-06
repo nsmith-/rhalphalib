@@ -68,11 +68,11 @@ class MorphHistW2(object):
         if self.return_hist:  # return hist object
             import hist
             h = hist.Hist(
-                hist.axis.Regular(bins=len(edges)-1, start=edges[0], stop=edges[-1], name=self.varname),
+                hist.axis.Variable(edges, name=self.varname),
                 storage="weight",
             )
-            h.view(flow=True).value[1:-1] = nom
-            h.view(flow=True).variance[1:-1] = w2s
+            h.view(flow=False).value = nom
+            h.view(flow=False).variance = w2s
             return h
         else:  # return tuple
             return nom, edges, self.varname, w2s
