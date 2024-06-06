@@ -67,6 +67,7 @@ class MorphHistW2(object):
         w2s, edges, _ = self.w2s.get(shift, smear)
         if self.return_hist:  # return hist object
             import hist
+
             h = hist.Hist(
                 hist.axis.Variable(edges, name=self.varname),
                 storage="weight",
