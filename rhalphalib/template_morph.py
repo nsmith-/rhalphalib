@@ -47,15 +47,17 @@ class MorphHistW2(object):
         hist: uproot/UHI histogram or a tuple (values, edges, variances)
         """
         try:  # hist object
-            self.sumw = hist.values
-            self.edges = hist.edges
+            self.sumw = hist.values()
+            self.edges = hist.axes[0].edges
             self.varname = hist.axes[0].name
-            self.variances = hist.variances
+            self.variances = hist.variances()
+            self.return_hist = True
         except:  # tuple  # noqa
             self.sumw = hist[0]
             self.edges = hist[1]
             self.varname = hist[2]
             self.variances = hist[3]
+            self.return_hist = False
 
         self.nominal = AffineMorphTemplate((self.sumw, self.edges, self.varname))
         self.w2s = AffineMorphTemplate((self.variances, self.edges, self.varname))
@@ -63,4 +65,14 @@ class MorphHistW2(object):
     def get(self, shift=0.0, smear=1.0):
         nom, edges, _ = self.nominal.get(shift, smear)
         w2s, edges, _ = self.w2s.get(shift, smear)
-        return nom, edges, self.varname, w2s
+        if self.return_hist:  # return hist object
+            import hist
+            h = hist.Hist(
+                hist.axis.Regular(bins=len(edges)-1, start=edges[0], stop=edges[-1], name=self.varname),
+                storage="weight",
+            )
+            h.view(flow=True).value[1:-1] = nom
+            h.view(flow=True).variance[1:-1] = w2s
+            return h
+        else:  # return tuple
+            return nom, edges, self.varname, w2s
