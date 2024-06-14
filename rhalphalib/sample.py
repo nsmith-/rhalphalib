@@ -170,7 +170,7 @@ class TemplateSample(Sample):
         """
         if not isinstance(param, NuisanceParameter):
             if isinstance(param, IndependentParameter) and isinstance(effect_up, DependentParameter):
-                extras = effect_up.getDependents() - {param}
+                extras = effect_up.getDependents(deep=True) - {param}
                 if not all(isinstance(p, IndependentParameter) for p in extras):
                     raise ValueError("Normalization effects can only depend on one or more IndependentParameters")
                 self._extra_dependencies.update(extras)
@@ -337,7 +337,8 @@ class TemplateSample(Sample):
         if nominal:
             return nominalval
         else:
-            out = np.array([IndependentParameter(self.name + "_bin%d_nominal" % i, v, constant=True) for i, v in enumerate(nominalval)])
+            #out = np.array([IndependentParameter(self.name + "_bin%d_nominal" % i, v, constant=True) for i, v in enumerate(nominalval)])
+            out = nominalval
             for param in self.parameters:
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
@@ -399,7 +400,10 @@ class TemplateSample(Sample):
                     # Normalization systematics can just go into combine datacards (although if we build PDF here, will need it)
                     if isinstance(effect_up, DependentParameter):
                         # this is a rateParam, we should add the IndependentParameter to the workspace
-                        param.renderRoofit(workspace)
+                        #param.renderRoofit(workspace)
+                        dependents = effect_up.getDependents(deep=True)
+                        for p in dependents:
+                            p.renderRoofit(workspace)
                     continue
                 name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
@@ -436,7 +440,7 @@ class TemplateSample(Sample):
             # about here's where I start to feel painted into a corner
             dep = self.getParamEffect(param, up=True)
             channel, sample = self.name[: self.name.find("_")], self.name[self.name.find("_") + 1 :]
-            dependents = dep.getDependents()
+            dependents = dep.getDependents(deep=True)
             formula = dep.formula(rendering=True).format(**{var.name: "@%d" % i for i, var in enumerate(dependents)})
             return "{0} rateParam {1} {2} {3} {4}".format(
                 dep.name,
@@ -649,7 +653,18 @@ class ParametericSample(Sample):
 
 
 class TransferFactorSample(ParametericSample):
-    def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None, min_val=None):
+    def __init__(self, 
+                 samplename, 
+                 sampletype, 
+                 transferfactor, 
+                 dependentsample, 
+                 nominal_values=None, 
+                 stat_unc=None, 
+                 observable=None, 
+                 min_val=None, 
+                 epsilon=1e-5, 
+                 effect_threshold=0.01, 
+                 channel_name=None):
         """
         Create a sample that depends on another Sample by some transfer factor.
         The transfor factor can be a constant, an array of parameters of same length
@@ -672,15 +687,32 @@ class TransferFactorSample(ParametericSample):
                     params[idx] = p.max(min_val)
         elif len(transferfactor.shape) <= 1:
             observable = dependentsample.observable
-            params = transferfactor * dependentsample.getExpectation()
+            if stat_unc is not None:
+                name = samplename if channel_name is None else channel_name
+                MCStatTemplate = (np.ones_like(stat_unc), observable._binning, observable._name)
+                MCStat = TemplateSample(name+'_mcstat', Sample.BACKGROUND, MCStatTemplate)
+                for i in range(MCStat.observable.nbins):
+                    effect_up = np.ones_like(MCStat._nominal)
+                    effect_down = np.ones_like(MCStat._nominal)
+                    if stat_unc[i] < effect_threshold:
+                        continue
+                    effect_up[i] = 1.0 + min(1.0, stat_unc[i])
+                    effect_down[i] = max(epsilon, 1.0 - min(1.0, stat_unc[i]))
+                    param = NuisanceParameter(name + '_mcstat_bin%i' % i, combinePrior='shape')
+                    MCStat.setParamEffect(param, effect_up, effect_down)
+                params = transferfactor * MCStat.getExpectation() * dependentsample.getExpectation()
+            else:
+                params = transferfactor * dependentsample.getExpectation()
             if min_val is not None:
                 for i, p in enumerate(params):
                     params[i] = p.max(min_val)
         else:
             raise ValueError("Transfer factor has invalid dimension")
-        super(TransferFactorSample, self).__init__(name, sampletype, observable, params)
+        super(TransferFactorSample, self).__init__(samplename, sampletype, observable, params)
         self._transferfactor = transferfactor
         self._dependentsample = dependentsample
+        self._stat_unc = stat_unc
+        self._nominal_values = nominal_values
 
     @property
     def transferfactor(self):
@@ -689,3 +721,11 @@ class TransferFactorSample(ParametericSample):
     @property
     def dependentsample(self):
         return self._dependentsample
+
+    @property
+    def stat_unc(self):
+        return self._stat_unc
+
+    @property
+    def nominal_values(self):
+        return self._nominal_values
