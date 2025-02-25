@@ -3,38 +3,28 @@ name: PR Tests
 on:
   pull_request:
     branches:
-    - master
+      - master
 
 jobs:
-  linter:
-    name: Linter
+  pre-commit:
+    name: Format
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v4
         with:
-          python-version: 3.9
-
-      - name: Install Python dependencies
-        run: pip install black flake8
-
-      - name: Run black
-        uses: wearerequired/lint-action@v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
         with:
-          auto_fix: true
-          black: true
-          black_auto_fix: true
-      
-      - name: Lint with flake8
-        run: flake8 rhalphalib --count --show-source --statistics
+          python-version: "3.x"
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --hook-stage manual --all-files
 
   test:
-    name: Run pytest (Python ${{ matrix.python-version }}, ROOT ${{ matrix.root-version }})
-    needs: linter
+    name:
+      Run pytest (Python ${{ matrix.python-version }}, ROOT ${{
+      matrix.root-version }})
+    needs: pre-commit
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -44,25 +34,24 @@ jobs:
         root-version: ["6.26", "6.32"]
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v3.1.0
-      with:
-        python-version: ${{ matrix.python-version }}
-        miniforge-variant: Miniforge3
-        channels: conda-forge,defaults
-        channel-priority: true
-        activate-environment: condaenv
-    - name: Install ROOT ${{ matrix.root-version }}
-      shell: bash -l {0}
-      run: |
-        mamba install -c conda-forge numpy scipy nomkl root==${{ matrix.root-version }}
-    - name: Install package
-      shell: bash -l {0}
-      run: |
-        pip install -e .
-    - name: Test with pytest
-      shell: bash -l {0}
-      run: |
-        pip install pytest
-        pytest tests
+      - uses: actions/checkout@v1
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          miniforge-variant: Miniforge3
+          channels: conda-forge,defaults
+          channel-priority: true
+          activate-environment: condaenv
+      - name: Install ROOT ${{ matrix.root-version }}
+        shell: bash -l {0}
+        run: |
+          mamba install -c conda-forge numpy scipy nomkl root==${{ matrix.root-version }}
+      - name: Install package
+        shell: bash -l {0}
+        run: |
+          pip install .[test]
+      - name: Test with pytest
+        shell: bash -l {0}
+        run: |
+          pytest tests
