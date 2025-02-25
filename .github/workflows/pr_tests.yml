@@ -36,13 +36,10 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3.1.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
-          miniforge-variant: Miniforge3
-          channels: conda-forge,defaults
-          channel-priority: true
-          activate-environment: condaenv
+          miniforge-version: latest
       - name: Install ROOT ${{ matrix.root-version }}
         shell: bash -l {0}
         run: |
