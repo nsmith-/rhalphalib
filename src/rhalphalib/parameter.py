@@ -297,7 +297,7 @@ class Observable(Parameter):
     """
     A simple struct that holds the name of an observable (e.g. x axis of discriminator histogram) and its binning
     The first sample attached to a channel will dictate how the rendering of the observable is done.
-    Subequent samples attached will be checked against the first, and if they match, their observable will be set
+    Subsequent samples attached will be checked against the first, and if they match, their observable will be set
     to the first samples' instance of this class.
     """
 
