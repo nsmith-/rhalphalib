@@ -1,0 +1,66 @@
+rhalphalib package
+==================
+
+.. automodule:: rhalphalib
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   rhalphalib.plot
+
+Submodules
+----------
+
+rhalphalib.function module
+--------------------------
+
+.. automodule:: rhalphalib.function
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+rhalphalib.model module
+-----------------------
+
+.. automodule:: rhalphalib.model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+rhalphalib.parameter module
+---------------------------
+
+.. automodule:: rhalphalib.parameter
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+rhalphalib.sample module
+------------------------
+
+.. automodule:: rhalphalib.sample
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+rhalphalib.template\_morph module
+---------------------------------
+
+.. automodule:: rhalphalib.template_morph
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+rhalphalib.util module
+----------------------
+
+.. automodule:: rhalphalib.util
+   :members:
+   :show-inheritance:
+   :undoc-members:

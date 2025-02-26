@@ -1,0 +1,300 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Introduction to rhalphabet\n",
+    "\n",
+    "What is the rhalphabet method?\n",
+    "Well, at least the name comes from _rho_ alphabet, which refers to\n",
+    "applying the _differential alphabet method_ in the dimensionless QCD\n",
+    "scaling variable $\\rho = -2\\ln(m_{SD}/p_T)$ where $m_{SD}$ is the jet\n",
+    "softdrop mass, and $p_T$ is the jet transverse momentum.\n",
+    "\n",
+    "So really, the question is: what is the _differential alphabet method_?\n",
+    "Let's start with a review of the plain alphabet method, aka ABCD method."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# TODO: ABCD demo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import rhalphalib as rl\n",
+    "import numpy as np\n",
+    "import hist\n",
+    "import matplotlib.pyplot as plt\n",
+    "import ROOT\n",
+    "\n",
+    "rng = np.random.default_rng(42)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<html>\n",
+       "<div style=\"display:flex; align-items:center;\">\n",
+       "<div style=\"width:290px;\">\n",
+       "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-10 -105 270 120\">\n",
+       "<line x1=\"-5\" y1=\"0\" x2=\"255\" y2=\"0\" style=\"fill:none;stroke-width:2;stroke:currentColor\"/>\n",
+       "<text text-anchor=\"middle\" x=\"0\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "0\n",
+       "</text>\n",
+       "<text text-anchor=\"middle\" x=\"250\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "100\n",
+       "</text>\n",
+       "<text text-anchor=\"middle\" x=\"125.0\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "mass [GeV]\n",
+       "</text>\n",
+       "<polyline points=\"  0,0   0,-0 12.5,-0 12.5,-0  25,-0  25,-0 37.5,-0 37.5,-0  50,-0  50,-0 62.5,-0 62.5,-0  75,-0  75,-12.5 87.5,-12.5 87.5,-33.3 100,-33.3 100,-62.5 112.5,-62.5 112.5,-100 125,-100 125,-100 137.5,-100 137.5,-87.5 150,-87.5 150,-16.7 162.5,-16.7 162.5,-0 175,-0 175,-4.17 187.5,-4.17 187.5,-0 200,-0 200,-0 212.5,-0 212.5,-0 225,-0 225,-0 237.5,-0 237.5,-0 250,-0 250,0\" style=\"fill:none; stroke:currentColor;\"/>\n",
+       "</svg>\n",
+       "</div>\n",
+       "<div style=\"flex=grow:1;\">\n",
+       "Regular(20, 0, 100, name='mass', label='mass [GeV]')<br/>\n",
+       "<hr style=\"margin-top:.2em; margin-bottom:.2em;\"/>\n",
+       "Double() Σ=100.0\n",
+       "\n",
+       "</div>\n",
+       "</div>\n",
+       "</html>"
+      ],
+      "text/plain": [
+       "Hist(Regular(20, 0, 100, name='mass', label='mass [GeV]'), storage=Double()) # Sum: 100.0"
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "signal_hist = hist.Hist.new.Reg(20, 0, 100, name=\"mass\", label=\"mass [GeV]\").Double().fill(rng.normal(50, 10, 100))\n",
+    "signal_hist"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<html>\n",
+       "<div style=\"display:flex; align-items:center;\">\n",
+       "<div style=\"width:290px;\">\n",
+       "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-10 -105 270 120\">\n",
+       "<line x1=\"-5\" y1=\"0\" x2=\"255\" y2=\"0\" style=\"fill:none;stroke-width:2;stroke:currentColor\"/>\n",
+       "<text text-anchor=\"middle\" x=\"0\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "0\n",
+       "</text>\n",
+       "<text text-anchor=\"middle\" x=\"250\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "100\n",
+       "</text>\n",
+       "<text text-anchor=\"middle\" x=\"125.0\" y=\"15\" style=\"fill:currentColor;\">\n",
+       "mass [GeV]\n",
+       "</text>\n",
+       "<polyline points=\"  0,0   0,-100 12.5,-100 12.5,-81  25,-81  25,-70 37.5,-70 37.5,-75  50,-75  50,-64 62.5,-64 62.5,-55  75,-55  75,-60 87.5,-60 87.5,-51 100,-51 100,-30 112.5,-30 112.5,-44 125,-44 125,-39 137.5,-39 137.5,-40 150,-40 150,-11 162.5,-11 162.5,-27 175,-27 175,-25 187.5,-25 187.5,-26 200,-26 200,-19 212.5,-19 212.5,-13 225,-13 225,-10 237.5,-10 237.5,-12 250,-12 250,0\" style=\"fill:none; stroke:currentColor;\"/>\n",
+       "</svg>\n",
+       "</div>\n",
+       "<div style=\"flex=grow:1;\">\n",
+       "Regular(20, 0, 100, name='mass', label='mass [GeV]')<br/>\n",
+       "<hr style=\"margin-top:.2em; margin-bottom:.2em;\"/>\n",
+       "Double() Σ=852.0 <em>(1000.0 with flow)</em>\n",
+       "\n",
+       "</div>\n",
+       "</div>\n",
+       "</html>"
+      ],
+      "text/plain": [
+       "Hist(Regular(20, 0, 100, name='mass', label='mass [GeV]'), storage=Double()) # Sum: 852.0 (1000.0 with flow)"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "bkg_hist = hist.Hist.new.Reg(20, 0, 100, name=\"mass\", label=\"mass [GeV]\").Double().fill(rng.exponential(50, 1000))\n",
+    "bkg_hist"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model = rl.Model(\"simplemodel\")\n",
+    "lumi = rl.NuisanceParameter(\"CMS_lumi\", \"lnN\")\n",
+    "\n",
+    "cr = rl.Channel(\"cr\")\n",
+    "model.addChannel(cr)\n",
+    "\n",
+    "crbkg = rl.TemplateSample(\"cr_background\", rl.Sample.BACKGROUND, bkg_hist * 10)\n",
+    "crbkg.setParamEffect(lumi, 0.03)\n",
+    "cr.addSample(crbkg)\n",
+    "cr.setObservation(bkg_hist * 10)\n",
+    "\n",
+    "sigregion = rl.Channel(\"sigregion\")\n",
+    "model.addChannel(sigregion)\n",
+    "\n",
+    "signal = rl.TemplateSample(\"sigregion_signal\", rl.Sample.SIGNAL, signal_hist)\n",
+    "signal.setParamEffect(lumi, 0.03)\n",
+    "sigregion.addSample(signal)\n",
+    "\n",
+    "tf = np.array([rl.IndependentParameter(f\"tfbin{i}\", 1.0, 0.5, 1.5) for i in range(cr.observable.nbins)])\n",
+    "background = rl.TransferFactorSample(\"sigregion_background\", rl.Sample.BACKGROUND, tf, crbkg)\n",
+    "sigregion.addSample(background)\n",
+    "\n",
+    "fakeobs = signal_hist + bkg_hist\n",
+    "sigregion.setObservation(fakeobs)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/ncsmith/src/rhalphalib/.nox/tests/lib/python3.13/site-packages/rhalphalib/sample.py:672: RuntimeWarning: Could not load RooParametricHist, falling back to RooParametricStepFunction, which has strange rounding issues.\n",
+      "Set ParametericSample.PreferRooParametricHist = False to disable this warning\n",
+      "  warnings.warn(\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "RooSimultaneous::simplemodel_simPdf[ indexCat=simplemodel_channel cr=cr sigregion=sigregion ] = 3.54545\n",
+      "RooDataHist::simplemodel_observation[simplemodel_channel,mass] = 40 bins (9472 weights)\n",
+      "\n",
+      "  RooFitResult: minimized FCN value: 23305.5, estimated distance to minimum: 0.000210152\n",
+      "                covariance matrix quality: Full, accurate covariance matrix\n",
+      "                Status : MINIMIZE=0 HESSE=0 \n",
+      "\n",
+      "    Floating Parameter    FinalValue +/-  Error   \n",
+      "  --------------------  --------------------------\n",
+      "              CMS_lumi   -4.3787e-01 +/-  1.52e-02\n",
+      "                tfbin0    1.5000e+00 +/-  2.45e-02\n",
+      "                tfbin1    1.5000e+00 +/-  6.46e-02\n",
+      "               tfbin10    1.3048e+00 +/-  1.78e-01\n",
+      "               tfbin11    1.2683e+00 +/-  1.76e-01\n",
+      "               tfbin12    5.0000e-01 +/-  2.92e-02\n",
+      "               tfbin13    5.8167e-01 +/-  1.13e-01\n",
+      "               tfbin14    5.5703e-01 +/-  1.09e-01\n",
+      "               tfbin15    5.6010e-01 +/-  1.09e-01\n",
+      "               tfbin16    5.0000e-01 +/-  5.81e-02\n",
+      "               tfbin17    5.0000e-01 +/-  2.43e-02\n",
+      "               tfbin18    5.0000e-01 +/-  1.88e-02\n",
+      "               tfbin19    5.0000e-01 +/-  2.21e-02\n",
+      "                tfbin2    1.4999e+00 +/-  7.06e-01\n",
+      "                tfbin3    1.5000e+00 +/-  1.34e-01\n",
+      "                tfbin4    1.3786e+00 +/-  1.77e-01\n",
+      "                tfbin5    1.1843e+00 +/-  1.68e-01\n",
+      "                tfbin6    1.3502e+00 +/-  1.77e-01\n",
+      "                tfbin7    1.2532e+00 +/-  1.73e-01\n",
+      "                tfbin8    9.3695e-01 +/-  1.50e-01\n",
+      "                tfbin9    1.4129e+00 +/-  1.78e-01\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "ws = ROOT.RooWorkspace(\"simplemodel\")\n",
+    "pdf, data = model.renderRoofit(ws)\n",
+    "pdf.Print()\n",
+    "data.Print()\n",
+    "fit = pdf.fitTo(\n",
+    "    data,\n",
+    "    ROOT.RooFit.Extended(True),\n",
+    "    ROOT.RooFit.Minimizer(\"Minuit2\", \"migrad\"),\n",
+    "    ROOT.RooFit.Save(),\n",
+    "    ROOT.RooFit.PrintLevel(-1),\n",
+    ")\n",
+    "fit.Print()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.patches.StepPatch at 0x3152b38c0>"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    },
+    {
+     "data": {
+      "image/png": "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YMCAevvT9vPPP9/gOdu3b2/w+LT/SObMmRO33HLLYfvLy8ujJVTMa5HLAkCbUdGCfwv37dsXZWVlzRNGWkvqeTm0N6WmpiZefvnleNvb3hadOnVq1sSWAs7WrVujT58+zXZd6tPOrUdbtw7t3Dq0c9tv59QjkoLIoEGDjnpck8JIv379okuXLrFjx456+9P2wIEDGzwn7W/K8UmPHj2Kcqi+fftGS0mN7xe95Wnn1qOtW4d2bh3auW2389F6RI5pAGv37t1j9OjRsWLFinq9Fmm7oqKiwXPS/kOPTx599NEjHg8AdCxNvk2Tbp9MnTo1xowZE2PHjo158+ZFVVVVMbsmmTJlSgwePLgY95Fcc801MX78+LjzzjvjoosuisWLF8eaNWvinnvuaf5/DQDQ/sPI5MmTY9euXTF79uxiEOrIkSNj+fLldYNUt2zZUsywqXXOOefE/fffH1/4whfi85//fLz3ve8tZtIMHz48cku3gtJ6KW+8JUTz0s6tR1u3Du3cOrRzx2nnTqU3m28DANCCPJsGAMhKGAEAshJGAICshBEAIKsOHUbmz58fQ4YMiZ49e8a4ceNi9erVuavUpqXp3H/wB38Qb33rW6N///7F05lfeOGFesf89re/jauvvrpYTfekk06KP/3TPz1sUTya5o477ihWJr722mvr9mnn5rFt27b4q7/6q6Ide/XqFWeeeWaxNEGtNP4/zSx8xzveUfw8PafrxRdfzFrntiY9YuSmm26K0047rWjD97znPcUDVQ+dW6Gdj81TTz0VkyZNKlY/Te8Rb3wmXGPaNa1+fumllxaLoaXFR6+44orYv39/NLtSB7V48eJS9+7dSwsXLiz913/9V2n69Omlvn37lnbs2JG7am3WxIkTS9/85jdLzz33XGnDhg2lj3zkI6VTTz21tH///rpjrrrqqlJ5eXlpxYoVpTVr1pT+8A//sHTOOedkrXdbtnr16tKQIUNKZ511Vumaa66p26+dj9/LL79cete73lX667/+69JPfvKT0qZNm0qPPPJIaePGjXXH3HHHHaWysrLS0qVLSz/72c9KH/3oR0unnXZa6dVXX81a97bktttuK73tbW8r/ehHPypt3ry59N3vfrd00kknle666666Y7TzsVm2bFnpxhtvLD344IMp2ZUeeuihej9vTLt++MMfLo0YMaL04x//uPTv//7vpdNPP710ySWXlJpbhw0jY8eOLV199dV12wcPHiwNGjSoNGfOnKz1ak927txZ/Afw5JNPFtt79uwpdevWrXizqfXzn/+8OGbVqlUZa9o27du3r/Te97639Oijj5bGjx9fF0a0c/O4/vrrS+9///uP+POamprSwIEDS1/+8pfr9qW279GjR+k73/lOK9Wy7bvoootKl19+eb19H/vYx0qXXnpp8b12bh5vDCONadf//u//Ls776U9/WnfMv/7rv5Y6depU2rZtW6k5dcjbNAcOHIi1a9cWXVK10kJtaXvVqlVZ69ae7N27t/h6yimnFF9Tm7/22mv12n3o0KFx6qmnavdjkG7DpFWND23PRDs3jx/84AfFStN//ud/Xtx2HDVqVNx77711P9+8eXOx8OOh7ZyewZFu+WrnxksLY6ZHhvziF78otn/2s5/F008/HRdeeGGxrZ1bRmPaNX1Nt2bSfwe10vHp7+VPfvKTZq3PCfnU3pa2e/fu4j5l7aqxtdL2888/n61e7Ul6ZlEaw3DuuefWrbabfvHT843e+NDD1O7pZzReeqzCunXr4qc//elhP9POzWPTpk3xta99rXgERlo9OrX1pz/96aJt0yMxatuyofcR7dx4N9xwQ/HU2BSY04NY03vzbbfdVoxTSLRzy2hMu6avKYgfqmvXrsUHzOZu+w4ZRmidT+3PPfdc8QmH5pUe852e+ZQeOJkGX9NygTp9Irz99tuL7dQzkn6nFyxYUIQRmscDDzwQ9913X/HYkN///d+PDRs2FB9k0qBL7dxxdMjbNP369SsS+BtnF6TtgQMHZqtXezFjxoz40Y9+FE888US8853vrNuf2jbdItuzZ0+947V706TbMDt37oyzzz67+JSSypNPPhn/9E//VHyfPtlo5+OXZhgMGzas3r4zzjijeP5WUtuW3keOz2c/+9mid+Qv//Ivi9lKl112WVx33XV1D1vVzi2jMe2avqb3mkO9/vrrxQyb5m77DhlGUjfr6NGji/uUh34KStsVFRVZ69aWpTFSKYg89NBD8fjjjxdT9Q6V2rxbt2712j1N/U1v7tq98S644IJ49tlni0+QtSV9gk/d2rXfa+fjl24xvnFqehrX8K53vav4Pv1+pzfkQ9s53W5I99K1c+O98sor9R6umqQPi+k9OdHOLaMx7Zq+pg816QNQrfTenv6/SWNLmlWpA0/tTaOGFy1aVIwY/sQnPlFM7d2+fXvuqrVZn/zkJ4tpYitXriy99NJLdeWVV16pN+U0Tfd9/PHHiymnFRUVReH4HDqbJtHOzTNtumvXrsXU0xdffLF03333lXr37l369re/XW9qZHrf+P73v1/6z//8z9If//Efm3LaRFOnTi0NHjy4bmpvmobar1+/0uc+97m6Y7Tzsc+4W79+fVHSn/u5c+cW3//qV79qdLumqb2jRo0qprc//fTTxQw+U3ub2T//8z8Xb9hpvZE01TfNo+bYpV/2hkpae6RW+iX/1Kc+VTr55JOLN/Y/+ZM/KQILzRtGtHPz+OEPf1gaPnx48cFl6NChpXvuuafez9P0yJtuuqk0YMCA4pgLLrig9MILL2Srb1tUWVlZ/O6m9+KePXuW3v3udxdrY1RXV9cdo52PzRNPPNHge3IKgI1t11//+tdF+Ehrv/Tp06c0bdq0IuQ0t07pf5q3rwUAoPE65JgRAODEIYwAAFkJIwBAVsIIAJCVMAIAZCWMAABZCSMAQFbCCACQlTACAGQljAAAWQkjAEBWwggAEDn9f/SHUaE1Ot5BAAAAAElFTkSuQmCC",
+      "text/plain": [
+       "<Figure size 640x480 with 1 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "model.readRooFitResult(fit)\n",
+    "tfvalues = np.array([b.value for b in tf])\n",
+    "\n",
+    "plt.stairs(tfvalues, sigregion.observable.binning, label=\"Transfer factor\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "tests",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
