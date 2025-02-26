@@ -99,8 +99,13 @@ class Model(object):
 
             workspace.add(rooSimul)
             rooObservable = ROOT.RooArgList(channel.observable.renderRoofit(workspace))
-            # that's right I don't need no CombDataSetFactory
-            rooData = ROOT.RooDataHist(self.name + "_observation", "Combined observation", rooObservable, channelCat, obsmap)
+            rooData = ROOT.RooDataHist(
+                self.name + "_observation",
+                "Combined observation",
+                rooObservable,
+                ROOT.RooFit.Index(channelCat),
+                ROOT.RooFit.Import(obsmap),
+            )
             workspace.add(rooData)
         elif rooSimul == None or rooData == None:  # noqa: E711
             raise RuntimeError("Model %r has a pdf or dataset already embedded in workspace %r" % (self, workspace))
