@@ -73,6 +73,7 @@ class Parameter(object):
             out.intermediate = True
             return out
         elif isinstance(other, numbers.Number):
+            other = float(other)  # cast np.float to float
             if right:
                 name = type(other).__name__ + opname + self.name
                 out = DependentParameter(name, "%r%s{0}" % (other, op), self)
