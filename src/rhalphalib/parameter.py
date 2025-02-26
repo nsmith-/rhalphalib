@@ -73,6 +73,7 @@ class Parameter(object):
             out.intermediate = True
             return out
         elif isinstance(other, numbers.Number):
+            other = float(other)  # cast np.float to float
             if right:
                 name = type(other).__name__ + opname + self.name
                 out = DependentParameter(name, "%r%s{0}" % (other, op), self)
@@ -297,7 +298,7 @@ class Observable(Parameter):
     """
     A simple struct that holds the name of an observable (e.g. x axis of discriminator histogram) and its binning
     The first sample attached to a channel will dictate how the rendering of the observable is done.
-    Subequent samples attached will be checked against the first, and if they match, their observable will be set
+    Subsequent samples attached will be checked against the first, and if they match, their observable will be set
     to the first samples' instance of this class.
     """
 

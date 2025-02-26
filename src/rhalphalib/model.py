@@ -99,8 +99,13 @@ class Model(object):
 
             workspace.add(rooSimul)
             rooObservable = ROOT.RooArgList(channel.observable.renderRoofit(workspace))
-            # that's right I don't need no CombDataSetFactory
-            rooData = ROOT.RooDataHist(self.name + "_observation", "Combined observation", rooObservable, channelCat, obsmap)
+            rooData = ROOT.RooDataHist(
+                self.name + "_observation",
+                "Combined observation",
+                rooObservable,
+                ROOT.RooFit.Index(channelCat),
+                ROOT.RooFit.Import(obsmap),
+            )
             workspace.add(rooData)
         elif rooSimul == None or rooData == None:  # noqa: E711
             raise RuntimeError("Model %r has a pdf or dataset already embedded in workspace %r" % (self, workspace))
@@ -168,7 +173,7 @@ class Channel(object):
         if sample.name in self._samples:
             raise ValueError("Channel %r already has a sample named %s" % (self, sample.name))
         if sample.name[: sample.name.find("_")] != self.name:
-            raise ValueError("Naming convention requires begining of sample %r name to be %s" % (sample, self.name))
+            raise ValueError("Naming convention requires beginning of sample %r name to be %s" % (sample, self.name))
         if self._observable is not None:
             if not sample.observable == self._observable:
                 raise ValueError("Sample %r has an incompatible observable with channel %r" % (sample, self))

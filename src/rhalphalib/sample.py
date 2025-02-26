@@ -208,8 +208,9 @@ class TemplateSample(Sample):
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
         if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
             print(
-                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
+                    param.name, self._name, _weighted_effect_magnitude * 100
+                )
             )
         self._paramEffectsUp[param] = effect_up
 
@@ -237,8 +238,9 @@ class TemplateSample(Sample):
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
             if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
                 print(
-                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                    "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
+                        param.name, self._name, _weighted_effect_magnitude * 100
+                    )
                 )
             self._paramEffectsDown[param] = effect_down
         else:
@@ -259,7 +261,7 @@ class TemplateSample(Sample):
             return self._paramEffectsUp[param]
         else:
             if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
-                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                # TODO the symmetrized value depends on if param prior is 'shapeN' or 'shape'
                 if param.combinePrior == "lnN":
                     return 1.0 / self._paramEffectsUp[param]
                 elif param.combinePrior == "shape":
@@ -380,7 +382,7 @@ class TemplateSample(Sample):
     def renderRoofit(self, workspace):
         """
         Import the necessary Roofit objects into the workspace for this sample
-        and return an extended pdf representing this sample's prediciton for pdf and norm.
+        and return an extended pdf representing this sample's prediction for pdf and norm.
         """
         import ROOT
 
@@ -451,7 +453,7 @@ class TemplateSample(Sample):
             up = (self.getParamEffect(param, up=True) - 1) * scale + 1
             down = (self.getParamEffect(param, up=False) - 1) * scale + 1
             if isinstance(up, np.ndarray):
-                # Convert shape to norm (note symmeterized effect on shape != symmeterized effect on norm)
+                # Convert shape to norm (note symmetrized effect on shape != symmetrized effect on norm)
                 nominal = self.getExpectation(nominal=True)
                 if nominal.sum() == 0:
                     up = 1.0
@@ -460,7 +462,7 @@ class TemplateSample(Sample):
                     up = (up * nominal).sum() / nominal.sum()
                     down = (down * nominal).sum() / nominal.sum()
             elif self._paramEffectsDown[param] is None:
-                # Here we can safely defer to combine to calculate symmeterized effect
+                # Here we can safely defer to combine to calculate symmetrized effect
                 down = None
             if down is None:
                 return "%.4f" % up
@@ -544,7 +546,7 @@ class ParametericSample(Sample):
             return self._paramEffectsUp[param]
         else:
             if self._paramEffectsDown[param] is None:
-                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                # TODO the symmetrized value depends on if param prior is 'shapeN' or 'shape'
                 return 1.0 / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
 
@@ -635,7 +637,7 @@ class ParametericSample(Sample):
 
     def combineNormalization(self):
         """
-        For combine, the normalization in the card is used to scale the parameteric process PDF
+        For combine, the normalization in the card is used to scale the parametric process PDF
         Since we provide an explicit normalization function, this should always stay at 1.
         """
         # TODO: optionally we could set the normalization here and leave only normalization modifiers
