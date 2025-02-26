@@ -29,6 +29,7 @@ dependencies = [
   "scipy",
   "mplhep",
   "seaborn",
+  "hist",
 ]
 
 [project.optional-dependencies]

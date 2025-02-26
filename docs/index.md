@@ -1,13 +1,15 @@
-# rootfilespec
+# rhalphalib
 
-```{toctree}
-:maxdepth: 2
-:hidden:
+```{include} ../README.md
 
 ```
 
-```{include} ../README.md
-:start-after: <!-- SPHINX-START -->
+```{toctree}
+:maxdepth: 2
+:caption: Contents:
+:hidden:
+Introduction <self>
+api/rhalphalib
 ```
 
 ## Indices and tables

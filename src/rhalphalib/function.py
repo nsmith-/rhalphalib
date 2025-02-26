@@ -1,3 +1,4 @@
+from typing import Callable
 import numpy as np
 from scipy.special import binom
 import numbers
@@ -6,14 +7,20 @@ from .parameter import IndependentParameter, NuisanceParameter, DependentParamet
 from .util import install_roofit_helpers
 
 
-def matrix_bernstein(n):
+def matrix_bernstein(n: int):
+    """
+    Construct the Bernstein basis matrix for a given order n
+    """
     v = np.arange(n + 1)
     bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1.0, np.subtract.outer(v, v)))
     bmat[np.greater.outer(v, v)] = 0  # v > l
     return bmat
 
 
-def matrix_chebyshev(n):
+def matrix_chebyshev(n: int):
+    """
+    Construct the Chebyshev basis matrix for a given order n
+    """
     M = np.zeros((n + 1, n + 1))
     for nth in range(1, n + 2):
         _coef_basis = np.zeros(nth)
@@ -24,23 +31,39 @@ def matrix_chebyshev(n):
     return M
 
 
-def matrix_poly(n):
+def matrix_poly(n: int):
+    """
+    Construct the polynomial basis matrix for a given order n
+    """
     return np.identity(n + 1)
 
 
-class BasisPoly(object):
-    def __init__(self, name, order, dim_names=None, basis="Bernstein", init_params=None, limits=None, coefficient_transform=None, square_params=False):
-        """
-        Construct a multidimensional Bernstein polynomial
-            name: will be used to prefix any RooFit object names
-            order: tuple of order in each dimension
-            dim_names: optional, names of each dimension
-            init_params: ndarray of initial params
-            limits: tuple of independent parameter limits, default: (0, 10)
-            coefficient_transform: callable to transform coefficients before multiplying by parameters
-            square_params: if True, square the parameters before multiplying by coefficient;
-              this is a way to ensure a positive definite polynomial in the Bernstein basis.
-        """
+class BasisPoly:
+    """
+    Construct a multidimensional polynomial
+
+    Parameters:
+        name: will be used to prefix any RooFit object names
+        order: tuple of order in each dimension
+        dim_names: optional, names of each dimension
+        init_params: ndarray of initial params
+        limits: tuple of independent parameter limits, default: (0, 10)
+        coefficient_transform: callable to transform coefficients before multiplying by parameters
+        square_params: if True, square the parameters before multiplying by coefficient;
+            this is a way to ensure a positive definite polynomial in the Bernstein basis.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        order: tuple[int, ...],
+        dim_names: tuple[str, ...] | None = None,
+        basis: str = "Bernstein",
+        init_params: np.ndarray | None = None,
+        limits: tuple[float, float] | None = None,
+        coefficient_transform: Callable | None = None,
+        square_params: bool = False,
+    ):
         self._name = name
         if not isinstance(order, tuple):
             raise ValueError
@@ -144,15 +167,13 @@ class BasisPoly(object):
             bpolyval = self._transform(bpolyval)
         return bpolyval
 
-    def __call__(self, *vals, **kwargs):
-        """
-        vals: a ndarray for each dimension's values to evaluate the polynomial at
-        kwargs:
+    def __call__(self, *vals, nominal: bool = False):
+        """Evaluate the polynomial at the given values
+
+        Parameters:
+            vals: a ndarray for each dimension's values to evaluate the polynomial at
             nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
         """
-        nominal = kwargs.pop("nominal", False)
-        if len(kwargs) > 0:
-            raise ValueError("Extra keyword arguments supplied!")
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
@@ -187,16 +208,30 @@ class BasisPoly(object):
 
 
 class BernsteinPoly(BasisPoly):
+    """
+    Backcompatibility subclass of BasisPoly with fixed poly basis
+    """
+
     def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
-        """
-        Backcompatibility subclass of BasisPoly with fixed poly basis
-        """
         super(BernsteinPoly, self).__init__(name=name, order=order, dim_names=dim_names, basis="Bernstein", init_params=init_params, limits=limits, coefficient_transform=coefficient_transform)
-        warnings.warn("Consider switching to ``BasisPoly(..., basis='Bernstein', ...)")
+        warnings.warn("BernsteinPoly is deprecated. Consider switching to BasisPoly(..., basis='Bernstein', ...)")
 
 
-class DecorrelatedNuisanceVector(object):
-    def __init__(self, prefix, param_in, param_cov):
+class DecorrelatedNuisanceVector:
+    """A decorrelated nuisance vector
+
+    This class is used to create a vector of nuisance parameters that are
+    decorrelated from a set of correlated parameters and a covariance matrix.
+    This is useful for creating a set of constrained nuisance parameters in combine,
+    as combine does not support correlated nuisance parameters.
+
+    Parameters:
+        prefix: a prefix for the names of the parameters
+        param_in: a numpy array of means for the nuisance parameters
+        param_cov: a numpy array of covariance matrix for the nuisance parameters
+    """
+
+    def __init__(self, prefix: str, param_in: np.ndarray, param_cov: np.ndarray):
         if not isinstance(param_in, np.ndarray):
             raise ValueError("Expecting param_in to be numpy array")
         if not isinstance(param_cov, np.ndarray):
@@ -214,7 +249,15 @@ class DecorrelatedNuisanceVector(object):
             self._correlated[i] = np.sum(self._parameters[order] * coef[order]) + param_in[i]
 
     @classmethod
-    def fromRooFitResult(cls, prefix, fitresult, param_names=None):
+    def fromRooFitResult(cls, prefix: str, fitresult, param_names: list[str] | None = None):
+        """Create a DecorrelatedNuisanceVector from a RooFit result
+
+        Parameters:
+            prefix: a prefix for the names of the parameters
+            fitresult: a RooFitResult object
+            param_names: optional list of parameter names to include in the vector. If None,
+                all parameters in the fit result will be included.
+        """
         install_roofit_helpers()
         names = [p.GetName() for p in fitresult.floatParsFinal()]
         means = fitresult.valueArray()

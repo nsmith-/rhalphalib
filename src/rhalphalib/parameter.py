@@ -1,11 +1,16 @@
 import numbers
+from typing import Iterable
 import warnings
 import numpy as np
 from .util import install_roofit_helpers
 
 
-class Parameter(object):
-    def __init__(self, name, value):
+class Parameter:
+    """
+    Base class for parameters.
+    """
+
+    def __init__(self, name: str, value):
         self._name = name
         self._value = value
         self._hasPrior = False
@@ -120,9 +125,22 @@ class Parameter(object):
 
 
 class IndependentParameter(Parameter):
-    DefaultRange = (-10, 10)
+    """
+    A parameter that is independent of any other parameters.
 
-    def __init__(self, name, value, lo=None, hi=None, constant=False):
+    This is a parameter that will ultimately be floating in a fit.
+
+    Parameters:
+        name (str): name of parameter
+        value (float): initial value of parameter
+        lo (float | None): lower bound of parameter. If None, use DefaultRange[0]
+        hi (float | None): upper bound of parameter. If None, use DefaultRange[1]
+        constant (bool): True if parameter is constant
+    """
+
+    DefaultRange = (-10.0, 10.0)
+
+    def __init__(self, name: str, value: float, lo: float | None = None, hi: float | None = None, constant: bool = False):
         super(IndependentParameter, self).__init__(name, value)
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
@@ -137,7 +155,7 @@ class IndependentParameter(Parameter):
         return self._lo
 
     @lo.setter
-    def lo(self, lo):
+    def lo(self, lo: float):
         self._lo = lo
 
     @property
@@ -145,7 +163,7 @@ class IndependentParameter(Parameter):
         return self._hi
 
     @hi.setter
-    def hi(self, hi):
+    def hi(self, hi: float):
         self._hi = hi
 
     @property
@@ -153,7 +171,7 @@ class IndependentParameter(Parameter):
         return self._constant
 
     @constant.setter
-    def constant(self, const):
+    def constant(self, const: bool):
         self._constant = const
 
     def renderRoofit(self, workspace):
@@ -168,19 +186,26 @@ class IndependentParameter(Parameter):
 
 
 class NuisanceParameter(IndependentParameter):
-    def __init__(self, name, combinePrior, value=0, lo=None, hi=None):
-        """
-        A nuisance parameter.
-        name: name of parameter
-        combinePrior: one of 'shape', 'shapeN', 'lnN', etc.
+    """A nuisance parameter.
 
-        Render the prior somewhere else?  Probably in Model because the prior needs
-        to be added at the RooSimultaneus level (I think)
-        Filtering the set of model parameters for these classes can collect needed priors.
-        """
+    Parameters:
+        name (str): name of parameter
+        combinePrior (str): prior type. Possible values are defined in :obj:`Priors`
+        value (float): initial value of parameter
+        lo (float | None): lower bound of parameter. If None, use DefaultRange[0]
+        hi (float | None): upper bound of parameter. If None, use DefaultRange[1]
+
+    Render the prior somewhere else?  Probably in Model because the prior needs
+    to be added at the RooSimultaneus level (I think)
+    Filtering the set of model parameters for these classes can collect needed priors.
+    """
+
+    Priors = {"shape", "shapeN", "shapeU", "lnN", "lnU", "gmM", "trG", "param"}
+
+    def __init__(self, name: str, combinePrior: str, value=0, lo=None, hi=None):
         super(NuisanceParameter, self).__init__(name, value, lo, hi)
         self._hasPrior = True
-        if combinePrior not in {"shape", "shapeN", "shapeU", "lnN", "lnU", "gmM", "trG", "param"}:
+        if combinePrior not in self.Priors:
             raise ValueError("Unrecognized combine prior %s" % combinePrior)
         self._prior = combinePrior
 
@@ -190,13 +215,20 @@ class NuisanceParameter(IndependentParameter):
 
 
 class DependentParameter(Parameter):
-    def __init__(self, name, formula, *dependents):
-        """
-        Create a dependent parameter
-            name: name of parameter
-            formula: a python format-string using only indices, e.g.
-                '{0} + sin({1})*{2}'
-        """
+    """Dependent parameter.
+
+    A dependent parameter is one that is defined in terms of other parameters.
+    It is not a parameter that will be floating in a fit.
+
+
+    Parameters:
+        name (str): name of parameter
+        formula (str): a python format-string using only indices, e.g.
+            '{0} + sin({1})*{2}'
+        dependents (tuple[Parameter, ...]): list of dependent parameters
+    """
+
+    def __init__(self, name: str, formula: str, *dependents: Parameter):
         super(DependentParameter, self).__init__(name, np.nan)
         if not all(isinstance(d, Parameter) for d in dependents):
             raise ValueError
@@ -205,7 +237,8 @@ class DependentParameter(Parameter):
         self._dependents = dependents
 
     @property
-    def value(self):
+    def value(self) -> float:
+        """Evaluate directly the formula for this parameter."""
         return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     @Parameter.intermediate.setter
@@ -215,13 +248,16 @@ class DependentParameter(Parameter):
     def getDependents(self, rendering=False, deep=False):
         """
         Return a set of parameters that this parameter depends on, which will be rendered.
+
         By default, this means all non-intermediate dependent parameters, recursively descending and stopping at
         the first renderable parameter (i.e. either non-intermediate or an IndependentParameter)
         If this parameter itself is renderable, we return a set of just this parameter.
-        If rendering=True, we pass through this parameter if it is renderable.
-        If deep=True, descend all the way to the IndependentParameters
+
+        Parameters:
+            rendering (bool): if True, pass through this parameter if it is renderable
+            deep (bool): if True, descend all the way to the IndependentParameters
         """
-        dependents = set()
+        dependents: set[Parameter] = set()
         if deep:
             for p in self._dependents:
                 if isinstance(p, DependentParameter):
@@ -263,7 +299,21 @@ class DependentParameter(Parameter):
 
 
 class SmoothStep(DependentParameter):
-    def __init__(self, param):
+    r"""Convenience class for a smooth step function.
+
+    A smooth step has the following properties:
+
+    .. math::
+        f(x \leq -1) = 0 \\
+        f(x \geq 1) = 1 \\
+        f'(-1) = f'(1) = 0 \\
+        f''(-1) = f''(1) = 0
+
+    Parameters:
+        param (Parameter): parameter to depend on
+    """
+
+    def __init__(self, param: Parameter):
         if not isinstance(param, Parameter):
             raise ValueError("Expected a Parameter instance, got %r" % param)
         if param.intermediate:
@@ -273,7 +323,7 @@ class SmoothStep(DependentParameter):
         self.intermediate = False
 
     @property
-    def value(self):
+    def value(self) -> float:
         return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     def formula(self, rendering=False):
@@ -302,7 +352,7 @@ class Observable(Parameter):
     to the first samples' instance of this class.
     """
 
-    def __init__(self, name, binning):
+    def __init__(self, name: str, binning: Iterable[float]):
         super(Observable, self).__init__(name, np.nan)
         self._binning = np.array(binning)
 
