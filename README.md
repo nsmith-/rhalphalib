@@ -6,10 +6,15 @@
 
 ## Quickstart
 
-First, install [Combine v9](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#installation-instructions) using
-your choice of installation instructions (with CMSSW, using LCG, or inside a Conda environment), then in that environment, run:
+First, install
+[Combine v9](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#installation-instructions)
+using your choice of installation instructions (with CMSSW, using LCG, or inside
+a Conda environment), then in that environment, run:
+
 ```bash
 python3 -m pip install --user https://github.com/nsmith-/rhalphalib/archive/master.zip
 ```
-Take a look at [test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
+
+Take a look at
+[test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
 for examples of how to use the package.
