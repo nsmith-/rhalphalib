@@ -99,8 +99,13 @@ class Model(object):
 
             workspace.add(rooSimul)
             rooObservable = ROOT.RooArgList(channel.observable.renderRoofit(workspace))
-            # that's right I don't need no CombDataSetFactory
-            rooData = ROOT.RooDataHist(self.name + "_observation", "Combined observation", rooObservable, channelCat, obsmap)
+            rooData = ROOT.RooDataHist(
+                self.name + "_observation",
+                "Combined observation",
+                rooObservable,
+                ROOT.RooFit.Index(channelCat),
+                ROOT.RooFit.Import(obsmap),
+            )
             workspace.add(rooData)
         elif rooSimul == None or rooData == None:  # noqa: E711
             raise RuntimeError("Model %r has a pdf or dataset already embedded in workspace %r" % (self, workspace))
@@ -168,7 +173,7 @@ class Channel(object):
         if sample.name in self._samples:
             raise ValueError("Channel %r already has a sample named %s" % (self, sample.name))
         if sample.name[: sample.name.find("_")] != self.name:
-            raise ValueError("Naming convention requires begining of sample %r name to be %s" % (sample, self.name))
+            raise ValueError("Naming convention requires beginning of sample %r name to be %s" % (sample, self.name))
         if self._observable is not None:
             if not sample.observable == self._observable:
                 raise ValueError("Sample %r has an incompatible observable with channel %r" % (sample, self))
@@ -360,13 +365,19 @@ class Channel(object):
                     if effect != "-":
                         fout.write(effect + "\n")
 
-    def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None):
+    def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None, include_threshold=0):
         """
         Barlow-Beeston-lite method i.e. single stats parameter for all processes per bin.
         Same general algorithm as described in
         https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
         but *without the analytic minimisation*.
-        `include_signal` only refers to whether signal stats are included in the *decision* to use bb-lite or not.
+
+        epsilon: changes the minimum possible value from 0 -> epsilon.
+        threshold: the threshold used to decide whether or not bblite is used.
+        include_signal: whether signal stats are included in the *decision* only to use bb-lite or not.
+        channel_name: in case a custom name for the channel needs to be specified, e.g. for tying together mcstats parameters in different bins.
+        include_threshold: the *uncertainty* threshold used to decide whether an mcstats parameter is used at all.
+            i.e. if `threshold = 0.01`, then bins with less than a 1% mc stats uncertainty will not be included.
         """
         if not len(self._samples):
             raise RuntimeError("Channel %r has no samples for which to run autoMCStats" % (self))
@@ -397,7 +408,7 @@ class Channel(object):
                 for sample in self._samples.values():
                     if sample._sampletype == Sample.SIGNAL:
                         sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find("_") + 1 :]
-                        sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
+                        sample.autoMCStats(epsilon=epsilon, threshold=include_threshold, sample_name=sample_name, bini=i)
 
                 continue
 
@@ -405,8 +416,11 @@ class Channel(object):
             if neff_bb <= threshold:
                 for sample in self._samples.values():
                     sample_name = None if channel_name is None else channel_name + "_" + sample._name[sample._name.find("_") + 1 :]
-                    sample.autoMCStats(epsilon=epsilon, sample_name=sample_name, bini=i)
+                    sample.autoMCStats(epsilon=epsilon, threshold=include_threshold, sample_name=sample_name, bini=i)
             else:
+                if (np.sqrt(etot2_bb) / (ntot_bb + 1e-12)) < include_threshold:
+                    continue
+
                 effect_up = np.ones_like(first_sample._nominal)
                 effect_down = np.ones_like(first_sample._nominal)
 
