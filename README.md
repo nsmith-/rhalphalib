@@ -7,7 +7,10 @@
 ## Quickstart
 
 ### CMSSW with EL8/EL9
-We use the [scram-venv](http://cms-sw.github.io/venv.html) utility to create a python virtual environment in our CMSSW area:
+
+We use the [scram-venv](http://cms-sw.github.io/venv.html) utility to create a
+python virtual environment in our CMSSW area:
+
 ```bash
 cmsrel CMSSW_14_1_0_pre4
 cd CMSSW_14_1_0_pre4/src
@@ -21,16 +24,22 @@ python3 -m pip install git+https://github.com/nsmith-/rhalphalib.git
 ```
 
 ### Elsewhere (no warranty)
-First, install [Combine v10](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#installation-instructions) using
-your choice of installation instructions (with CMSSW, using LCG, or inside a Conda environment). In a python virtual environment, run:
+
+First, install
+[Combine v10](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#installation-instructions)
+using your choice of installation instructions (with CMSSW, using LCG, or inside
+a Conda environment). In a python virtual environment, run:
+
 ```bash
 python3 -m pip install --user git+https://github.com/nsmith-/rhalphalib.git
 ```
 
 ## Usage
 
-Take a look at [test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
+Take a look at
+[test_rhalphalib.py](https://github.com/nsmith-/rhalphalib/blob/master/tests/test_rhalphalib.py)
 for examples of how to use the package. You can run a test with, e.g.
+
 ```bash
 curl -Ol https://raw.githubusercontent.com/nsmith-/rhalphalib/master/tests/test_rhalphalib.py
 python3 test_rhalphalib.py
@@ -40,6 +49,7 @@ combine -M FitDiagnostics model_combined.root
 ```
 
 An example output of the final line is:
+
 ```
  <<< Combine >>>
  <<< v10.1.0 >>>
