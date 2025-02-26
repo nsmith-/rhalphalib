@@ -7,3 +7,6 @@ build
 dist
 .vscode
 src/rhalphalib/version.py
+docs/api
+docs/_build
+.nox

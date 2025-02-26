@@ -61,3 +61,15 @@ An example output of the final line is:
 Best fit r: 0.999999  -0.208174/+0.212715  (68% CL)
 Done in 0.59 min (cpu), 0.59 min (real)
 ```
+
+## Development
+
+Clone this repo, and edit! To run tests, we use
+[nox](https://nox.thea.codes/en/stable/index.html) to simplify the
+configuration. If `nox` is installed systemwide, then simply running `nox` in
+this directory will automatically create linting and testing virtual
+environments and run the tests.
+
+For vscode, you can set the python interpreter to `.nox/tests/bin/python`.
+
+To build docs, run `nox -s build_api_docs docs`.

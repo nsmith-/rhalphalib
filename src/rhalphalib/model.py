@@ -10,14 +10,18 @@ from .parameter import Observable, IndependentParameter, NuisanceParameter
 from .util import _to_numpy, _to_TH1, install_roofit_helpers
 
 
-class Model(object):
-    """
-    Model -> Channel -> Sample
+class Model:
+    """Representation of a statistical model
+
+    A Model is a collection of Channels, each of which is a collection of Samples.
+
+    Parameters:
+        name (str): name of the model
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self._name = name
-        self._channels = OrderedDict()
+        self._channels: OrderedDict[str, Channel] = OrderedDict()
         self.t2w_config = None
 
     def __getitem__(self, key):
@@ -54,7 +58,12 @@ class Model(object):
     def parameters(self):
         return reduce(set.union, (c.parameters for c in self), set())
 
-    def addChannel(self, channel):
+    def addChannel(self, channel: "Channel"):
+        """Add a channel to the model.
+
+        Parameters:
+            channel: a Channel object
+        """
         if not isinstance(channel, Channel):
             raise ValueError("Only Channel types can be attached to Model. Got: %r" % channel)
         if channel.name in self._channels:
@@ -64,8 +73,10 @@ class Model(object):
 
     def readRooFitResult(self, res):
         """
-        Update all independent parameters with the values given in the fit result
-        res: a RooFitResult object
+        Update all independent parameters in the model with the values given in the fit result
+
+        Parameters:
+            res: a RooFitResult object
         """
         install_roofit_helpers()
         params = {p.name: p for p in self.parameters if isinstance(p, IndependentParameter)}
@@ -78,6 +89,14 @@ class Model(object):
                 p.constant = p_in.isConstant()
 
     def renderRoofit(self, workspace):
+        """Render the model into a RooFit workspace
+
+        Renders each channel in the model and adds them into a RooSimultaneous object.
+        Also renders the observation as a RooDataHist with a RooCategory index variable
+        for the channels.
+        Parameters:
+            workspace: a RooWorkspace object
+        """
         import ROOT
 
         install_roofit_helpers()
@@ -113,7 +132,11 @@ class Model(object):
         rooData = workspace.data(dataName)
         return rooSimul, rooData
 
-    def renderCombine(self, outputPath):
+    def renderCombine(self, outputPath: str):
+        """Render combine datacard for this model
+
+        Parameters:
+            outputPath: path to the output directory"""
         import ROOT
 
         if not os.path.exists(outputPath):
@@ -138,22 +161,26 @@ class Model(object):
                 fout.write("text2workspace.py {} model_combined.txt".format(self.t2w_config))
 
 
-class Channel(object):
-    """
-    Channel -> Sample
+class Channel:
+    """A Channel is a collection of Samples that share the same observable.
+    It also has an observation, which is a histogram of the same observable.
+    The observable is automatically set when the first sample is added or when the observation is set.
+
+    Parameters:
+        name (str): name of the channel. Must be unique in the Model.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self._name = name
         if "_" in self._name:
             raise ValueError("Naming convention restricts '_' characters in channel %r" % self)
-        self._samples = OrderedDict()
-        self._observable = None
+        self._samples: OrderedDict[str, Sample] = OrderedDict()
+        self._observable: Observable | None = None
         self._observation = None
         self._mask = None
         self._mask_val = 0.0
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Sample:
         if key in self._samples:
             return self._samples[key]
         elif self.name + "_" + key in self._samples:
@@ -167,7 +194,13 @@ class Channel(object):
     def __len__(self):
         return len(self._samples)
 
-    def addSample(self, sample):
+    def addSample(self, sample: Sample):
+        """
+        Add a sample to the channel.
+
+        Parameters:
+            sample: a Sample object
+        """
         if not isinstance(sample, Sample):
             raise ValueError("Only Sample types can be attached to Channel. Got: %r" % sample)
         if sample.name in self._samples:
@@ -183,15 +216,17 @@ class Channel(object):
         sample.mask = self.mask
         self._samples[sample.name] = sample
 
-    def setObservation(self, obs, read_sumw2=False):
+    def setObservation(self, obs, read_sumw2: bool = False):
         """
         Set the observation of the channel.
-        obs: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram
-            in the latter case, please extend the numpy histogram tuple to define an observable name
-            i.e. (sumw, binning, name)
-            (for the others, the observable name is taken from the x axis name)
-        read_sumw2: bool
-            If true, don't assume observation is poisson, and read sumw2 for observation into model
+
+        Parameters:
+            obs: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram.
+                In the latter case, please extend the numpy histogram tuple to define an observable name
+                i.e. (sumw, binning, name)
+                (for the others, the observable name is taken from the x axis name)
+            read_sumw2 (bool):
+                If true, don't assume observation is poisson, and read the sum of weights squared for observation into model
         """
         if read_sumw2:
             sumw, binning, obs_name, sumw2 = _to_numpy(obs, read_sumw2=True)
@@ -248,7 +283,10 @@ class Channel(object):
         return reduce(set.union, (s.parameters for s in self), set())
 
     @property
-    def observable(self):
+    def observable(self) -> Observable:
+        """
+        The observable for this channel.
+        """
         if self._observable is None:
             raise RuntimeError("No observable set for channel %r yet.  Add a sample or observation to set observable." % self)
         return self._observable
@@ -256,8 +294,8 @@ class Channel(object):
     @property
     def mask(self):
         """
-        An array matching the observable binning that specifies which bins to populate
-        i.e. when mask[i] is False, the bin content for all samples and the observation will be set to 0
+        An array matching the observable binning that specifies which bins to populate.
+        i.e. when ``mask[i]`` is False, the bin content for all samples and the observation will be set to 0.
         Useful for blinding!
         """
         return self._mask
@@ -277,9 +315,13 @@ class Channel(object):
             sample.mask = self.mask
 
     def renderRoofit(self, workspace):
-        """
-        Render each sample in the channel and add them into an extended RooAddPdf
-        Also render the observation
+        """Render the channel into a RooFit workspace
+
+        Renders each sample in the channel and add them into an extended RooAddPdf
+        Also renders the observation as a RooDataHist
+
+        Parameters:
+            workspace: a RooWorkspace object
         """
         import ROOT
 
@@ -307,7 +349,13 @@ class Channel(object):
         rooData = workspace.data(dataName)
         return rooPdf, rooData
 
-    def renderCard(self, outputFilename, workspaceName):
+    def renderCard(self, outputFilename: str, workspaceName: str):
+        """Render combine datacard for this channel
+
+        Parameters:
+            outputFilename: name of the output file
+            workspaceName: name of the workspace to be used in the datacard
+        """
         observation = self.getObservation()
         if isinstance(observation, tuple):
             observation = observation[0]
@@ -366,18 +414,20 @@ class Channel(object):
                         fout.write(effect + "\n")
 
     def autoMCStats(self, epsilon=0, threshold=0, include_signal=0, channel_name=None, include_threshold=0):
-        """
-        Barlow-Beeston-lite method i.e. single stats parameter for all processes per bin.
+        """Barlow-Beeston-lite method
+
+        i.e. single stats parameter for all processes per bin.
         Same general algorithm as described in
         https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/bin-wise-stats/
         but *without the analytic minimisation*.
 
-        epsilon: changes the minimum possible value from 0 -> epsilon.
-        threshold: the threshold used to decide whether or not bblite is used.
-        include_signal: whether signal stats are included in the *decision* only to use bb-lite or not.
-        channel_name: in case a custom name for the channel needs to be specified, e.g. for tying together mcstats parameters in different bins.
-        include_threshold: the *uncertainty* threshold used to decide whether an mcstats parameter is used at all.
-            i.e. if `threshold = 0.01`, then bins with less than a 1% mc stats uncertainty will not be included.
+        Parameters:
+            epsilon: changes the minimum possible value from 0 -> epsilon.
+            threshold: the threshold used to decide whether or not bblite is used.
+            include_signal: whether signal stats are included in the *decision* only to use bb-lite or not.
+            channel_name: in case a custom name for the channel needs to be specified, e.g. for tying together mcstats parameters in different bins.
+            include_threshold: the *uncertainty* threshold used to decide whether an mcstats parameter is used at all.
+                i.e. if ``threshold = 0.01``, then bins with less than a 1% mc stats uncertainty will not be included.
         """
         if not len(self._samples):
             raise RuntimeError("Channel %r has no samples for which to run autoMCStats" % (self))

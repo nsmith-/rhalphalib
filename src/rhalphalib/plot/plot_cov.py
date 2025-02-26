@@ -1,12 +1,13 @@
-import ROOT as r
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import mplhep as hep
-import root_numpy as rnp
 
 
 def plot_cov(fitDiagnostics_file="fitDiagnostics.root", out="covariance_matrix.png", include=None, data=False, year=2017):
+    import ROOT as r
+    import root_numpy as rnp
+
     assert include in [None, "all", "tf"]
     rf = r.TFile.Open(fitDiagnostics_file)
     h2 = rf.Get("fit_s").correlationHist()
