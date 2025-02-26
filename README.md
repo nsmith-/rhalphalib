@@ -14,6 +14,7 @@ python virtual environment in our CMSSW area:
 ```bash
 cmsrel CMSSW_14_1_0_pre4
 cd CMSSW_14_1_0_pre4/src
+cmsenv
 scram-venv
 cmsenv
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
