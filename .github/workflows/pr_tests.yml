@@ -31,7 +31,7 @@ jobs:
       fail-fast: true
       matrix:
         python-version: ["3.10"]
-        root-version: ["6.30", "6.32.10"]
+        root-version: ["6.30.04", "6.32.10"]
 
     steps:
       - uses: actions/checkout@v1
