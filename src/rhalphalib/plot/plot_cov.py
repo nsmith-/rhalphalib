@@ -1,47 +1,77 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import hist
 import mplhep as hep
+from typing import List, Union
+import fnmatch
+import itertools
 
 
-def plot_cov(fitDiagnostics_file="fitDiagnostics.root", out="covariance_matrix.png", include=None, data=False, year=2017):
+def plot_cov(
+    fitDiagnostics_file="fitDiagnostics.root",
+    out=None,
+    include: Union[str, List[str], None] = None,
+    data=False,
+    year=2017,
+):
     import ROOT as r
-    import root_numpy as rnp
-
-    assert include in [None, "all", "tf"]
+    
     rf = r.TFile.Open(fitDiagnostics_file)
     h2 = rf.Get("fit_s").correlationHist()
-    TH2 = rnp.hist2array(h2)
 
-    labs = []
-    for i in range(h2.GetXaxis().GetNbins() + 2):
-        lab = h2.GetXaxis().GetBinLabel(i)
-        labs.append(lab)
-    labs = labs[1:-1]  # Remove over/under flows
-
+    x_bins = h2.GetXaxis().GetNbins()
+    y_bins = h2.GetYaxis().GetNbins()
+    y_labels = [h2.GetYaxis().GetBinLabel(i) for i in range(1, y_bins + 1)]
+    x_labels = [h2.GetXaxis().GetBinLabel(i) for i in range(1, x_bins + 1)]
+    hist_2d = hist.new.StrCat(x_labels, label="").StrCat(y_labels, label="").Double()
+    for i in range(0, x_bins):
+        for j in range(0, y_bins):
+            hist_2d.view()[i, j] = h2.GetBinContent(i + 1, j + 1)
+    
     if include == "all":
-        sel_labs = [lab for lab in labs]
+        keys = [lab for lab in x_labels]
     elif include == "tf":
-        sel_labs = [lab for lab in labs if not (lab.startswith("qcdparam") or "mcstat" in lab)]
+        keys = [
+            lab
+            for lab in x_labels
+            if not (lab.startswith("qcdparam") or "mcstat" in lab)
+        ]
+    elif include is None:
+        keys = [
+            lab
+            for lab in x_labels
+            if not (
+                lab.startswith("qcdparam") or "mcstat" in lab or lab.startswith("tf")
+            )
+        ]
+    elif isinstance(include, str) or isinstance(include, list):
+        # check for fnmatch wildcards
+        if not isinstance(include, list):
+            include = [include]
+        if any(any(special in pattern for special in ["*", "?"]) for pattern in include):
+            keys = []
+            for pattern in include:
+                keys.append(
+                    [k for k in x_labels if fnmatch.fnmatch(k, pattern)]
+                )
+            keys = list(
+                dict.fromkeys(list(itertools.chain.from_iterable(keys)))
+            )
+        else:
+            keys = include
     else:
-        sel_labs = [lab for lab in labs if not (lab.startswith("qcdparam") or "mcstat" in lab or lab.startswith("tf"))]
-    sel_ixes = [labs.index(lab) for lab in sel_labs]
-
-    # Get only values we want
-    def extract(arr2d, ix):
-        x, y = np.meshgrid(ix, ix)
-        return arr2d[x, y]
-
-    cov_mat = extract(np.flip(TH2, axis=1), sel_ixes)
+        keys = x_labels
 
     # Plot it
-    fig, ax = plt.subplots(figsize=(12, 10))
-    g = sns.heatmap(cov_mat, xticklabels=sel_labs, yticklabels=sel_labs, cmap="RdBu", vmin=-1, vmax=1, ax=ax)
-    hep.cms.label(fontsize=23, year=year, data=data)
-    g.set_xticklabels(g.get_xticklabels(), rotation=30, horizontalalignment="right")
-    g.set_yticklabels(g.get_yticklabels(), rotation=30, horizontalalignment="right")
-    cbar = ax.collections[0].colorbar
-    cbar.set_ticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-    plt.minorticks_off()
+    fig, ax = plt.subplots()
+    hist_2d[keys, keys].plot2d(cmap="RdBu", cmin=-1, cmax=1, ax=ax)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, horizontalalignment="right")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=30, horizontalalignment="right")
+    ax.minorticks_off()
+    ax.set_ylabel("")
+    ax.set_xlabel("")
 
-    fig.savefig(out, bbox_inches="tight")
+    if out is None:
+        return fig
+    else:
+        fig.savefig(out, bbox_inches="tight")
