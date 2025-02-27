@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from functools import reduce
 import importlib.metadata
+import inspect
 from typing import Any
+import subprocess
 
 project = "rhalphalib"
 copyright = "2025, rhalphalib developers"
 author = "Nick Smith"
 version = release = importlib.metadata.version("rhalphalib")
+githash = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode("ascii")
 
 extensions = [
     "myst_parser",
@@ -14,6 +18,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "sphinx.ext.linkcode",
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
     "nbsphinx",
@@ -45,7 +50,7 @@ html_theme_options: dict[str, Any] = {
         },
     ],
     "source_repository": "https://github.com/nsmith-/rhalphalib",
-    "source_branch": "main",
+    "source_branch": "master",
     "source_directory": "docs/",
 }
 
@@ -65,3 +70,20 @@ nitpick_ignore = [
 ]
 
 always_document_param_types = True
+
+
+def linkcode_resolve(domain, info):
+    if domain != "py":
+        return None
+    if not info["module"]:
+        return None
+    mod = importlib.import_module(info["module"])
+    obj = reduce(getattr, [mod] + info["fullname"].split("."))
+    try:
+        path = inspect.getsourcefile(obj)
+        relpath = path[path.rfind("/src") + 1 :]
+        _, lineno = inspect.getsourcelines(obj)
+    except TypeError:
+        # skip property or other type that inspect doesn't like
+        return None
+    return "http://github.com/nsmith-/rhalphalib/blob/{}/{}#L{}".format(githash, relpath, lineno)

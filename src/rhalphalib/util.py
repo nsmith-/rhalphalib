@@ -91,6 +91,13 @@ ROOFIT_HELPERS_INSTALLED = False
 
 
 def install_roofit_helpers():
+    """Install some nice pythonizations for RooFit
+
+    This is a one-time operation, so it is safe to call multiple times.
+    Some of these helpers are part of more recent ROOT releases, so
+    we check the version and only install them if they are not
+    already present.
+    """
     global ROOFIT_HELPERS_INSTALLED
     if ROOFIT_HELPERS_INSTALLED:
         return
