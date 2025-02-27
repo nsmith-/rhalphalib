@@ -1,7 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import hist
-import mplhep as hep
 from typing import List, Union
 import fnmatch
 import itertools
@@ -15,7 +13,7 @@ def plot_cov(
     year=2017,
 ):
     import ROOT as r
-    
+
     rf = r.TFile.Open(fitDiagnostics_file)
     h2 = rf.Get("fit_s").correlationHist()
 
@@ -27,23 +25,13 @@ def plot_cov(
     for i in range(0, x_bins):
         for j in range(0, y_bins):
             hist_2d.view()[i, j] = h2.GetBinContent(i + 1, j + 1)
-    
+
     if include == "all":
         keys = [lab for lab in x_labels]
     elif include == "tf":
-        keys = [
-            lab
-            for lab in x_labels
-            if not (lab.startswith("qcdparam") or "mcstat" in lab)
-        ]
+        keys = [lab for lab in x_labels if not (lab.startswith("qcdparam") or "mcstat" in lab)]
     elif include is None:
-        keys = [
-            lab
-            for lab in x_labels
-            if not (
-                lab.startswith("qcdparam") or "mcstat" in lab or lab.startswith("tf")
-            )
-        ]
+        keys = [lab for lab in x_labels if not (lab.startswith("qcdparam") or "mcstat" in lab or lab.startswith("tf"))]
     elif isinstance(include, str) or isinstance(include, list):
         # check for fnmatch wildcards
         if not isinstance(include, list):
@@ -51,12 +39,8 @@ def plot_cov(
         if any(any(special in pattern for special in ["*", "?"]) for pattern in include):
             keys = []
             for pattern in include:
-                keys.append(
-                    [k for k in x_labels if fnmatch.fnmatch(k, pattern)]
-                )
-            keys = list(
-                dict.fromkeys(list(itertools.chain.from_iterable(keys)))
-            )
+                keys.append([k for k in x_labels if fnmatch.fnmatch(k, pattern)])
+            keys = list(dict.fromkeys(list(itertools.chain.from_iterable(keys))))
         else:
             keys = include
     else:

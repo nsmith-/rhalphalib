@@ -236,8 +236,9 @@ class TemplateSample(Sample):
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
         if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
             logging.warning(
-                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
+                    param.name, self._name, _weighted_effect_magnitude * 100
+                )
             )
         self._paramEffectsUp[param] = effect_up
 
