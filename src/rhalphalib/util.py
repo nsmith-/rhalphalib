@@ -67,6 +67,9 @@ def _to_numpy(hinput, read_sumw2=False):
 def _to_TH1(sumw, binning, name):
     import ROOT
 
+    # avoid creating fake error values when setting bin content manually
+    oldDefaultSumw2 = ROOT.TH1.GetDefaultSumw2()
+    ROOT.TH1.SetDefaultSumw2(False)
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
@@ -75,6 +78,7 @@ def _to_TH1(sumw, binning, name):
     else:
         for i, w in enumerate(sumw):
             h.SetBinContent(i + 1, w)
+    ROOT.TH1.SetDefaultSumw2(oldDefaultSumw2)
     return h
 
 
