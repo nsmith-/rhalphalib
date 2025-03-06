@@ -45,5 +45,10 @@ jobs:
         session: ${{ fromJson(needs.generate-jobs.outputs.session) }}
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: 3.12
+          miniforge-version: latest
       - uses: wntrblm/nox@main
       - run: nox -s "${{ matrix.session }}"
