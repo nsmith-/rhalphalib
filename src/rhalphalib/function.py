@@ -62,31 +62,34 @@ def compute_band(params, coefs, shape, cov):
     """
     # compute correlation matrix
     std = np.sqrt(np.diag(cov))
-    corr = cov / std[:,None] / std[None,:]
+    corr = cov / std[:, None] / std[None, :]
     # compute gradients
     plus_vars = []
     minus_vars = []
-    for i,par in enumerate(params):
+    for i, par in enumerate(params):
         val = par
-        err = np.sqrt(cov[i,i])
+        err = np.sqrt(cov[i, i])
         # temporarily vary param
-        params[i] = val+err
+        params[i] = val + err
         plus_vars.append(sum_terms(params, coefs, shape))
-        params[i] = val-err
+        params[i] = val - err
         minus_vars.append(sum_terms(params, coefs, shape))
         # reset to central value
         params[i] = val
     # flatten
-    plus_vars = np.stack(plus_vars).reshape(len(params),-1)
-    minus_vars = np.stack(minus_vars).reshape(len(params),-1)
-    F = (plus_vars - minus_vars)/2.
+    plus_vars = np.stack(plus_vars).reshape(len(params), -1)
+    minus_vars = np.stack(minus_vars).reshape(len(params), -1)
+    F = (plus_vars - minus_vars) / 2.0
+
     # final values
-    def proj(F): return F.T @ corr @ F
+    def proj(F):
+        return F.T @ corr @ F
+
     central = sum_terms(params, coefs, shape)
     err2 = np.apply_along_axis(proj, 1, F.T).reshape(shape)
     lo = central + np.sqrt(err2)
     hi = central - np.sqrt(err2)
-    return lo,hi
+    return lo, hi
 
 
 class BasisPoly:
@@ -204,7 +207,7 @@ class BasisPoly:
     def update_from_roofit(self, fit_result, from_deco=False):
         par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(",") if self.name in p])
         means, cov = params_from_roofit(fit_result, par_names)
-        par_results = {p: round(means[i], 3) for i,p in enumerate(par_names)}
+        par_results = {p: round(means[i], 3) for i, p in enumerate(par_names)}
         for par in self._params.reshape(-1):
             par.value = par_results[par.name]
         self._cov = cov
@@ -306,14 +309,14 @@ class DecorrelatedNuisanceVector:
 
         _, s, v = np.linalg.svd(param_cov)
         self._transform = np.sqrt(s)[:, None] * v
-        self._parameters = np.array([NuisanceParameter(prefix + str(i+1), "param") for i in range(param_in.size)])
+        self._parameters = np.array([NuisanceParameter(prefix + str(i + 1), "param") for i in range(param_in.size)])
         self._correlated = np.full(self._parameters.shape, None)
         self._correlated_str = []
         for i in range(self._parameters.size):
             coef = self._transform[:, i]
             order = np.argsort(np.abs(coef))
             self._correlated[i] = np.sum(self._parameters[order] * coef[order]) + param_in[i]
-            self._correlated_str.append('('+' + '.join([f"{coef[o]:.3g}*{self._parameters[o].name}" for o in order])+f' + {param_in[i]:.3g})')
+            self._correlated_str.append("(" + " + ".join([f"{coef[o]:.3g}*{self._parameters[o].name}" for o in order]) + f" + {param_in[i]:.3g})")
 
     @classmethod
     def fromRooFitResult(cls, prefix: str, fitresult, param_names: Optional[List[str]] = None):
@@ -342,4 +345,4 @@ class DecorrelatedNuisanceVector:
 
     @property
     def correlated_str(self):
-        return '\n'.join(self._correlated_str)
+        return "\n".join(self._correlated_str)

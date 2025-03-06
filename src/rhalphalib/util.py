@@ -61,7 +61,7 @@ def _to_numpy(hinput, read_sumw2=False):
             return (sumw, binning, name, sumw2)
         return (sumw, binning, name)
     else:
-        raise ValueError("Cannot understand template type %r of %r" % (type(hinput),hinput))
+        raise ValueError("Cannot understand template type %r of %r" % (type(hinput), hinput))
 
 
 def _to_TH1(sumw, binning, name):
