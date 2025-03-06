@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 import nox
 
@@ -12,7 +13,7 @@ nox.options.sessions = ["lint", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 
 
-@nox.session
+@nox.session(python=["3.8", "3.10"])
 def lint(session: nox.Session) -> None:
     """
     Run the linter.
@@ -22,11 +23,21 @@ def lint(session: nox.Session) -> None:
 
 
 @nox.session(reuse_venv=True, venv_backend="conda")
-def tests(session: nox.Session) -> None:
+@nox.parametrize(
+    "python,root",
+    [
+        ("3.9", "6.22.08"),
+        ("3.10", "6.30.04"),
+        ("3.10", "6.32.10"),
+    ],
+)
+def tests(session: nox.Session, root: str) -> None:
     """
     Run the unit and regular tests.
     """
-    session.conda_install("root")
+    if root == "6.22.08" and sys.platform == "darwin":
+        session.skip("ROOT 6.22.08 is not working on macOS")
+    session.conda_install(f"root=={root}")
     session.install(".[test]")
     session.run("pytest", *session.posargs)
 

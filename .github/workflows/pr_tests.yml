@@ -20,34 +20,30 @@ jobs:
         with:
           extra_args: --hook-stage manual --all-files
 
-  test:
-    name:
-      Run pytest (Python ${{ matrix.python-version }}, ROOT ${{
-      matrix.root-version }})
-    needs: pre-commit
+  generate-jobs:
+    name: Generate Jobs
+    needs: [pre-commit]
+    runs-on: ubuntu-latest
+    outputs:
+      session: ${{ steps.set-matrix.outputs.session }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: wntrblm/nox@main
+      - id: set-matrix
+        shell: bash
+        run:
+          echo session=$(nox --json -l | jq -c '[.[].session]') | tee --append
+          $GITHUB_OUTPUT
+
+  checks:
+    name: Session ${{ matrix.session }}
+    needs: [generate-jobs]
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
-      fail-fast: true
+      fail-fast: false
       matrix:
-        python-version: ["3.10"]
-        root-version: ["6.30.04", "6.32.10"]
-        include:
-          - python-version: "3.9"
-            root-version: "6.22.8"
-
+        session: ${{ fromJson(needs.generate-jobs.outputs.session) }}
     steps:
-      - uses: actions/checkout@v1
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: ${{ matrix.python-version }}
-          miniforge-version: latest
-      - name: Install ROOT ${{ matrix.root-version }}
-        shell: bash -l {0}
-        run: |
-          mamba install -c conda-forge numpy scipy nomkl nox root==${{ matrix.root-version }}
-      - name: Test with nox
-        shell: bash -l {0}
-        run: |
-          nox
+      - uses: actions/checkout@v3
+      - uses: wntrblm/nox@main
+      - run: nox -s "${{ matrix.session }}"
