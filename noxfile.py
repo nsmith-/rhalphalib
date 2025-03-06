@@ -37,7 +37,7 @@ def tests(session: nox.Session, root: str) -> None:
     """
     if root == "6.22.08" and sys.platform == "darwin":
         session.skip("ROOT 6.22.08 is not working on macOS")
-    session.conda_install(f"-c conda-forge root=={root}")
+    session.conda_install(f"root=={root}")
     session.install(".[test]")
     session.run("pytest", *session.posargs)
 
