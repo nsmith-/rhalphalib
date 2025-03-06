@@ -52,3 +52,14 @@ jobs:
           miniforge-version: latest
       - uses: wntrblm/nox@main
       - run: nox -s "${{ matrix.session }}"
+
+  check_py38:
+    name: Check valid py3.8 code
+    needs: [pre-commit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+      - run: python -m compileall -q src tests
