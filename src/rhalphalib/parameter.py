@@ -1,5 +1,5 @@
 import numbers
-from typing import Iterable
+from typing import Iterable, Optional
 import warnings
 import numpy as np
 from .util import install_roofit_helpers
@@ -140,7 +140,7 @@ class IndependentParameter(Parameter):
 
     DefaultRange = (-10.0, 10.0)
 
-    def __init__(self, name: str, value: float, lo: float | None = None, hi: float | None = None, constant: bool = False):
+    def __init__(self, name: str, value: float, lo: Optional[float] = None, hi: Optional[float] = None, constant: bool = False):
         super(IndependentParameter, self).__init__(name, value)
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
