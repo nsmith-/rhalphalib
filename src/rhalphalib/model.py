@@ -236,7 +236,7 @@ class Channel:
         observable = Observable(obs_name, binning)
         if self._observable is not None:
             if not observable == self._observable:
-                raise ValueError("Observation has an incompatible observable with channel %r:\n  %r\n  %r" % (self, sample.observable, self._observable))
+                raise ValueError("Observation has an incompatible observable with channel %r:\n  %r\n  %r" % (self, observable, self._observable))
         else:
             self._observable = observable
         if read_sumw2:
