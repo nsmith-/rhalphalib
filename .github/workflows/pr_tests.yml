@@ -46,12 +46,8 @@ jobs:
       - name: Install ROOT ${{ matrix.root-version }}
         shell: bash -l {0}
         run: |
-          mamba install -c conda-forge numpy scipy nomkl root==${{ matrix.root-version }}
-      - name: Install package
+          mamba install -c conda-forge numpy scipy nomkl nox root==${{ matrix.root-version }}
+      - name: Test with nox
         shell: bash -l {0}
         run: |
-          pip install .[test]
-      - name: Test with pytest
-        shell: bash -l {0}
-        run: |
-          pytest tests
+          nox
