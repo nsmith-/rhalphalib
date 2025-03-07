@@ -11,7 +11,7 @@ class AffineMorphTemplate(object):
     hist: a numpy-histogram-like tuple of (sumw, edges, varname)
     """
 
-    def __init__(self, hist: tuple[np.ndarray, np.ndarray, str]):
+    def __init__(self, hist: Tuple[np.ndarray, np.ndarray, str]):
         self.sumw = hist[0]
         self.edges = hist[1]
         self.varname = hist[2]
