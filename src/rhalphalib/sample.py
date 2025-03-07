@@ -1,6 +1,6 @@
 from __future__ import division
 from abc import ABC
-from typing import Iterable
+from typing import Iterable, Optional
 import numpy as np
 import numbers
 import warnings
@@ -35,7 +35,7 @@ class Sample(ABC):
     def __init__(self, name: str, sampletype: int):
         self._name = name
         self._sampletype = sampletype
-        self._observable: Observable | None = None
+        self._observable: Optional[Observable] = None
         self._mask = None
         self._mask_val = 0.0
 
@@ -298,7 +298,7 @@ class TemplateSample(Sample):
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self, lnN: bool = False, epsilon: float = 0, threshold: float = 0.0, sample_name: str | None = None, bini: int | None = None):
+    def autoMCStats(self, lnN: bool = False, epsilon: float = 0, threshold: float = 0.0, sample_name: Optional[str] = None, bini: Optional[int] = None):
         """
         Set MC statical uncertainties based on self._sumw2. ``sample_name`` and ``bini`` parameters
         don't need to modified for typical use cases.

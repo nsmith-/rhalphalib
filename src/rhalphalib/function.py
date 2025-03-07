@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List, Optional, Tuple
 import numpy as np
 from scipy.special import binom
 import numbers
@@ -56,12 +56,12 @@ class BasisPoly:
     def __init__(
         self,
         name: str,
-        order: tuple[int, ...],
-        dim_names: tuple[str, ...] | None = None,
+        order: Tuple[int, ...],
+        dim_names: Optional[Tuple[str, ...]] = None,
         basis: str = "Bernstein",
-        init_params: np.ndarray | None = None,
-        limits: tuple[float, float] | None = None,
-        coefficient_transform: Callable | None = None,
+        init_params: Optional[np.ndarray] = None,
+        limits: Optional[Tuple[float, float]] = None,
+        coefficient_transform: Optional[Callable] = None,
         square_params: bool = False,
     ):
         self._name = name
@@ -249,7 +249,7 @@ class DecorrelatedNuisanceVector:
             self._correlated[i] = np.sum(self._parameters[order] * coef[order]) + param_in[i]
 
     @classmethod
-    def fromRooFitResult(cls, prefix: str, fitresult, param_names: list[str] | None = None):
+    def fromRooFitResult(cls, prefix: str, fitresult, param_names: Optional[List[str]] = None):
         """Create a DecorrelatedNuisanceVector from a RooFit result
 
         Parameters:

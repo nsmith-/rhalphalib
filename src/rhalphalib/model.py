@@ -4,6 +4,7 @@ from functools import reduce
 from itertools import chain
 import logging
 import os
+from typing import Optional
 import numpy as np
 from .sample import Sample
 from .parameter import Observable, IndependentParameter, NuisanceParameter
@@ -175,7 +176,7 @@ class Channel:
         if "_" in self._name:
             raise ValueError("Naming convention restricts '_' characters in channel %r" % self)
         self._samples: OrderedDict[str, Sample] = OrderedDict()
-        self._observable: Observable | None = None
+        self._observable: Optional[Observable] = None
         self._observation = None
         self._mask = None
         self._mask_val = 0.0
