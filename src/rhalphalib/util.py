@@ -20,7 +20,7 @@ def _to_numpy(hinput, read_sumw2=False):
         if read_sumw2 and hinput[3].size != hinput[1].size - 1:
             raise ValueError("Sumw2 array and binning array are incompatible in tuple {}".format(hinput))
         return hinput
-    elif "<class 'ROOT.TH1" in str(type(hinput)):
+    elif "<class 'ROOT.TH1" in str(type(hinput)) or "<class cppyy.gbl.TH1" in str(type(hinput)):
         sumw = np.zeros(hinput.GetNbinsX())
         sumw2 = np.zeros(hinput.GetNbinsX())
         binning = np.zeros(sumw.size + 1)
@@ -61,12 +61,15 @@ def _to_numpy(hinput, read_sumw2=False):
             return (sumw, binning, name, sumw2)
         return (sumw, binning, name)
     else:
-        raise ValueError("Cannot understand template type of %r" % hinput)
+        raise ValueError("Cannot understand template type %r of %r" % (type(hinput), hinput))
 
 
 def _to_TH1(sumw, binning, name):
     import ROOT
 
+    # avoid creating fake error values when setting bin content manually
+    oldDefaultSumw2 = ROOT.TH1.GetDefaultSumw2()
+    ROOT.TH1.SetDefaultSumw2(False)
     h = ROOT.TH1D(name, "template;%s;Counts" % name, binning.size - 1, binning)
     if isinstance(sumw, tuple):
         for i, (w, w2) in enumerate(zip(sumw[0], sumw[1])):
@@ -75,6 +78,7 @@ def _to_TH1(sumw, binning, name):
     else:
         for i, w in enumerate(sumw):
             h.SetBinContent(i + 1, w)
+    ROOT.TH1.SetDefaultSumw2(oldDefaultSumw2)
     return h
 
 

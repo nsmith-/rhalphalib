@@ -210,7 +210,7 @@ class Channel:
             raise ValueError("Naming convention requires beginning of sample %r name to be %s" % (sample, self.name))
         if self._observable is not None:
             if not sample.observable == self._observable:
-                raise ValueError("Sample %r has an incompatible observable with channel %r" % (sample, self))
+                raise ValueError("Sample %r has an incompatible observable with channel %r:\n  %r\n  %r" % (sample, self, sample.observable, self._observable))
             sample.observable = self._observable
         else:
             self._observable = sample.observable
@@ -236,7 +236,7 @@ class Channel:
         observable = Observable(obs_name, binning)
         if self._observable is not None:
             if not observable == self._observable:
-                raise ValueError("Observation has an incompatible observable with channel %r" % self)
+                raise ValueError("Observation has an incompatible observable with channel %r:\n  %r\n  %r" % (self, observable, self._observable))
         else:
             self._observable = observable
         if read_sumw2:
