@@ -1,3 +1,4 @@
+from typing import Tuple, Union
 from scipy.interpolate import interp1d
 import numpy as np
 import hist
@@ -10,7 +11,7 @@ class AffineMorphTemplate(object):
     hist: a numpy-histogram-like tuple of (sumw, edges, varname)
     """
 
-    def __init__(self, hist: tuple[np.ndarray, np.ndarray, str]):
+    def __init__(self, hist: Tuple[np.ndarray, np.ndarray, str]):
         self.sumw = hist[0]
         self.edges = hist[1]
         self.varname = hist[2]
@@ -37,7 +38,7 @@ class AffineMorphTemplate(object):
         return np.diff(self.cdf(smeard_edges)) * self.norm, self.edges, self.varname
 
 
-_HistType = hist.Hist | tuple[np.ndarray, np.ndarray, str, np.ndarray]
+_HistType = Union[hist.Hist, Tuple[np.ndarray, np.ndarray, str, np.ndarray]]
 
 
 class MorphHistW2(object):

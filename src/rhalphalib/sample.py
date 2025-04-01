@@ -1,6 +1,6 @@
 from __future__ import division
 from abc import ABC
-from typing import Iterable
+from typing import Iterable, Optional
 import numpy as np
 import numbers
 import warnings
@@ -35,7 +35,7 @@ class Sample(ABC):
     def __init__(self, name: str, sampletype: int):
         self._name = name
         self._sampletype = sampletype
-        self._observable: Observable | None = None
+        self._observable: Optional[Observable] = None
         self._mask = None
         self._mask_val = 0.0
 
@@ -226,15 +226,16 @@ class TemplateSample(Sample):
             effect_up[zerobins] = 1.0
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
-            # TODO: warning? this can happen regularly
-            # we might even want some sort of threshold
+            logging.warning("effect_up ({}, {}) has magnitude less than 0, skipping".format(param.name, self._name))
+            # raise error instead?
             return
         elif effect_down is None and np.all(effect_up == 1.0):
-            # some sort of threshold might be useful here as well
+            logging.warning("effect_up ({}, {}) = 1 and has no effect, skipping".format(param.name, self._name))
+            # raise error instead?
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
         if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
-            print(
+            logging.warning(
                 "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
                     param.name, self._name, _weighted_effect_magnitude * 100
                 )
@@ -264,7 +265,7 @@ class TemplateSample(Sample):
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
             if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
-                print(
+                logging.warning(
                     "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
                         param.name, self._name, _weighted_effect_magnitude * 100
                     )
@@ -297,7 +298,7 @@ class TemplateSample(Sample):
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self, lnN: bool = False, epsilon: float = 0, threshold: float = 0.0, sample_name: str | None = None, bini: int | None = None):
+    def autoMCStats(self, lnN: bool = False, epsilon: float = 0, threshold: float = 0.0, sample_name: Optional[str] = None, bini: Optional[int] = None):
         """
         Set MC statical uncertainties based on self._sumw2. ``sample_name`` and ``bini`` parameters
         don't need to modified for typical use cases.

@@ -28,7 +28,6 @@ dependencies = [
   "numpy >=1.14",
   "scipy",
   "mplhep",
-  "seaborn",
   "hist",
 ]
 

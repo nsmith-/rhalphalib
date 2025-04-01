@@ -4,6 +4,7 @@ from functools import reduce
 from itertools import chain
 import logging
 import os
+from typing import Optional
 import numpy as np
 from .sample import Sample
 from .parameter import Observable, IndependentParameter, NuisanceParameter
@@ -175,7 +176,7 @@ class Channel:
         if "_" in self._name:
             raise ValueError("Naming convention restricts '_' characters in channel %r" % self)
         self._samples: OrderedDict[str, Sample] = OrderedDict()
-        self._observable: Observable | None = None
+        self._observable: Optional[Observable] = None
         self._observation = None
         self._mask = None
         self._mask_val = 0.0
@@ -209,7 +210,7 @@ class Channel:
             raise ValueError("Naming convention requires beginning of sample %r name to be %s" % (sample, self.name))
         if self._observable is not None:
             if not sample.observable == self._observable:
-                raise ValueError("Sample %r has an incompatible observable with channel %r" % (sample, self))
+                raise ValueError("Sample %r has an incompatible observable with channel %r:\n  %r\n  %r" % (sample, self, sample.observable, self._observable))
             sample.observable = self._observable
         else:
             self._observable = sample.observable
@@ -235,7 +236,7 @@ class Channel:
         observable = Observable(obs_name, binning)
         if self._observable is not None:
             if not observable == self._observable:
-                raise ValueError("Observation has an incompatible observable with channel %r" % self)
+                raise ValueError("Observation has an incompatible observable with channel %r:\n  %r\n  %r" % (self, observable, self._observable))
         else:
             self._observable = observable
         if read_sumw2:

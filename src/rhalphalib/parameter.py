@@ -1,5 +1,5 @@
 import numbers
-from typing import Iterable
+from typing import Iterable, Optional
 import warnings
 import numpy as np
 from .util import install_roofit_helpers
@@ -17,9 +17,10 @@ class Parameter:
         self._intermediate = False
 
     def __repr__(self):
-        return "<%s (%s) instance at 0x%x>" % (
+        return "<%s (%s, %s) instance at 0x%x>" % (
             self.__class__.__name__,
             self._name,
+            self._value,
             id(self),
         )
 
@@ -140,7 +141,7 @@ class IndependentParameter(Parameter):
 
     DefaultRange = (-10.0, 10.0)
 
-    def __init__(self, name: str, value: float, lo: float | None = None, hi: float | None = None, constant: bool = False):
+    def __init__(self, name: str, value: float, lo: Optional[float] = None, hi: Optional[float] = None, constant: bool = False):
         super(IndependentParameter, self).__init__(name, value)
         # if name starts with a number, it will not be render right in a formula
         if name[0].isdigit():
@@ -358,6 +359,14 @@ class Observable(Parameter):
     def __init__(self, name: str, binning: Iterable[float]):
         super(Observable, self).__init__(name, np.nan)
         self._binning = np.array(binning)
+
+    def __repr__(self):
+        return "<%s (%s, %s) instance at 0x%x>" % (
+            self.__class__.__name__,
+            self._name,
+            self._binning,
+            id(self),
+        )
 
     def __eq__(self, other):
         if isinstance(other, Observable) and self._name == other._name and np.allclose(self._binning, other._binning):
