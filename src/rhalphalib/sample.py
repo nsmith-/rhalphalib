@@ -193,7 +193,7 @@ class TemplateSample(Sample):
                 ad-hoc rescaling of the effect, most useful for shape effects where the nuisance parameter effect needs to be
                 magnified to ensure good vertical interpolation
             nowarn: bool, optional
-                suppress the warning about the magnitude of the effect 
+                suppress the warning about the magnitude of the effect
                 (useful for template shifting nuisances, which have large magnitude by design)
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
