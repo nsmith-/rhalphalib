@@ -396,10 +396,12 @@ class TemplateSample(Sample):
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                 else:
                     effect_down = self.getParamEffect(param, up=False)
-                    smoothStep = SmoothStep(param_scaled)
+                    smoothStep = SmoothStep(param)
                     if param.combinePrior == "shape":
                         combined_effect = smoothStep * (1 + (effect_up - 1) * param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1) * param_scaled)
                     elif param.combinePrior == "shapeN":
+                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
+                    elif param.combinePrior == "shapeU":
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     elif param.combinePrior == "lnN":
                         # TODO: ensure scalar effect
