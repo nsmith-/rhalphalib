@@ -143,6 +143,9 @@ class IndependentParameter(Parameter):
 
     def __init__(self, name: str, value: float, lo: Optional[float] = None, hi: Optional[float] = None, constant: bool = False):
         super(IndependentParameter, self).__init__(name, value)
+        # if name starts with a number, it will not be render right in a formula
+        if name[0].isdigit():
+            raise ValueError(f"IndependentParameter name must not start with a number. Supplied name: `{name}`.")
         self._lo = lo if lo is not None else self.DefaultRange[0]
         self._hi = hi if hi is not None else self.DefaultRange[1]
         self._constant = constant
