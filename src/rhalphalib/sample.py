@@ -178,7 +178,7 @@ class TemplateSample(Sample):
         pset.update(self._extra_dependencies)
         return pset
 
-    def setParamEffect(self, param: Parameter, effect_up, effect_down=None, scale=None):
+    def setParamEffect(self, param: Parameter, effect_up, effect_down=None, scale=None, nowarn=False):
         """
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
 
@@ -192,6 +192,9 @@ class TemplateSample(Sample):
             scale : number, optional
                 ad-hoc rescaling of the effect, most useful for shape effects where the nuisance parameter effect needs to be
                 magnified to ensure good vertical interpolation
+            nowarn: bool, optional
+                suppress the warning about the magnitude of the effect
+                (useful for template shifting nuisances, which have large magnitude by design)
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         """
@@ -234,7 +237,7 @@ class TemplateSample(Sample):
             # raise error instead?
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
-        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
+        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
             logging.warning(
                 "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
                     param.name, self._name, _weighted_effect_magnitude * 100
@@ -264,7 +267,7 @@ class TemplateSample(Sample):
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
-            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
+            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
                 logging.warning(
                     "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
                         param.name, self._name, _weighted_effect_magnitude * 100
