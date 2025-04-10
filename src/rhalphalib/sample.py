@@ -378,7 +378,6 @@ class TemplateSample(Sample):
                 effect_up = self.getParamEffect(param, up=True)
                 if effect_up is None:
                     continue
-                print("pscales", self._paramEffectScales)
                 if param in self._paramEffectScales:
                     param_scaled = param * self._paramEffectScales[param]
                     param_scale = self._paramEffectScales[param]
