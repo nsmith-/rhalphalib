@@ -13,6 +13,7 @@ from .parameter import (
     NuisanceParameter,
     IndependentParameter,
     DependentParameter,
+    Parameter,
 )
 from .function import (
     BasisPoly,
@@ -36,6 +37,7 @@ __all__ = [
     "NuisanceParameter",
     "IndependentParameter",
     "DependentParameter",
+    "Parameter",
     "BasisPoly",
     "BernsteinPoly",
     "DecorrelatedNuisanceVector",

@@ -3,66 +3,63 @@ name: PR Tests
 on:
   pull_request:
     branches:
-    - master
+      - master
 
 jobs:
-  linter:
-    name: Linter
+  pre-commit:
+    name: Format
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v4
         with:
-          python-version: 3.9
-
-      - name: Install Python dependencies
-        run: pip install black flake8
-
-      - name: Run black
-        uses: wearerequired/lint-action@v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
         with:
-          auto_fix: true
-          black: true
-          black_auto_fix: true
-      
-      - name: Lint with flake8
-        run: flake8 rhalphalib --count --show-source --statistics
+          python-version: "3.x"
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --hook-stage manual --all-files
 
-  test:
-    name: Run pytest (Python ${{ matrix.python-version }}, ROOT ${{ matrix.root-version }})
-    needs: linter
+  generate-jobs:
+    name: Generate Jobs
+    needs: [pre-commit]
+    runs-on: ubuntu-latest
+    outputs:
+      session: ${{ steps.set-matrix.outputs.session }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: wntrblm/nox@main
+      - id: set-matrix
+        shell: bash
+        run:
+          echo session=$(nox --json -l | jq -c '[.[].session]') | tee --append
+          $GITHUB_OUTPUT
+
+  checks:
+    name: Session ${{ matrix.session }}
+    needs: [generate-jobs]
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
-      fail-fast: true
+      fail-fast: false
       matrix:
-        python-version: [3.7]
-        root-version: [6.16, 6.22]
-
+        session: ${{ fromJson(needs.generate-jobs.outputs.session) }}
     steps:
-    - uses: actions/checkout@v1
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v2.2.0
-      with:
-        python-version: ${{ matrix.python-version }}
-        miniforge-variant: Mambaforge
-        channels: conda-forge,defaults
-        channel-priority: true
-        activate-environment: condaenv
-    - name: Install ROOT ${{ matrix.root-version }}
-      shell: bash -l {0}
-      run: |
-        mamba install -c conda-forge numpy scipy nomkl root==${{ matrix.root-version }}
-    - name: Install package
-      shell: bash -l {0}
-      run: |
-        pip install -e .
-    - name: Test with pytest
-      shell: bash -l {0}
-      run: |
-        pip install pytest
-        pytest tests
+      - uses: actions/checkout@v3
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: 3.12
+          miniforge-version: latest
+      - uses: wntrblm/nox@main
+      - run: nox -s "${{ matrix.session }}"
+
+  check_py38:
+    name: Check valid py3.8 code
+    needs: [pre-commit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+      - run: python -m compileall -q src tests

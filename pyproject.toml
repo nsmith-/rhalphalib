@@ -1,2 +1,61 @@
-[tool.black]
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rhalphalib"
+dynamic = ["version"]
+authors = [
+    {name = "Nick Smith", email = "nick.smith@cern.ch"},
+]
+maintainers = [
+    {name = "Nick Smith", email = "nick.smith@cern.ch"},
+]
+description = "A binned fit intermediate representation library"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+# keywords = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.8"
+dependencies = [
+  "numpy >=1.14",
+  "scipy",
+  "mplhep",
+  "hist",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+]
+dev = [
+  "pre-commit",
+]
+docs = [
+  "sphinx>=7.0",
+  "myst_parser>=0.13",
+  "sphinx_copybutton",
+  "sphinx_autodoc_typehints",
+  "furo>=2023.08.17",
+  "nbsphinx",
+  "ipython",
+]
+
+[project.urls]
+Homepage = "https://github.com/nsmith-/rhalphalib"
+
+[tool.setuptools_scm]
+write_to = "src/rhalphalib/version.py"
+
+[tool.ruff]
 line-length = 199
+
+[tool.codespell]
+ignore-words-list = "fpt"

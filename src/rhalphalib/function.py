@@ -1,3 +1,4 @@
+from typing import Callable, List, Optional, Tuple
 import numpy as np
 from scipy.special import binom
 import numbers
@@ -6,14 +7,20 @@ from .parameter import IndependentParameter, NuisanceParameter, DependentParamet
 from .util import install_roofit_helpers
 
 
-def matrix_bernstein(n):
+def matrix_bernstein(n: int):
+    """
+    Construct the Bernstein basis matrix for a given order n
+    """
     v = np.arange(n + 1)
     bmat = np.einsum("l,lv,lv->vl", binom.outer(n, v), binom.outer(v, v), np.power(-1.0, np.subtract.outer(v, v)))
     bmat[np.greater.outer(v, v)] = 0  # v > l
     return bmat
 
 
-def matrix_chebyshev(n):
+def matrix_chebyshev(n: int):
+    """
+    Construct the Chebyshev basis matrix for a given order n
+    """
     M = np.zeros((n + 1, n + 1))
     for nth in range(1, n + 2):
         _coef_basis = np.zeros(nth)
@@ -24,23 +31,93 @@ def matrix_chebyshev(n):
     return M
 
 
-def matrix_poly(n):
+def matrix_poly(n: int):
+    """
+    Construct the polynomial basis matrix for a given order n
+    """
     return np.identity(n + 1)
 
 
-class BasisPoly(object):
-    def __init__(self, name, order, dim_names=None, basis="Bernstein", init_params=None, limits=None, coefficient_transform=None, square_params=False):
-        """
-        Construct a multidimensional Bernstein polynomial
-            name: will be used to prefix any RooFit object names
-            order: tuple of order in each dimension
-            dim_names: optional, names of each dimension
-            init_params: ndarray of initial params
-            limits: tuple of independent parameter limits, default: (0, 10)
-            coefficient_transform: callable to transform coefficients before multiplying by parameters
-            square_params: if True, square the parameters before multiplying by coefficient;
-              this is a way to ensure a positive definite polynomial in the Bernstein basis.
-        """
+def params_from_roofit(fitresult, param_names=None):
+    install_roofit_helpers()
+    names = [p.GetName() for p in fitresult.floatParsFinal()]
+    means = fitresult.valueArray()
+    cov = fitresult.covarianceArray()
+    if param_names is not None:
+        pidx = np.array([names.index(pname) for pname in param_names])
+        means = means[pidx]
+        cov = cov[np.ix_(pidx, pidx)]
+    return means, cov
+
+
+def sum_terms(params, coefs, shape):
+    return (params * coefs).sum(axis=1).reshape(shape)
+
+
+def compute_band(params, coefs, shape, cov):
+    """
+    This computation follows the linearized error propagation method used in RooAbsReal::plotOnWithErrorBand() and RooCurve::calcBandInterval()
+    err(x) = F(x,a) C_ab F(x,b)
+    where F(x,a) = (f(x,a+da) - f(x,a-da))/2 (numerical partial derivative) and C_ab is the correlation matrix
+    """
+    # compute correlation matrix
+    std = np.sqrt(np.diag(cov))
+    corr = cov / std[:, None] / std[None, :]
+    # compute gradients
+    plus_vars = []
+    minus_vars = []
+    for i, par in enumerate(params):
+        val = par
+        err = np.sqrt(cov[i, i])
+        # temporarily vary param
+        params[i] = val + err
+        plus_vars.append(sum_terms(params, coefs, shape))
+        params[i] = val - err
+        minus_vars.append(sum_terms(params, coefs, shape))
+        # reset to central value
+        params[i] = val
+    # flatten
+    plus_vars = np.stack(plus_vars).reshape(len(params), -1)
+    minus_vars = np.stack(minus_vars).reshape(len(params), -1)
+    F = (plus_vars - minus_vars) / 2.0
+
+    # final values
+    def proj(F):
+        return F.T @ corr @ F
+
+    central = sum_terms(params, coefs, shape)
+    err2 = np.apply_along_axis(proj, 1, F.T).reshape(shape)
+    lo = central + np.sqrt(err2)
+    hi = central - np.sqrt(err2)
+    return lo, hi
+
+
+class BasisPoly:
+    """
+    Construct a multidimensional polynomial
+
+    Parameters:
+        name: will be used to prefix any RooFit object names
+        order: tuple of order in each dimension
+        dim_names: optional, names of each dimension
+        init_params: ndarray of initial params
+        limits: tuple of independent parameter limits, default: (0, 10)
+        coefficient_transform: callable to transform coefficients before multiplying by parameters
+        square_params: if True, square the parameters before multiplying by coefficient;
+            this is a way to ensure a positive definite polynomial in the Bernstein basis.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        order: Tuple[int, ...],
+        dim_names: Optional[Tuple[str, ...]] = None,
+        basis: str = "Bernstein",
+        init_params: Optional[np.ndarray] = None,
+        limits: Optional[Tuple[float, float]] = None,
+        coefficient_transform: Optional[Callable] = None,
+        square_params: bool = False,
+    ):
         self._name = name
         if not isinstance(order, tuple):
             raise ValueError
@@ -89,6 +166,8 @@ class BasisPoly(object):
             else:
                 paramsq = DependentParameter("_".join([self.name] + ["%s_parsq%d" % (d, i) for d, i in zip(self._dim_names, ipar)]), "{0}*{0}", param)
                 self._params[ipar] = paramsq
+        # covariance is not populated until after fit is performed
+        self._cov = None
 
     @property
     def name(self):
@@ -122,12 +201,16 @@ class BasisPoly(object):
             if pnew.intermediate:
                 pnew.intermediate = False
         self._params = newparams
+        # covariance is invalidated whenever parameters are changed
+        self._cov = None
 
     def update_from_roofit(self, fit_result, from_deco=False):
         par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(",") if self.name in p])
-        par_results = {p: round(fit_result.floatParsFinal().find(p).getVal(), 3) for p in par_names}
+        means, cov = params_from_roofit(fit_result, par_names)
+        par_results = {p: round(means[i], 3) for i, p in enumerate(par_names)}
         for par in self._params.reshape(-1):
             par.value = par_results[par.name]
+        self._cov = cov
 
     def set_parvalues(self, parvalues):
         for par, new_val in zip(self._params.reshape(-1), parvalues):
@@ -144,15 +227,14 @@ class BasisPoly(object):
             bpolyval = self._transform(bpolyval)
         return bpolyval
 
-    def __call__(self, *vals, **kwargs):
-        """
-        vals: a ndarray for each dimension's values to evaluate the polynomial at
-        kwargs:
+    def __call__(self, *vals, nominal: bool = False, errorband: bool = False):
+        """Evaluate the polynomial at the given values
+
+        Parameters:
+            vals: a ndarray for each dimension's values to evaluate the polynomial at
             nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
+            errorband: set true to output error band along with nominal
         """
-        nominal = kwargs.pop("nominal", False)
-        if len(kwargs) > 0:
-            raise ValueError("Extra keyword arguments supplied!")
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
@@ -172,7 +254,14 @@ class BasisPoly(object):
         coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
         if nominal:
             parameters = np.vectorize(lambda p: p.value)(parameters)
-            return (parameters * coefficients).sum(axis=1).reshape(shape)
+            nominal_vals = sum_terms(parameters, coefficients, shape)
+            if errorband:
+                if self._cov is None:
+                    raise RuntimeError("Can only compute error band after covariance matrix loaded using update_from_roofit()")
+                band = compute_band(parameters, coefficients, shape, self._cov)
+                return nominal_vals, band
+            else:
+                return nominal_vals
 
         out = np.full(coefficients.shape[0], None)
         for i in range(coefficients.shape[0]):
@@ -187,16 +276,30 @@ class BasisPoly(object):
 
 
 class BernsteinPoly(BasisPoly):
+    """
+    Backcompatibility subclass of BasisPoly with fixed poly basis
+    """
+
     def __init__(self, name, order, dim_names=None, init_params=None, limits=None, coefficient_transform=None):
-        """
-        Backcompatibility subclass of BasisPoly with fixed poly basis
-        """
         super(BernsteinPoly, self).__init__(name=name, order=order, dim_names=dim_names, basis="Bernstein", init_params=init_params, limits=limits, coefficient_transform=coefficient_transform)
-        warnings.warn("Consider switching to ``BasisPoly(..., basis='Bernstein', ...)")
+        warnings.warn("BernsteinPoly is deprecated. Consider switching to BasisPoly(..., basis='Bernstein', ...)")
 
 
-class DecorrelatedNuisanceVector(object):
-    def __init__(self, prefix, param_in, param_cov):
+class DecorrelatedNuisanceVector:
+    """A decorrelated nuisance vector
+
+    This class is used to create a vector of nuisance parameters that are
+    decorrelated from a set of correlated parameters and a covariance matrix.
+    This is useful for creating a set of constrained nuisance parameters in combine,
+    as combine does not support correlated nuisance parameters.
+
+    Parameters:
+        prefix: a prefix for the names of the parameters
+        param_in: a numpy array of means for the nuisance parameters
+        param_cov: a numpy array of covariance matrix for the nuisance parameters
+    """
+
+    def __init__(self, prefix: str, param_in: np.ndarray, param_cov: np.ndarray):
         if not isinstance(param_in, np.ndarray):
             raise ValueError("Expecting param_in to be numpy array")
         if not isinstance(param_cov, np.ndarray):
@@ -206,23 +309,24 @@ class DecorrelatedNuisanceVector(object):
 
         _, s, v = np.linalg.svd(param_cov)
         self._transform = np.sqrt(s)[:, None] * v
-        self._parameters = np.array([NuisanceParameter(prefix + str(i), "param") for i in range(param_in.size)])
+        self._parameters = np.array([NuisanceParameter(prefix + str(i + 1), "param") for i in range(param_in.size)])
         self._correlated = np.full(self._parameters.shape, None)
         for i in range(self._parameters.size):
             coef = self._transform[:, i]
             order = np.argsort(np.abs(coef))
-            self._correlated[i] = np.sum(self._parameters[order] * coef[order]) + param_in[i]
+            self._correlated[i] = np.sum(coef[order] * self._parameters[order]) + param_in[i]
 
     @classmethod
-    def fromRooFitResult(cls, prefix, fitresult, param_names=None):
-        install_roofit_helpers()
-        names = [p.GetName() for p in fitresult.floatParsFinal()]
-        means = fitresult.valueArray()
-        cov = fitresult.covarianceArray()
-        if param_names is not None:
-            pidx = np.array([names.index(pname) for pname in param_names])
-            means = means[pidx]
-            cov = cov[np.ix_(pidx, pidx)]
+    def fromRooFitResult(cls, prefix: str, fitresult, param_names: Optional[List[str]] = None):
+        """Create a DecorrelatedNuisanceVector from a RooFit result
+
+        Parameters:
+            prefix: a prefix for the names of the parameters
+            fitresult: a RooFitResult object
+            param_names: optional list of parameter names to include in the vector. If None,
+                all parameters in the fit result will be included.
+        """
+        means, cov = params_from_roofit(fitresult, param_names)
         out = cls(prefix, means, cov)
         if param_names is not None:
             for p, name in zip(out.correlated_params, param_names):
@@ -236,3 +340,7 @@ class DecorrelatedNuisanceVector(object):
     @property
     def correlated_params(self):
         return self._correlated
+
+    @property
+    def correlated_str(self):
+        return "\n".join(p.formula(rendering=True) for p in self._correlated)

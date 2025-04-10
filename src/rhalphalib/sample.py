@@ -1,7 +1,10 @@
 from __future__ import division
+from abc import ABC
+from typing import Iterable, Optional
 import numpy as np
 import numbers
 import warnings
+import logging
 from .parameter import (
     Parameter,
     IndependentParameter,
@@ -13,17 +16,26 @@ from .parameter import (
 from .util import _to_numpy, _to_TH1, _pairwise_sum, install_roofit_helpers
 
 
-class Sample(object):
-    """
-    Sample base class
+class Sample(ABC):
+    """Sample base class
+
+    A sample is a collection of bins in an observable, with a name and a type.
+
+    Parameters:
+        name (str): name of the sample. Naming convention: the sample name must
+            be prefixed with the name of the channel it belongs to.
+            i.e. if channel name is "mychannel", then sample name must be
+            "mychannel_sample1" or "mychannel_sample2", etc. This is to avoid
+            name clashes when using the same sample in different channels.
+        sampletype (int): type of the sample. One of Sample.SIGNAL, Sample.BACKGROUND, or Sample.DATA.
     """
 
     SIGNAL, BACKGROUND = range(2)
 
-    def __init__(self, name, sampletype):
+    def __init__(self, name: str, sampletype: int):
         self._name = name
         self._sampletype = sampletype
-        self._observable = None
+        self._observable: Optional[Observable] = None
         self._mask = None
         self._mask_val = 0.0
 
@@ -36,10 +48,12 @@ class Sample(object):
 
     @property
     def name(self):
+        """Sample name"""
         return self._name
 
     @property
     def sampletype(self):
+        """Sample type"""
         return self._sampletype
 
     @property
@@ -60,8 +74,9 @@ class Sample(object):
     @property
     def mask(self):
         """
-        An array matching the observable binning that specifies which bins to populate
-        i.e. when mask[i] is False, the bin content will be set to 0.
+        An array matching the observable binning that specifies which bins to populate.
+        i.e. when ``mask[i]`` is False, the bin content for all samples and the observation will be set to 0.
+        Useful for blinding!
         """
         return self._mask
 
@@ -97,21 +112,38 @@ class Sample(object):
 
 
 class TemplateSample(Sample):
-    def __init__(self, name, sampletype, template):
-        """
+    """
+    A template sample is a sample that is defined by a template histogram.
+
+    Parameters:
         name: self-explanatory
         sampletype: Sample.SIGNAL or BACKGROUND or DATA
-        template: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram
-            in the latter case, please extend the numpy histogram tuple to define an observable name
+        template: Either a ROOT TH1, a 1D Coffea Hist object, a 1D hist Hist object, or a numpy histogram.
+            In the latter case, please extend the numpy histogram tuple to define an observable name
             i.e. (sumw, binning, name)
             (for the others, the observable name is taken from the x axis name)
-        """
+        force_positive: if True, negative values in the template will be set to 0
+    """
+
+    def __init__(self, name: str, sampletype: int, template, force_positive: bool = False):
         super(TemplateSample, self).__init__(name, sampletype)
         sumw2 = None
         try:
             sumw, binning, obs_name, sumw2 = _to_numpy(template, read_sumw2=True)
         except ValueError:
             sumw, binning, obs_name = _to_numpy(template)
+        if force_positive:
+            if np.any(sumw < 0):
+                logging.info(f"Negative values found in sample '{name}'. They are being set to 0.")
+            sumw[sumw < 0] = 0.0
+            if sumw2 is not None:
+                sumw2[sumw2 < 0] = 0.0
+        if np.any(sumw < 0):
+            logging.warning(
+                f"Sample '{name}' template contains negative yields. This may cause normalization mismatch issues when building the workspace. "
+                "Set `log_level` to 'logging.DEBUG' to show the template:"
+            )
+            logging.debug(f"Sample '{name}' template = {sumw}.")
         observable = Observable(obs_name, binning)
         self._observable = observable
         self._nominal = sumw
@@ -122,11 +154,17 @@ class TemplateSample(Sample):
         self._extra_dependencies = set()
 
     def show(self):
+        """Print the nominal values and their sumw2"""
         print(self._nominal)
         if self._sumw2 is not None:
             print(self._sumw2)
 
     def scale(self, _scale):
+        """Scale the sample by a factor
+
+        Parameters:
+            _scale: the scale factor, can be a number or a numpy array of the same length as the sample
+        """
         self._nominal *= _scale
         if self._sumw2 is not None:
             self._sumw2 *= _scale * _scale
@@ -140,18 +178,23 @@ class TemplateSample(Sample):
         pset.update(self._extra_dependencies)
         return pset
 
-    def setParamEffect(self, param, effect_up, effect_down=None, scale=None):
+    def setParamEffect(self, param: Parameter, effect_up, effect_down=None, scale=None, nowarn=False):
         """
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
-        param: a Parameter object
-        effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
-                   or a single number representing the relative effect on the sample normalization,
-                   or a histogram representing the *bin yield* under the effect of the parameter (i.e. not relative)
-                   or a DependentParameter representing the value to scale the *normalization* of this process
-        effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
-        scale : number, optional
-            ad-hoc rescaling of the effect, most useful for shape effects where the nuisance parameter effect needs to be
-            magnified to ensure good vertical interpolation
+
+        Parameters:
+            param: a Parameter object
+            effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
+                or a single number representing the relative effect on the sample normalization,
+                or a histogram representing the *bin yield* under the effect of the parameter (i.e. not relative)
+                or a DependentParameter representing the value to scale the *normalization* of this process
+            effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
+            scale : number, optional
+                ad-hoc rescaling of the effect, most useful for shape effects where the nuisance parameter effect needs to be
+                magnified to ensure good vertical interpolation
+            nowarn: bool, optional
+                suppress the warning about the magnitude of the effect
+                (useful for template shifting nuisances, which have large magnitude by design)
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         """
@@ -170,7 +213,8 @@ class TemplateSample(Sample):
                 return
             else:
                 raise ValueError("Template morphing can only be done via a NuisanceParameter or IndependentParameter")
-
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError(f"Parameter '{param.name}' already exists in sample '{self.name}': {sorted([p.name for p in self.parameters])}")
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
@@ -185,17 +229,19 @@ class TemplateSample(Sample):
             effect_up[zerobins] = 1.0
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
-            # TODO: warning? this can happen regularly
-            # we might even want some sort of threshold
+            logging.warning("effect_up ({}, {}) has magnitude less than 0, skipping".format(param.name, self._name))
+            # raise error instead?
             return
         elif effect_down is None and np.all(effect_up == 1.0):
-            # some sort of threshold might be useful here as well
+            logging.warning("effect_up ({}, {}) = 1 and has no effect, skipping".format(param.name, self._name))
+            # raise error instead?
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
-        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
-            print(
-                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
+            logging.warning(
+                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
+                    param.name, self._name, _weighted_effect_magnitude * 100
+                )
             )
         self._paramEffectsUp[param] = effect_up
 
@@ -221,10 +267,11 @@ class TemplateSample(Sample):
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
-            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5:
-                print(
-                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), "
-                    "you might be passing absolute values instead of relative".format(param.name, self._name, _weighted_effect_magnitude * 100)
+            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
+                logging.warning(
+                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
+                        param.name, self._name, _weighted_effect_magnitude * 100
+                    )
                 )
             self._paramEffectsDown[param] = effect_down
         else:
@@ -245,7 +292,7 @@ class TemplateSample(Sample):
             return self._paramEffectsUp[param]
         else:
             if param not in self._paramEffectsDown or self._paramEffectsDown[param] is None:
-                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                # TODO the symmetrized value depends on if param prior is 'shapeN' or 'shape'
                 if param.combinePrior == "lnN":
                     return 1.0 / self._paramEffectsUp[param]
                 elif param.combinePrior == "shape":
@@ -254,18 +301,19 @@ class TemplateSample(Sample):
                     raise NotImplementedError
             return self._paramEffectsDown[param]
 
-    def autoMCStats(self, lnN=False, epsilon=0, threshold=0, sample_name=None, bini=None):
+    def autoMCStats(self, lnN: bool = False, epsilon: float = 0, threshold: float = 0.0, sample_name: Optional[str] = None, bini: Optional[int] = None):
         """
-        Set MC statical uncertainties based on self._sumw2. `sample_name` and `bini` parameters
+        Set MC statical uncertainties based on self._sumw2. ``sample_name`` and ``bini`` parameters
         don't need to modified for typical use cases.
 
-        lnN: aggregate differences
-        epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
-        threshold: if relative uncertainty is < threshold, won't be added (only for lnN = False)
-        sample_name: custom name for e.g. using same parameters in two regions. Uses ``self.name``
-            by default (if sample_name=None).
-        bini: create parameter for a specific bin. By default creates for all (if bin=None)
-            (only if lnN = False).
+        Parameters:
+            lnN: aggregate differences
+            epsilon: 0 -> epsilon, is only one bin is filled lower syst of 0, gives empty norm
+            threshold: if relative uncertainty is < threshold, won't be added (only for lnN = False)
+            sample_name: custom name for e.g. using same parameters in two regions. Uses ``self.name``
+                by default (if sample_name=None).
+            bini: create parameter for a specific bin. By default creates for all (if bin=None)
+                (only if lnN = False).
         """
 
         if self._sumw2 is None:
@@ -310,10 +358,13 @@ class TemplateSample(Sample):
                 param = NuisanceParameter(name + "_mcstat_bin%i" % i, combinePrior="shape")
                 self.setParamEffect(param, effect_up, effect_down)
 
-    def getExpectation(self, nominal=False):
+    def getExpectation(self, nominal: bool = False, eval: bool = False):
         """
         Create an array of per-bin expectations, accounting for all nuisance parameter effects
+
+        Parameters:
             nominal: if True, calculate the nominal expectation (i.e. just plain numbers)
+            eval: if True, calculate the expectation, based on current parameter values
         """
 
         nominalval = self._nominal.copy()
@@ -357,12 +408,22 @@ class TemplateSample(Sample):
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                     out = out * combined_effect
 
-            return out
+            if eval:
+                return np.array([p.value for p in out])
+            else:
+                return out
 
     def renderRoofit(self, workspace):
-        """
-        Import the necessary Roofit objects into the workspace for this sample
-        and return an extended pdf representing this sample's prediciton for pdf and norm.
+        """Render the sample
+
+        Renders a RooHistPdf and a corresponding normalization RooRealVar to add to workspace
+
+        Parameters:
+            workspace: the RooWorkspace to add the sample to
+
+        Returns:
+            rooShape (RooHistPdf): the shape of the sample
+            rooNorm (RooRealVar): the normalization function
         """
         import ROOT
 
@@ -403,12 +464,16 @@ class TemplateSample(Sample):
         return rooShape, rooNorm
 
     def combineNormalization(self):
+        """Get the normalization for use in the combine datacard"""
         return self.getExpectation(nominal=True).sum()
 
-    def combineParamEffect(self, param):
+    def combineParamEffect(self, param: Parameter):
         """
         A formatted string for placement into the combine datacard that represents
         the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
+
+        Parameters:
+            param: a Parameter object
         """
         if self._paramEffectsUp.get(param, None) is None:
             return "-"
@@ -433,7 +498,7 @@ class TemplateSample(Sample):
             up = (self.getParamEffect(param, up=True) - 1) * scale + 1
             down = (self.getParamEffect(param, up=False) - 1) * scale + 1
             if isinstance(up, np.ndarray):
-                # Convert shape to norm (note symmeterized effect on shape != symmeterized effect on norm)
+                # Convert shape to norm (note symmetrized effect on shape != symmetrized effect on norm)
                 nominal = self.getExpectation(nominal=True)
                 if nominal.sum() == 0:
                     up = 1.0
@@ -442,7 +507,7 @@ class TemplateSample(Sample):
                     up = (up * nominal).sum() / nominal.sum()
                     down = (down * nominal).sum() / nominal.sum()
             elif self._paramEffectsDown[param] is None:
-                # Here we can safely defer to combine to calculate symmeterized effect
+                # Here we can safely defer to combine to calculate symmetrized effect
                 down = None
             if down is None:
                 return "%.4f" % up
@@ -451,14 +516,22 @@ class TemplateSample(Sample):
 
 
 class ParametericSample(Sample):
+    """Parametric sample class
+
+    A sample that is a binned function, where each bin yield
+    is given by the param in params.  The list params should have the
+    same number of bins as observable.
+
+    Parameters:
+        name: self-explanatory
+        sampletype: Sample.SIGNAL or BACKGROUND or DATA
+        observable: the observable for this sample
+        params: a list of parameters, one for each bin
+    """
+
     PreferRooParametricHist = True
 
-    def __init__(self, name, sampletype, observable, params):
-        """
-        Create a sample that is a binned function, where each bin yield
-        is given by the param in params.  The list params should have the
-        same number of bins as observable.
-        """
+    def __init__(self, name: str, sampletype: int, observable: Observable, params: Iterable[Parameter]):
         super(ParametericSample, self).__init__(name, sampletype)
         if not isinstance(observable, Observable):
             raise ValueError
@@ -481,19 +554,22 @@ class ParametericSample(Sample):
             pset.update(p.getDependents(deep=True))
         return pset
 
-    def setParamEffect(self, param, effect_up, effect_down=None):
+    def setParamEffect(self, param: Parameter, effect_up, effect_down=None):
         """
         Set the effect of a parameter on a sample (e.g. the size of unc. or multiplier for shape unc.)
-        param: a Parameter object
-        effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
-                   or a single number representing the relative effect on the sample normalization,
-        effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
+
+        Parameters:
+            param: a Parameter object
+            effect_up: a numpy array representing the relative (multiplicative) effect of the parameter on the bin yields,
+                    or a single number representing the relative effect on the sample normalization,
+            effect_down: if asymmetric effects, fill this in, otherwise the effect_up value will be symmetrized
 
         N.B. the parameter must have a compatible combinePrior, i.e. if param.combinePrior is 'shape', then one must pass a numpy array
         """
         if not isinstance(param, NuisanceParameter):
             raise ValueError("Template morphing can only be done via a NuisanceParameter")
-
+        if param.name in [p.name for p in self.parameters]:
+            raise ValueError(f"Parameter '{param.name}' already exists in sample '{self.name}': {sorted([p.name for p in self.parameters])}")
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
                 raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
@@ -525,7 +601,7 @@ class ParametericSample(Sample):
             return self._paramEffectsUp[param]
         else:
             if self._paramEffectsDown[param] is None:
-                # TODO the symmeterized value depends on if param prior is 'shapeN' or 'shape'
+                # TODO the symmetrized value depends on if param prior is 'shapeN' or 'shape'
                 return 1.0 / self._paramEffectsUp[param]
             return self._paramEffectsDown[param]
 
@@ -562,10 +638,21 @@ class ParametericSample(Sample):
             return out
 
     def renderRoofit(self, workspace):
-        """
-        Produce a RooParametricHist (if available) or RooParametricStepFunction and add to workspace
-        Note: for RooParametricStepFunction, bin values cannot be zero due to this ridiculous line:
-        https://github.com/root-project/root/blob/master/roofit/roofit/src/RooParametricStepFunction.cxx#L212-L213
+        """Render the sample
+
+        Renders a RooParametricHist (if available) and a corresponding normalization RooRealVar to add to workspace.
+
+        Parameters:
+            workspace: the RooWorkspace to add the sample to
+
+        Returns:
+            rooShape (RooParametricHist | RooParametricStepFunction): the shape of the sample
+            rooNorm (RooRealVar): the normalization function
+
+        Note: Generally we prefer RooParametricHist, which is available in cms-combine. The reason is that
+        for RooParametricStepFunction, the last bin value is defined by 1 - sum(others), which sets up a strong
+        correlation between all the bins that is difficult for the minimizer to deal with. Also, the bin values cannot be zero due to this ridiculous line:
+        https://github.com/root-project/root/blob/788a56428d892f0eb852bf797ba3e35137d11944/roofit/roofit/src/RooParametricStepFunction.cxx#L204
         """
         import ROOT
 
@@ -615,8 +702,9 @@ class ParametericSample(Sample):
         return rooShape, rooNorm
 
     def combineNormalization(self):
-        """
-        For combine, the normalization in the card is used to scale the parameteric process PDF
+        """Return the normalization for use in the combine datacard
+
+        For combine, the normalization in the card is used to scale the parametric process PDF.
         Since we provide an explicit normalization function, this should always stay at 1.
         """
         # TODO: optionally we could set the normalization here and leave only normalization modifiers
@@ -625,21 +713,30 @@ class ParametericSample(Sample):
     def combineParamEffect(self, param):
         """
         Combine cannot build shape param effects for parameterized templates, so we have to do it in the model.
+
+        TODO: This actually can be fixed, see https://github.com/nsmith-/rhalphalib/issues/20
         """
         return "-"
 
 
 class TransferFactorSample(ParametericSample):
-    def __init__(self, name, sampletype, transferfactor, dependentsample, observable=None, min_val=None):
-        """
-        Create a sample that depends on another Sample by some transfer factor.
-        The transfor factor can be a constant, an array of parameters of same length
-        as the dependent sample binning, or a matrix of parameters where the second
-        dimension matches the sample binning, i.e. expectation = tf @ dependent_expectation.
-        The latter requires an additional observable argument to specify the definition of the first dimension.
-        In all cases, please use numpy object arrays of Parameter types.
-        Passing in a ``min_val`` means param values will be clipped at the min_val.
-        """
+    """
+    Create a sample that depends on another Sample by some transfer factor.
+
+    Parameters:
+        name: self-explanatory
+        sampletype: Sample.SIGNAL or BACKGROUND or DATA
+        transferfactor: The transfer factor can be a constant, an array of parameters of same length
+            as the dependent sample binning, or a matrix of parameters where the second
+            dimension matches the sample binning, i.e. ``expectation = tf @ dependent_expectation``.
+            The latter requires an additional observable argument to specify the definition of the first dimension.
+            In all cases, please use numpy object arrays of Parameter types.
+        dependentsample (Sample): the sample that this sample depends on
+        observable (Observable | None): the observable for this sample
+        min_val: Passing in a ``min_val`` means param values will be clipped at the min_val.
+    """
+
+    def __init__(self, name: str, sampletype: int, transferfactor, dependentsample, observable=None, min_val=None):
         if not isinstance(transferfactor, np.ndarray):
             raise ValueError("Transfer factor is not a numpy array")
         if not isinstance(dependentsample, Sample):

@@ -6,3 +6,6 @@ __pycache__
 build
 dist
 .vscode
+src/rhalphalib/version.py
+docs/_build
+.nox

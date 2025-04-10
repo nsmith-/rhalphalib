@@ -69,8 +69,8 @@ def test_rhalphabet(tmpdir):
         failObs = failCh.getObservation()
         if rescale_qcd:
             qcdparams = np.array([rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), 0) for i in range(msd.nbins)])
-            sigmascale = 1.0
-            scaledparams = failObs * (1 + sigmascale / np.maximum(1.0, np.sqrt(failObs))) ** qcdparams
+            sigmascale = 10.0
+            scaledparams = failObs * (1 + 1.0 / np.maximum(1.0, np.sqrt(failObs))) ** (qcdparams * sigmascale)
             fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         else:
             qcdparams = np.array([rl.IndependentParameter("qcdparam_ptbin%d_msdbin%d" % (ptbin, i), n, lo=0, hi=2 * n) for i, n in enumerate(failObs)])
@@ -172,8 +172,8 @@ def test_rhalphabet(tmpdir):
             initial_qcd -= sample.getExpectation(nominal=True)
         if np.any(initial_qcd < 0.0):
             raise ValueError("initial_qcd negative for some bins..", initial_qcd)
-        sigmascale = 10  # to scale the deviation from initial
-        scaledparams = initial_qcd * (1 + sigmascale / np.maximum(1.0, np.sqrt(initial_qcd))) ** qcdparams
+        sigmascale = 10.0
+        scaledparams = initial_qcd * (1 + 1.0 / np.maximum(1.0, np.sqrt(initial_qcd))) ** (qcdparams * sigmascale)
         fail_qcd = rl.ParametericSample("ptbin%dfail_qcd" % ptbin, rl.Sample.BACKGROUND, msd, scaledparams)
         failCh.addSample(fail_qcd)
         pass_qcd = rl.TransferFactorSample("ptbin%dpass_qcd" % ptbin, rl.Sample.BACKGROUND, tf_params[ptbin, :], fail_qcd)
