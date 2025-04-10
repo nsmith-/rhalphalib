@@ -13,6 +13,7 @@ class Parameter:
     def __init__(self, name: str, value):
         self._name = name
         self._value = value
+        self._initial_value = value
         self._hasPrior = False
         self._intermediate = False
 
@@ -35,6 +36,9 @@ class Parameter:
     @property
     def value(self):
         return self._value
+
+    def reset(self):
+        self._value = self._initial_value
 
     @property
     def intermediate(self):

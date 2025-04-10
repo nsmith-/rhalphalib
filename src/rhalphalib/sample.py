@@ -380,8 +380,10 @@ class TemplateSample(Sample):
                     continue
                 if param in self._paramEffectScales:
                     param_scaled = param * self._paramEffectScales[param]
+                    param_scale = self._paramEffectScales[param]
                 else:
                     param_scaled = param
+                    param_scale = 1
                 if isinstance(effect_up, DependentParameter):
                     out = out * effect_up
                 elif self._paramEffectsDown[param] is None:
@@ -396,10 +398,12 @@ class TemplateSample(Sample):
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                 else:
                     effect_down = self.getParamEffect(param, up=False)
-                    smoothStep = SmoothStep(param_scaled)
+                    smoothStep = SmoothStep(param) * param_scale
                     if param.combinePrior == "shape":
                         combined_effect = smoothStep * (1 + (effect_up - 1) * param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1) * param_scaled)
                     elif param.combinePrior == "shapeN":
+                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
+                    elif param.combinePrior == "shapeU":
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     elif param.combinePrior == "lnN":
                         # TODO: ensure scalar effect
