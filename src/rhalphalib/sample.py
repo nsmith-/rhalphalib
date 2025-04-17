@@ -225,7 +225,12 @@ class TemplateSample(Sample):
             effect_up, binning, _ = _to_numpy(effect_up)
             if not np.array_equal(binning, self.observable.binning):
                 raise ValueError("effect_up has incompatible binning with sample %r" % self)
-            zerobins = (self._nominal <= 0.0) | (effect_up <= 0.0)
+            zerobins_nominal = (self._nominal <= 0.0) | np.isclose(self._nominal, 0.0)
+            zerobins_effect = (effect_up <= 0.0) | np.isclose(effect_up, 0.0)
+            _fraction_non_matching = sum(~zerobins_nominal == ~zerobins_effect) / len(zerobins_nominal)
+            if _fraction_non_matching <= 0.85 and not nowarn:
+                logging.warning(f"effect_up ({param.name}, {self._name}) has filled bins not matching with the nominal ({_fraction_non_matching * 100}%) - vertical morphing will be wonky.")
+            zerobins = zerobins_nominal | zerobins_effect
             effect_up[zerobins] = 1.0
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
@@ -256,7 +261,12 @@ class TemplateSample(Sample):
                 effect_down, binning, _ = _to_numpy(effect_down)
                 if not np.array_equal(binning, self.observable.binning):
                     raise ValueError("effect_down has incompatible binning with sample %r" % self)
-                zerobins = (self._nominal <= 0.0) | (effect_down <= 0.0)
+                zerobins_nominal = (self._nominal <= 0.0) | np.isclose(self._nominal, 0.0)
+                zerobins_effect = (effect_down <= 0.0) | np.isclose(effect_down, 0.0)
+                _fraction_non_matching = sum(~zerobins_nominal == ~zerobins_effect) / len(zerobins_nominal)
+                if _fraction_non_matching <= 0.85 and not nowarn:
+                    logging.warning(f"effect_up ({param.name}, {self._name}) has filled bins not matching with the nominal ({_fraction_non_matching * 100}%) - vertical morphing will be wonky.")
+                zerobins = zerobins_nominal | zerobins_effect
                 effect_down[zerobins] = 1.0
                 effect_down[~zerobins] /= self._nominal[~zerobins]
                 if np.sum(effect_down * self._nominal) <= 0:
@@ -264,6 +274,8 @@ class TemplateSample(Sample):
                     # we might even want some sort of threshold
                     return
                 elif np.all(effect_up == 1.0) and np.all(effect_down == 1.0):
+                    logging.warning(f"effect_down ({param.name}, {self._name}) = 1 and has no effect, skipping")
+                    del self._paramEffectsUp[param]
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
@@ -380,8 +392,10 @@ class TemplateSample(Sample):
                     continue
                 if param in self._paramEffectScales:
                     param_scaled = param * self._paramEffectScales[param]
+                    param_scale = self._paramEffectScales[param]
                 else:
                     param_scaled = param
+                    param_scale = 1.0
                 if isinstance(effect_up, DependentParameter):
                     out = out * effect_up
                 elif self._paramEffectsDown[param] is None:
@@ -396,10 +410,12 @@ class TemplateSample(Sample):
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
                 else:
                     effect_down = self.getParamEffect(param, up=False)
-                    smoothStep = SmoothStep(param_scaled)
+                    smoothStep = SmoothStep(param) * param_scale
                     if param.combinePrior == "shape":
                         combined_effect = smoothStep * (1 + (effect_up - 1) * param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1) * param_scaled)
                     elif param.combinePrior == "shapeN":
+                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
+                    elif param.combinePrior == "shapeU":
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     elif param.combinePrior == "lnN":
                         # TODO: ensure scalar effect
@@ -446,10 +462,14 @@ class TemplateSample(Sample):
                     continue
                 name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
+                if np.sum(shape) < 0:
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Up' with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
                 name = self.name + "_" + param.name + "Down"
                 shape = nominal * self.getParamEffect(param, up=False)
+                if np.sum(shape) < 0:
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Down with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
 
