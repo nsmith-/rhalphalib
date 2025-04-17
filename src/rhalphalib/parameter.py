@@ -13,6 +13,7 @@ class Parameter:
     def __init__(self, name: str, value):
         self._name = name
         self._value = value
+        self._initial_value = value
         self._hasPrior = False
         self._intermediate = False
 
@@ -35,6 +36,9 @@ class Parameter:
     @property
     def value(self):
         return self._value
+
+    def reset(self):
+        self._value = self._initial_value
 
     @property
     def intermediate(self):
@@ -328,10 +332,11 @@ class SmoothStep(DependentParameter):
 
     @property
     def value(self) -> float:
+        print("getting smoothstep value")
         return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     def formula(self, rendering=False):
-        return "((((0.1875**x - 0.625)*x*x + 0.9375)*x + 0.5)*(x > -1)*(x < 1) + 1*(x >= 1))".replace("x", "{%s}" % self.original_name)
+        return "(((0.1875*x*x - 0.625)*x*x + 0.9375)*x + 0.5)*(x > -1)*(x < 1) + 1*(x >= 1)".replace("x", "{%s}" % self.original_name)
 
     def renderRoofit(self, workspace):
         import ROOT
