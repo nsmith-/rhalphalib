@@ -332,7 +332,6 @@ class SmoothStep(DependentParameter):
 
     @property
     def value(self) -> float:
-        print("getting smoothstep value")
         return eval(self.formula().format(**{p.name: p.value for p in self.getDependents(deep=True)}))
 
     def formula(self, rendering=False):

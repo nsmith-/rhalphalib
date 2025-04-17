@@ -274,6 +274,8 @@ class TemplateSample(Sample):
                     # we might even want some sort of threshold
                     return
                 elif np.all(effect_up == 1.0) and np.all(effect_down == 1.0):
+                    logging.warning(f"effect_down ({param.name}, {self._name}) = 1 and has no effect, skipping")
+                    del self._paramEffectsUp[param]
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
@@ -460,10 +462,14 @@ class TemplateSample(Sample):
                     continue
                 name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
+                if np.sum(shape) < 0:
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Up' with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
                 name = self.name + "_" + param.name + "Down"
                 shape = nominal * self.getParamEffect(param, up=False)
+                if np.sum(shape) < 0:
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Down with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
 
