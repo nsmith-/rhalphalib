@@ -61,7 +61,7 @@ def test_rhalphabet(tmpdir):
         qcdpass += passCh.getObservation().sum()
 
     qcdeff = qcdpass / qcdfail
-    tf_MCtempl = rl.BernsteinPoly("tf_MCtempl", (2, 2), ["pt", "rho"], limits=(0, 10))
+    tf_MCtempl = rl.BasisPoly("tf_MCtempl", (2, 2), ["pt", "rho"], basis="Bernstein", limits=(0, 10))
     tf_MCtempl_params = qcdeff * tf_MCtempl(ptscaled, rhoscaled)
     for ptbin in range(npt):
         failCh = qcdmodel["ptbin%dfail" % ptbin]
@@ -104,7 +104,7 @@ def test_rhalphabet(tmpdir):
     decoVector = rl.DecorrelatedNuisanceVector.fromRooFitResult(tf_MCtempl.name + "_deco", qcdfit, param_names)
     tf_MCtempl.parameters = decoVector.correlated_params.reshape(tf_MCtempl.parameters.shape)
     tf_MCtempl_params_final = tf_MCtempl(ptscaled, rhoscaled)
-    tf_dataResidual = rl.BernsteinPoly("tf_dataResidual", (2, 2), ["pt", "rho"], limits=(0, 10))
+    tf_dataResidual = rl.BasisPoly("tf_dataResidual", (2, 2), ["pt", "rho"], basis="Bernstein", limits=(0, 10))
     tf_dataResidual_params = tf_dataResidual(ptscaled, rhoscaled)
     tf_params = qcdeff * tf_MCtempl_params_final * tf_dataResidual_params
 
