@@ -59,6 +59,16 @@ class Model:
     def parameters(self):
         return reduce(set.union, (c.parameters for c in self), set())
 
+    def getParameter(self, name: str) -> Optional[IndependentParameter]:
+        for p in self.parameters:
+            if p.name == name:
+                return p
+        raise KeyError("Parameter %r not found in channel %r" % (name, self))
+
+    def reset(self):
+        for p in self.parameters:
+            p.reset()
+
     def addChannel(self, channel: "Channel"):
         """Add a channel to the model.
 
@@ -282,6 +292,16 @@ class Channel:
     @property
     def parameters(self):
         return reduce(set.union, (s.parameters for s in self), set())
+
+    def getParameter(self, name: str) -> Optional[IndependentParameter]:
+        for p in self.parameters:
+            if p.name == name:
+                return p
+        raise KeyError("Parameter %r not found in channel %r" % (name, self))
+
+    def reset(self):
+        for p in self.parameters:
+            p.reset()
 
     @property
     def observable(self) -> Observable:
