@@ -125,6 +125,9 @@ class TemplateSample(Sample):
         force_positive: if True, negative values in the template will be set to 0
     """
 
+    EffectNonMatchingThreshold = 0.85  # Threshold for the number of bins that are filled both in nominal and effect_up/down shape
+    EffectMagnitudeThreshold = 0.5  # Threshold for the effect magnitude to trigger a warning
+
     def __init__(self, name: str, sampletype: int, template, force_positive: bool = False):
         super(TemplateSample, self).__init__(name, sampletype)
         sumw2 = None
@@ -217,7 +220,7 @@ class TemplateSample(Sample):
             raise ValueError(f"Parameter '{param.name}' already exists in sample '{self.name}': {sorted([p.name for p in self.parameters])}")
         if isinstance(effect_up, np.ndarray):
             if len(effect_up) != self.observable.nbins:
-                raise ValueError("effect_up has the wrong number of bins (%d, expected %d)" % (len(effect_up), self.observable.nbins))
+                raise ValueError(f"effect_up has the wrong number of bins ({len(effect_up)}, expected {self.observable.nbins})")
         elif isinstance(effect_up, numbers.Number):
             if "shape" in param.combinePrior:
                 effect_up = np.full(self.observable.nbins, effect_up)
@@ -228,32 +231,30 @@ class TemplateSample(Sample):
             zerobins_nominal = (self._nominal <= 0.0) | np.isclose(self._nominal, 0.0)
             zerobins_effect = (effect_up <= 0.0) | np.isclose(effect_up, 0.0)
             _fraction_non_matching = sum(~zerobins_nominal == ~zerobins_effect) / len(zerobins_nominal)
-            if _fraction_non_matching <= 0.85 and not nowarn:
+            if _fraction_non_matching <= self.EffectNonMatchingThreshold and not nowarn:
                 logging.warning(f"effect_up ({param.name}, {self._name}) has filled bins not matching with the nominal ({_fraction_non_matching * 100}%) - vertical morphing will be wonky.")
             zerobins = zerobins_nominal | zerobins_effect
             effect_up[zerobins] = 1.0
             effect_up[~zerobins] /= self._nominal[~zerobins]
         if np.sum(effect_up * self._nominal) <= 0:
-            logging.warning("effect_up ({}, {}) has magnitude less than 0, skipping".format(param.name, self._name))
+            logging.warning(f"effect_up ({param.name}, {self._name}) has magnitude less than 0, skipping")
             # raise error instead?
             return
         elif effect_down is None and np.all(effect_up == 1.0):
-            logging.warning("effect_up ({}, {}) = 1 and has no effect, skipping".format(param.name, self._name))
+            logging.warning(f"effect_up ({param.name}, {self._name}) = 1 and has no effect, skipping")
             # raise error instead?
             return
         _weighted_effect_magnitude = np.sum(abs(effect_up - 1) * self._nominal) / np.sum(self._nominal)
-        if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
+        if "shape" in param.combinePrior and _weighted_effect_magnitude > self.EffectMagnitudeThreshold and not nowarn:
             logging.warning(
-                "effect_up ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
-                    param.name, self._name, _weighted_effect_magnitude * 100
-                )
+                f"effect_up ({param.name}, {self._name}) has magnitude greater than {round(100 * self.EffectMagnitudeThreshold)}% ({_weighted_effect_magnitude * 100:.2f}%), you might be passing absolute values instead of relative"
             )
         self._paramEffectsUp[param] = effect_up
 
         if effect_down is not None:
             if isinstance(effect_down, np.ndarray):
                 if len(effect_down) != self.observable.nbins:
-                    raise ValueError("effect_down has the wrong number of bins (%d, expected %d)" % (len(effect_down), self.observable.nbins))
+                    raise ValueError(f"effect_down has the wrong number of bins ({len(effect_down)}, expected {self.observable.nbins})")
             elif isinstance(effect_down, numbers.Number):
                 if "shape" in param.combinePrior:
                     effect_down = np.full(self.observable.nbins, effect_down)
@@ -264,8 +265,8 @@ class TemplateSample(Sample):
                 zerobins_nominal = (self._nominal <= 0.0) | np.isclose(self._nominal, 0.0)
                 zerobins_effect = (effect_down <= 0.0) | np.isclose(effect_down, 0.0)
                 _fraction_non_matching = sum(~zerobins_nominal == ~zerobins_effect) / len(zerobins_nominal)
-                if _fraction_non_matching <= 0.85 and not nowarn:
-                    logging.warning(f"effect_up ({param.name}, {self._name}) has filled bins not matching with the nominal ({_fraction_non_matching * 100}%) - vertical morphing will be wonky.")
+                if _fraction_non_matching <= self.EffectNonMatchingThreshold and not nowarn:
+                    logging.warning(f"effect_down ({param.name}, {self._name}) has filled bins not matching with the nominal ({_fraction_non_matching * 100}%) - vertical morphing will be wonky.")
                 zerobins = zerobins_nominal | zerobins_effect
                 effect_down[zerobins] = 1.0
                 effect_down[~zerobins] /= self._nominal[~zerobins]
@@ -279,11 +280,9 @@ class TemplateSample(Sample):
                     # some sort of threshold might be useful here as well
                     return
             _weighted_effect_magnitude = np.sum(abs(effect_down - 1) * self._nominal) / np.sum(self._nominal)
-            if "shape" in param.combinePrior and _weighted_effect_magnitude > 0.5 and not nowarn:
+            if "shape" in param.combinePrior and _weighted_effect_magnitude > self.EffectMagnitudeThreshold and not nowarn:
                 logging.warning(
-                    "effect_down ({}, {}) has magnitude greater than 50% ({:.2f}%), you might be passing absolute values instead of relative".format(
-                        param.name, self._name, _weighted_effect_magnitude * 100
-                    )
+                    f"effect_down ({param.name}, {self._name}) has magnitude greater than {round(100 * self.EffectMagnitudeThreshold)}% ({_weighted_effect_magnitude * 100:.2f}%), you might be passing absolute values instead of relative"
                 )
             self._paramEffectsDown[param] = effect_down
         else:
@@ -413,12 +412,8 @@ class TemplateSample(Sample):
                     smoothStep = SmoothStep(param) * param_scale
                     if param.combinePrior == "shape":
                         combined_effect = smoothStep * (1 + (effect_up - 1) * param_scaled) + (1 - smoothStep) * (1 - (effect_down - 1) * param_scaled)
-                    elif param.combinePrior == "shapeN":
-                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
-                    elif param.combinePrior == "shapeU":
-                        combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
-                    elif param.combinePrior == "lnN":
-                        # TODO: ensure scalar effect
+                    elif param.combinePrior in ["shapeN", "shapeU", "lnN"]:
+                        # TODO: ensure scalar effect for lnN
                         combined_effect = smoothStep * (effect_up**param_scaled) + (1 - smoothStep) / (effect_down**param_scaled)
                     else:
                         raise NotImplementedError("per-bin effects for other nuisance parameter types")
@@ -463,13 +458,13 @@ class TemplateSample(Sample):
                 name = self.name + "_" + param.name + "Up"
                 shape = nominal * effect_up
                 if np.sum(shape) < 0:
-                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Up' with value {shape}. Can't build workspace.")
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}Up' with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
                 name = self.name + "_" + param.name + "Down"
                 shape = nominal * self.getParamEffect(param, up=False)
                 if np.sum(shape) < 0:
-                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}-Down with value {shape}. Can't build workspace.")
+                    raise RuntimeError(f"Sample '{self.name}' has negative shape for parameter '{param.name}Down with value {shape}. Can't build workspace.")
                 rooTemplate = ROOT.RooDataHist(name, name, ROOT.RooArgList(rooObservable), _to_TH1(shape, self.observable.binning, self.observable.name))
                 workspace.add(rooTemplate)
 
