@@ -1,6 +1,8 @@
 from typing import Callable, List, Optional, Tuple
+from collections import OrderedDict
 import numpy as np
 from scipy.special import binom
+from scipy.linalg import block_diag
 import numbers
 import warnings
 from .parameter import IndependentParameter, NuisanceParameter, DependentParameter
@@ -38,6 +40,12 @@ def matrix_poly(n: int):
     return np.identity(n + 1)
 
 
+def svd_transform(cov):
+    _, s, v = np.linalg.svd(cov)
+    _transform = np.sqrt(s)[:, None] * v
+    return _transform
+
+
 def params_from_roofit(fitresult, param_names=None):
     install_roofit_helpers()
     names = [p.GetName() for p in fitresult.floatParsFinal()]
@@ -50,32 +58,33 @@ def params_from_roofit(fitresult, param_names=None):
     return means, cov
 
 
-def sum_terms(params, coefs, shape):
-    return (params * coefs).sum(axis=1).reshape(shape)
+def get_parvalues(params):
+    return np.vectorize(lambda p: p.value)(params)
 
 
-def compute_band(params, coefs, shape, cov):
+def compute_band(obj, shape, coefficients, central):
     """
     This computation follows the linearized error propagation method used in RooAbsReal::plotOnWithErrorBand() and RooCurve::calcBandInterval()
     err(x) = F(x,a) C_ab F(x,b)
     where F(x,a) = (f(x,a+da) - f(x,a-da))/2 (numerical partial derivative) and C_ab is the correlation matrix
     """
     # compute correlation matrix
-    std = np.sqrt(np.diag(cov))
-    corr = cov / std[:, None] / std[None, :]
+    std = np.sqrt(np.diag(obj._cov))
+    corr = obj._cov / std[:, None] / std[None, :]
     # compute gradients
     plus_vars = []
     minus_vars = []
+    params = obj.flat_parameters
     for i, par in enumerate(params):
-        val = par
-        err = np.sqrt(cov[i, i])
+        val = par.value
+        err = np.sqrt(obj._cov[i, i])
         # temporarily vary param
-        params[i] = val + err
-        plus_vars.append(sum_terms(params, coefs, shape))
-        params[i] = val - err
-        minus_vars.append(sum_terms(params, coefs, shape))
+        obj.set_par_by_name(par.name, val + err)
+        plus_vars.append(obj._eval(shape, coefficients))
+        obj.set_par_by_name(par.name, val - err)
+        minus_vars.append(obj._eval(shape, coefficients))
         # reset to central value
-        params[i] = val
+        obj.set_par_by_name(par.name, val)
     # flatten
     plus_vars = np.stack(plus_vars).reshape(len(params), -1)
     minus_vars = np.stack(minus_vars).reshape(len(params), -1)
@@ -85,8 +94,7 @@ def compute_band(params, coefs, shape, cov):
     def proj(F):
         return F.T @ corr @ F
 
-    central = sum_terms(params, coefs, shape)
-    err2 = np.apply_along_axis(proj, 1, F.T).reshape(shape)
+    err2 = np.apply_along_axis(proj, 1, F.T).reshape(central.shape)
     lo = central + np.sqrt(err2)
     hi = central - np.sqrt(err2)
     return lo, hi
@@ -189,13 +197,17 @@ class BasisPoly:
     def parameters(self):
         return self._params
 
+    @property
+    def flat_parameters(self):
+        return self._params.reshape(-1)
+
     @parameters.setter
     def parameters(self, newparams):
         if not isinstance(newparams, np.ndarray):
             raise ValueError("newparams should be numpy array")
         elif newparams.shape != self._params.shape:
             raise ValueError("newparams shape does not match")
-        for pnew, pold in zip(newparams.reshape(-1), self._params.reshape(-1)):
+        for pnew, pold in zip(newparams.reshape(-1), self.flat_parameters):
             pnew.name = pold.name
             # probably worth caching
             if pnew.intermediate:
@@ -204,17 +216,44 @@ class BasisPoly:
         # covariance is invalidated whenever parameters are changed
         self._cov = None
 
-    def update_from_roofit(self, fit_result, from_deco=False):
-        par_names = sorted([p for p in fit_result.floatParsFinal().contentsString().split(",") if self.name in p])
-        means, cov = params_from_roofit(fit_result, par_names)
-        par_results = {p: round(means[i], 3) for i, p in enumerate(par_names)}
-        for par in self._params.reshape(-1):
-            par.value = par_results[par.name]
-        self._cov = cov
+    def update_from_roofit(self, fit_result, transform=None, deco_name=None):
+        if (transform is None) ^ (deco_name is None):
+            raise ValueError("both transform and deco_name must be provided")
+
+        def update_obj_from_roofit(obj):
+            # order is important for transforms
+            fit_result_pars = fit_result.floatParsFinal().contentsString().split(",")
+            par_names = [p.name for p in obj.flat_parameters]
+            missing_pars = [p for p in par_names if p not in fit_result_pars]
+            if len(missing_pars) > 0:
+                raise ValueError("Some function parameters missing from fit result: " + ",".join(missing_pars))
+            means, cov = params_from_roofit(fit_result, par_names)
+            par_results = {p: round(means[i], 3) for i, p in enumerate(par_names)}
+            for par in obj.flat_parameters:
+                par.value = par_results[par.name]
+            obj._cov = cov
+            return obj
+
+        if transform is not None and deco_name is not None:
+            decoVector = DecorrelatedNuisanceVector(deco_name, np.array([p.value for p in self.flat_parameters]), transform=transform)
+            decoVector = update_obj_from_roofit(decoVector)
+            # update parameter values using deco formulas
+            self.set_parvalues([p.value for p in decoVector.correlated_params.reshape(-1)])
+            # covariance matrix order follows decoVector._parameters, not argsort(abs(transform coef))
+            self._cov = transform @ decoVector._cov @ transform.T
+            # save in case of later use by ProductBasisPoly
+            self._decoVector = decoVector
+        else:
+            update_obj_from_roofit(self)
 
     def set_parvalues(self, parvalues):
-        for par, new_val in zip(self._params.reshape(-1), parvalues):
+        for par, new_val in zip(self.flat_parameters, parvalues):
             par.value = new_val
+
+    def set_par_by_name(self, parname, parvalue):
+        for par in self.flat_parameters:
+            if par.name == parname:
+                par.value = parvalue
 
     def coefficients(self, *xvals):
         # evaluate polynomial product tensor
@@ -227,14 +266,8 @@ class BasisPoly:
             bpolyval = self._transform(bpolyval)
         return bpolyval
 
-    def __call__(self, *vals, nominal: bool = False, errorband: bool = False):
-        """Evaluate the polynomial at the given values
-
-        Parameters:
-            vals: a ndarray for each dimension's values to evaluate the polynomial at
-            nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
-            errorband: set true to output error band along with nominal
-        """
+    def _prepare(self, *vals):
+        # prepare for __call__ below
         if len(vals) != len(self._order):
             raise ValueError("Not all dimension values specified")
         xvals = []
@@ -243,26 +276,43 @@ class BasisPoly:
             if isinstance(x, numbers.Number):
                 x = np.array(x)
             if not np.all((x >= 0) & (x <= 1)):
-                raise ValueError("Bernstein polynomials are only defined on the interval [0, 1]")
+                raise ValueError("Basis polynomials are only defined on the interval [0, 1]")
             if shape is None:
                 shape = x.shape
             elif shape != x.shape:
-                raise ValueError("BernsteinPoly: all variables must have same shape")
+                raise ValueError("BasisPoly: all variables must have same shape")
             xvals.append(x.flatten())
 
-        parameters = self._params.reshape(-1)
-        coefficients = self.coefficients(*xvals).reshape(-1, parameters.size)
+        coefficients = self.coefficients(*xvals).reshape(-1, self.flat_parameters.size)
+
+        return xvals, shape, coefficients
+
+    def _eval(self, shape, coefficients):
+        parameters = get_parvalues(self.flat_parameters)
+        nominal_vals = (parameters * coefficients).sum(axis=1).reshape(shape)
+        return nominal_vals
+
+    def __call__(self, *vals, nominal: bool = False, errorband: bool = False):
+        """Evaluate the polynomial at the given values
+
+        Parameters:
+            vals: a ndarray for each dimension's values to evaluate the polynomial at
+            nominal: set true to evaluate nominal polynomial (rather than create DependentParameter objects)
+            errorband: set true to output error band along with nominal
+        """
+        xvals, shape, coefficients = self._prepare(*vals)
+
         if nominal:
-            parameters = np.vectorize(lambda p: p.value)(parameters)
-            nominal_vals = sum_terms(parameters, coefficients, shape)
+            nominal_vals = self._eval(shape, coefficients)
             if errorband:
                 if self._cov is None:
                     raise RuntimeError("Can only compute error band after covariance matrix loaded using update_from_roofit()")
-                band = compute_band(parameters, coefficients, shape, self._cov)
+                band = compute_band(self, shape, coefficients, nominal_vals)
                 return nominal_vals, band
             else:
                 return nominal_vals
 
+        parameters = self.flat_parameters
         out = np.full(coefficients.shape[0], None)
         for i in range(coefficients.shape[0]):
             # sum small coefficients first
@@ -285,6 +335,113 @@ class BernsteinPoly(BasisPoly):
         warnings.warn("BernsteinPoly is deprecated. Consider switching to BasisPoly(..., basis='Bernstein', ...)")
 
 
+class ProductBasisPoly:
+    """Composite function representing the product of multiple BasisPoly objects.
+
+    Supports a subset of BasisPoly interface.
+
+    Parameters:
+        name: will be used to prefix any RooFit object names
+        factors: list of BasisPoly objects that are multiplied together
+    """
+
+    def __init__(self, name, factors):
+        if not factors:
+            raise ValueError("ProductBasisPoly requires at least one BasisPoly factor")
+        self._functions = list(factors)
+
+        # deterministic parameter aggregation with deduplication
+        param_dict = OrderedDict()
+        dim_names = []
+        for f in self._functions:
+            if not isinstance(f, BasisPoly):
+                raise TypeError("All factors must be BasisPoly instances")
+            for p in f.parameters:
+                if p.name not in param_dict:
+                    param_dict[p.name] = p
+            for d in f.dim_names:
+                if d not in dim_names:
+                    dim_names.append(d)
+        self._params = np.array(list(param_dict.values()))
+        self._dim_names = dim_names
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def parameters(self):
+        return self._params
+
+    @property
+    def flat_parameters(self):
+        return self._params.reshape(-1)
+
+    @property
+    def dim_names(self):
+        return self._dim_names
+
+    def set_par_by_name(self, parname, parvalue):
+        for f in self._functions:
+            f.set_par_by_name(parname, parvalue)
+
+    def update_from_roofit(self, fit_result, transforms=None, deco_names=None):
+        if transforms is None:
+            transforms = {}
+        if deco_names is None:
+            deco_names = {}
+        # call for each factor to update parameter values and handle any deco
+        all_par_names = []
+        all_transforms = []
+        for f in self._functions:
+            transform = transforms.get(f.name, None)
+            f.update_from_roofit(fit_result, transform, deco_names.get(f.name, None))
+            # if f updated from deco, then cov will be in terms of decorrelated parameters
+            f_pars = f._decoVector.flat_parameters if hasattr(f, "_decoVector") else f.flat_parameters
+            all_par_names.extend([par.name for par in f_pars])
+            if transform is None:
+                transform = np.eye(len(f_pars))
+            all_transforms.append(transform)
+
+        # get complete covariance matrix and transform into final (dependent) parameter representation
+        full_transform = block_diag(*all_transforms)
+        fit_result_pars = fit_result.floatParsFinal().contentsString().split(",")
+        missing_pars = [p for p in all_par_names if p not in fit_result_pars]
+        if len(missing_pars) > 0:
+            raise ValueError("Some function parameters missing from fit result: " + ",".join(missing_pars))
+        _, cov = params_from_roofit(fit_result, all_par_names)
+        self._cov = full_transform @ cov @ full_transform.T
+
+    def _eval(self, shape, coefficients):
+        for ifn, f in enumerate(self._functions):
+            tmp = f._eval(shape[ifn], coefficients[ifn])
+            if ifn == 0:
+                results = tmp
+            else:
+                results *= tmp
+        return results
+
+    def __call__(self, *vals, nominal: bool = True, errorband: bool = False):
+        if not nominal:
+            raise ValueError("ProductBasisPoly currently does not implement nominal=False")
+
+        prepared = []
+        for f in self._functions:
+            # get x values only for dimensions used in this function
+            f_dim_indices = [self._dim_names.index(d) for d in f.dim_names]
+            vals_for_f = [vals[i] for i in f_dim_indices]
+            prepared.append(f._prepare(*vals_for_f))
+        _, shape, coefficients = zip(*prepared)
+        nominal_vals = self._eval(shape, coefficients)
+        if errorband:
+            if self._cov is None:
+                raise RuntimeError("Can only compute error band after covariance matrix loaded using update_from_roofit()")
+            band = compute_band(self, shape, coefficients, nominal_vals)
+            return nominal_vals, band
+        else:
+            return nominal_vals
+
+
 class DecorrelatedNuisanceVector:
     """A decorrelated nuisance vector
 
@@ -297,18 +454,31 @@ class DecorrelatedNuisanceVector:
         prefix: a prefix for the names of the parameters
         param_in: a numpy array of means for the nuisance parameters
         param_cov: a numpy array of covariance matrix for the nuisance parameters
+                   (mutually exclusive with transform)
+        transform: a numpy array of coefficients, derived from the singular value decomposition of the covariance matrix of the nuisance parameters
+                   (mutually exclusive with param_cov)
     """
 
-    def __init__(self, prefix: str, param_in: np.ndarray, param_cov: np.ndarray):
+    def __init__(self, prefix: str, param_in: np.ndarray, param_cov: np.ndarray = None, transform: np.ndarray = None):
         if not isinstance(param_in, np.ndarray):
             raise ValueError("Expecting param_in to be numpy array")
-        if not isinstance(param_cov, np.ndarray):
+        if param_cov is not None and not isinstance(param_cov, np.ndarray):
             raise ValueError("Expecting param_cov to be numpy array")
-        if not (len(param_in.shape) == 1 and len(param_cov.shape) == 2 and param_cov.shape[0] == param_in.shape[0] and param_cov.shape[1] == param_in.shape[0]):
-            raise ValueError("param_in and param_cov have mismatched shapes")
+        if transform is not None and not isinstance(transform, np.ndarray):
+            raise ValueError("Expecting transform to be numpy array")
+        if param_cov is not None and transform is not None:
+            raise ValueError("param_cov and transform are mutually exclusive, pick one")
+        if param_cov is None and transform is None:
+            raise ValueError("Exactly one of param_cov or transform is required")
 
-        _, s, v = np.linalg.svd(param_cov)
-        self._transform = np.sqrt(s)[:, None] * v
+        def compare_shape(param_in, cov_or_transform):
+            if not (len(param_in.shape) == 1 and len(cov_or_transform.shape) == 2 and cov_or_transform.shape[0] == param_in.shape[0] and cov_or_transform.shape[1] == param_in.shape[0]):
+                raise ValueError("param_in and param_cov (or transform) have mismatched shapes")
+
+        compare_shape(param_in, transform if transform is not None else param_cov)
+
+        self.name = prefix
+        self._transform = transform if transform is not None else svd_transform(param_cov)
         self._parameters = np.array([NuisanceParameter(prefix + str(i + 1), "param") for i in range(param_in.size)])
         self._correlated = np.full(self._parameters.shape, None)
         for i in range(self._parameters.size):
@@ -327,7 +497,8 @@ class DecorrelatedNuisanceVector:
                 all parameters in the fit result will be included.
         """
         means, cov = params_from_roofit(fitresult, param_names)
-        out = cls(prefix, means, cov)
+        transform = svd_transform(cov)
+        out = cls(prefix, means, transform=transform)
         if param_names is not None:
             for p, name in zip(out.correlated_params, param_names):
                 p.name = name
@@ -336,6 +507,10 @@ class DecorrelatedNuisanceVector:
     @property
     def parameters(self):
         return self._parameters
+
+    @property
+    def flat_parameters(self):
+        return self._parameters.reshape(-1)
 
     @property
     def correlated_params(self):

@@ -18,6 +18,7 @@ from .parameter import (
 from .function import (
     BasisPoly,
     BernsteinPoly,
+    ProductBasisPoly,
     DecorrelatedNuisanceVector,
 )
 from .template_morph import (
@@ -40,6 +41,7 @@ __all__ = [
     "Parameter",
     "BasisPoly",
     "BernsteinPoly",
+    "ProductBasisPoly",
     "DecorrelatedNuisanceVector",
     "AffineMorphTemplate",
     "MorphHistW2",
