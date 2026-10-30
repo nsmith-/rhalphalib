@@ -13,7 +13,7 @@ nox.options.sessions = ["lint", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 
 
-@nox.session(python="3.9")
+@nox.session(python="3.12")
 def lint(session: nox.Session) -> None:
     """
     Run the linter.
